@@ -57,6 +57,8 @@ CreativeWriter is a modern web-based writing tool designed for fiction authors w
 
 ## ✨ Features
 
+> **🎉 Update:** All Docker images are now being published automatically!
+
 ### 📝 Story Management
 - **Multi-Story Support**: Manage multiple writing projects simultaneously
 - **Rich Text Editor**: Full-featured ProseMirror-based editor with formatting tools
