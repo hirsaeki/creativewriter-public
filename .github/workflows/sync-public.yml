@@ -9,6 +9,13 @@ jobs:
   sync-public:
     runs-on: ubuntu-latest
     if: github.repository == 'MarcoDroll/creativewriter2' # Only run on private repo
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      commit_hash: ${{ steps.version.outputs.commit_hash }}
+      commit_message: ${{ steps.version.outputs.commit_message }}
+      build_date: ${{ steps.version.outputs.build_date }}
     
     steps:
       - name: Checkout private repository
@@ -38,8 +45,109 @@ jobs:
           git push public temp-public-sync:main --force
           echo "✅ Successfully synced release branch to public repository main branch (without private development files)"
 
-      - name: Create release info
+      - name: Generate version and release info
+        id: version
         run: |
-          echo "Public repository updated at: $(date)"
-          echo "Latest commit: $(git rev-parse --short HEAD)"
-          echo "Commit message: $(git log -1 --pretty=%B)"
+          # Get current version from package.json
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          
+          # Generate new version using timestamp for uniqueness
+          TIMESTAMP=$(date +"%Y%m%d%H%M")
+          MAJOR_MINOR=$(echo $CURRENT_VERSION | cut -d. -f1-2)
+          NEW_VERSION="${MAJOR_MINOR}.${TIMESTAMP}"
+          
+          # Get commit info
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          # Set outputs
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "commit_hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
+          echo "commit_message=$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+          
+          echo "Generated version: v$NEW_VERSION"
+          echo "Commit: $COMMIT_HASH - $COMMIT_MESSAGE"
+
+  create-public-release:
+    needs: sync-public
+    runs-on: ubuntu-latest
+    if: needs.sync-public.result == 'success'
+    
+    steps:
+      - name: Create release in public repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          VERSION="${{ needs.sync-public.outputs.version }}"
+          COMMIT_HASH="${{ needs.sync-public.outputs.commit_hash }}"
+          COMMIT_MESSAGE="${{ needs.sync-public.outputs.commit_message }}"
+          BUILD_DATE="${{ needs.sync-public.outputs.build_date }}"
+          
+          # Create release notes
+          RELEASE_NOTES="$(cat <<EOF
+          ## 🚀 Automated Release v${VERSION}
+          
+          This release was automatically created from the private repository sync.
+          
+          ### 📋 Release Details
+          - **Version**: v${VERSION}
+          - **Build Date**: ${BUILD_DATE}
+          - **Source Commit**: ${COMMIT_HASH}
+          - **Commit Message**: ${COMMIT_MESSAGE}
+          
+          ### 📦 Docker Images
+          The following stable Docker images are being built and will be available shortly:
+          
+          - **Main Application**: \`ghcr.io/marcodroll/creativewriter-public:v${VERSION}\`
+          - **Proxy Service**: \`ghcr.io/marcodroll/creativewriter-public-proxy:v${VERSION}\`
+          - **Gemini Proxy**: \`ghcr.io/marcodroll/creativewriter-public-gemini-proxy:v${VERSION}\`
+          - **Nginx Reverse Proxy**: \`ghcr.io/marcodroll/creativewriter-public-nginx:v${VERSION}\`
+          
+          ### 🎯 Quick Start
+          \`\`\`bash
+          # Pull the stable images
+          docker pull ghcr.io/marcodroll/creativewriter-public:stable
+          docker pull ghcr.io/marcodroll/creativewriter-public-proxy:stable
+          docker pull ghcr.io/marcodroll/creativewriter-public-gemini-proxy:stable
+          docker pull ghcr.io/marcodroll/creativewriter-public-nginx:stable
+          \`\`\`
+          
+          ### 🔧 Features in this Release
+          - Multi-platform Docker images (AMD64, ARM64)
+          - Build provenance attestation and SBOM
+          - Automated stable image tagging
+          - Enhanced security and performance optimizations
+          
+          ---
+          🤖 This release was automatically created when the private repository was synced to public.
+          EOF
+          )"
+          
+          # Create the release in the public repository
+          gh release create "v${VERSION}" \
+            --repo MarcoDroll/creativewriter-public \
+            --title "v${VERSION} - Automated Sync Release" \
+            --notes "$RELEASE_NOTES" \
+            --latest
+          
+          echo "✅ Created release v${VERSION} in public repository"
+          echo "🔗 Release URL: https://github.com/MarcoDroll/creativewriter-public/releases/tag/v${VERSION}"
+
+      - name: Create sync summary
+        run: |
+          echo "# 🔄 Public Repository Sync Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Sync Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Private → Public Sync**: ✅ Successful" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Creation**: ✅ Successful" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Images**: 🔄 Building (triggered by release)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 New Release" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: v${{ needs.sync-public.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release URL**: [v${{ needs.sync-public.outputs.version }}](https://github.com/MarcoDroll/creativewriter-public/releases/tag/v${{ needs.sync-public.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Registry**: [GitHub Container Registry](https://github.com/MarcoDroll/creativewriter-public/pkgs/container/creativewriter-public)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎯 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "The release will automatically trigger the stable Docker images workflow in the public repository." >> $GITHUB_STEP_SUMMARY
