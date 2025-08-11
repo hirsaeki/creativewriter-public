@@ -36,11 +36,35 @@ jobs:
           
           # Create a temporary branch without development files for public sync
           git checkout -b temp-public-sync
+          
+          # Copy the public docker-compose.yml to replace the private one
+          if [ -f "docker-compose.public.yml" ]; then
+            cp docker-compose.public.yml docker-compose.yml
+            git add docker-compose.yml
+            echo "✅ Replaced docker-compose.yml with public version"
+          fi
+          
+          # Copy the public Docker workflow file before removing .github
+          mkdir -p .github-public/workflows
+          if [ -f ".github/workflows/docker-public-images.yml" ]; then
+            cp .github/workflows/docker-public-images.yml .github-public/workflows/docker-build.yml
+            echo "✅ Copied public Docker workflow"
+          fi
+          
           git rm -r .github/ || true  # Remove workflow files
           git rm -r .claude/ || true  # Remove Claude development files
           git rm -r .vscode/ || true  # Remove VS Code settings
           git rm -r .claudescreenshots/ || true  # Remove Claude screenshots
-          git commit -m "Remove private development files for public sync" || true
+          git rm docker-compose.public.yml || true  # Remove the public compose file itself
+          
+          # Move the public workflow back to .github
+          if [ -d ".github-public" ]; then
+            mv .github-public .github
+            git add .github/
+            echo "✅ Added public workflow files"
+          fi
+          
+          git commit -m "Remove private development files and update docker-compose for public sync" || true
           
           git push public temp-public-sync:main --force
           echo "✅ Successfully synced release branch to public repository main branch (without private development files)"

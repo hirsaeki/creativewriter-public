@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: ghcr.io/marcodroll/creativewriter-public-nginx:latest
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3080}:80"  # Port can be overridden via .env, defaults to 3080
+    depends_on:
+      - creativewriter
+      - couchdb
+      - replicate-proxy
+      - gemini-proxy
+    networks:
+      - creativewriter-network
+
+  creativewriter:
+    image: ghcr.io/marcodroll/creativewriter-public:latest
+    restart: unless-stopped
+    # No ports exposed directly - only through nginx
+    environment:
+      - TZ=${TZ:-Europe/Berlin}  # Timezone can be overridden via .env
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - creativewriter-network
+    depends_on:
+      - couchdb
+
+  couchdb:
+    image: couchdb:3.3
+    restart: unless-stopped
+    # No ports exposed directly - only through nginx
+    environment:
+      - COUCHDB_USER=${COUCHDB_USER:-admin}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD:-password}  # Change this in production!
+      - COUCHDB_SECRET=${COUCHDB_SECRET:-mysecret}    # Change this in production!
+    volumes:
+      - ${DATA_PATH:-./data}/couchdb-data:/opt/couchdb/data
+      - ${DATA_PATH:-./data}/log/couchdb_log:/opt/couchdb/var/log
+    networks:
+      - creativewriter-network
+
+  replicate-proxy:
+    image: ghcr.io/marcodroll/creativewriter-public-proxy:latest
+    restart: unless-stopped
+    environment:
+      - PORT=3001
+    networks:
+      - creativewriter-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  gemini-proxy:
+    image: ghcr.io/marcodroll/creativewriter-public-gemini-proxy:latest
+    restart: unless-stopped
+    environment:
+      - PORT=3002
+    networks:
+      - creativewriter-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+networks:
+  creativewriter-network:
+    driver: bridge
