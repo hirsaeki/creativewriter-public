@@ -114,9 +114,9 @@ CreativeWriter is built with modern web technologies:
 
 ### Quick Start with Docker
 
-> **⚠️ Note:** Pre-built Docker images are currently being set up. For now, you'll need to build the images locally.
+> **⚠️ Note:** Currently only the main application image is published (`ghcr.io/marcodroll/creativewriter-public:latest`). The nginx, proxy, and gemini-proxy images still need to be built locally.
 
-#### Option 1: Build Images Locally (Recommended for now)
+#### Option 1: Build Images Locally (Required for complete setup)
 ```bash
 # Clone the repository
 git clone https://github.com/MarcoDroll/creativewriter2.git
@@ -134,13 +134,14 @@ docker compose up -d
 # Access at http://localhost:3080
 ```
 
-#### Option 2: Use Pre-built Images (Coming Soon)
-Once the public images are available:
+#### Option 2: Mixed Approach (Coming Soon)
+Once all images are published:
 ```bash
 mkdir creativewriter && cd creativewriter
 curl -O https://raw.githubusercontent.com/MarcoDroll/creativewriter-public/main/docker-compose.yml
 docker compose up -d
 ```
+Note: This will work once all supporting service images are published.
 
 Then configure your AI providers in Settings with your API keys.
 
@@ -237,13 +238,14 @@ See [README-MULTI-INSTANCE.md](README-MULTI-INSTANCE.md) for detailed multi-inst
 
 ## 📦 Docker Images
 
-> **Note:** Pre-built public images are being set up. Currently, you need to build images locally using the Dockerfiles in this repository.
+> **Current Status:** Main application image is published. Supporting service images coming soon.
 
-Docker images to build:
-- `Dockerfile` - Main application
-- `Dockerfile.nginx` - Nginx reverse proxy
-- `Dockerfile.proxy` - Replicate API proxy
-- `Dockerfile.gemini-proxy` - Gemini API proxy
+| Image | Status | Registry Path |
+|-------|--------|--------------|
+| Main Application | ✅ Published | `ghcr.io/marcodroll/creativewriter-public:latest` |
+| Nginx Proxy | ⚠️ Build locally | Use `Dockerfile.nginx` |
+| Replicate Proxy | ⚠️ Build locally | Use `Dockerfile.proxy` |
+| Gemini Proxy | ⚠️ Build locally | Use `Dockerfile.gemini-proxy` |
 
 ## 🛠️ Development
 
