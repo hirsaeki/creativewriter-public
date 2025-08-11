@@ -112,32 +112,37 @@ CreativeWriter is built with modern web technologies:
 
 ## 🚀 Getting Started
 
-### Quick Start with Docker (No Cloning Required!)
+### Quick Start with Docker
 
-1. **Create a directory for your instance**
-   ```bash
-   mkdir creativewriter && cd creativewriter
-   ```
+> **⚠️ Note:** Pre-built Docker images are currently being set up. For now, you'll need to build the images locally.
 
-2. **Download docker-compose.yml**
-   ```bash
-   curl -O https://raw.githubusercontent.com/MarcoDroll/creativewriter-public/main/docker-compose.yml
-   ```
+#### Option 1: Build Images Locally (Recommended for now)
+```bash
+# Clone the repository
+git clone https://github.com/MarcoDroll/creativewriter2.git
+cd creativewriter2
 
-3. **Start the application**
-   ```bash
-   docker compose up -d
-   ```
+# Build all Docker images
+docker build -t ghcr.io/marcodroll/creativewriter2:latest .
+docker build -t ghcr.io/marcodroll/creativewriter2-nginx:latest -f Dockerfile.nginx .
+docker build -t ghcr.io/marcodroll/creativewriter2-proxy:latest -f Dockerfile.proxy .
+docker build -t ghcr.io/marcodroll/creativewriter2-gemini-proxy:latest -f Dockerfile.gemini-proxy .
 
-4. **Access CreativeWriter**
-   ```
-   http://localhost:3080
-   ```
+# Start the application
+docker compose up -d
 
-5. **Configure your AI providers**
-   - Open Settings in the app
-   - Add your API keys for OpenRouter, Google Gemini, or Replicate
-   - Start writing with AI assistance!
+# Access at http://localhost:3080
+```
+
+#### Option 2: Use Pre-built Images (Coming Soon)
+Once the public images are available:
+```bash
+mkdir creativewriter && cd creativewriter
+curl -O https://raw.githubusercontent.com/MarcoDroll/creativewriter-public/main/docker-compose.yml
+docker compose up -d
+```
+
+Then configure your AI providers in Settings with your API keys.
 
 ### Development Setup
 
@@ -186,15 +191,19 @@ The application uses PouchDB for local storage with optional CouchDB sync:
 
 ### Prerequisites
 - Docker and Docker Compose installed
-- No need to clone the repository
+- Git (for cloning the repository)
 - ~500MB-1GB RAM per instance
 - Port 3080 available (or configure a different port)
 
 ### Single Instance
-Simply download and run:
+Build and run locally:
 ```bash
-mkdir creativewriter && cd creativewriter
-curl -O https://raw.githubusercontent.com/MarcoDroll/creativewriter-public/main/docker-compose.yml
+git clone https://github.com/MarcoDroll/creativewriter2.git
+cd creativewriter2
+docker build -t ghcr.io/marcodroll/creativewriter2:latest .
+docker build -t ghcr.io/marcodroll/creativewriter2-nginx:latest -f Dockerfile.nginx .
+docker build -t ghcr.io/marcodroll/creativewriter2-proxy:latest -f Dockerfile.proxy .
+docker build -t ghcr.io/marcodroll/creativewriter2-gemini-proxy:latest -f Dockerfile.gemini-proxy .
 docker compose up -d
 ```
 Then configure your AI API keys in Settings after accessing the app at http://localhost:3080.
@@ -203,15 +212,21 @@ Then configure your AI API keys in Settings after accessing the app at http://lo
 Run multiple isolated instances on the same host:
 
 ```bash
+# Clone once
+git clone https://github.com/MarcoDroll/creativewriter2.git creativewriter-base
+cd creativewriter-base
+
+# Build images once
+docker build -t ghcr.io/marcodroll/creativewriter2:latest .
+docker build -t ghcr.io/marcodroll/creativewriter2-nginx:latest -f Dockerfile.nginx .
+docker build -t ghcr.io/marcodroll/creativewriter2-proxy:latest -f Dockerfile.proxy .
+docker build -t ghcr.io/marcodroll/creativewriter2-gemini-proxy:latest -f Dockerfile.gemini-proxy .
+
 # Instance 1 - Personal Writing
-mkdir writer-personal && cd writer-personal
-curl -O https://raw.githubusercontent.com/MarcoDroll/creativewriter-public/main/docker-compose.yml
 echo "PORT=3080" > .env
 docker compose -p writer-personal up -d
 
-# Instance 2 - Work Projects (different directory)
-mkdir ../writer-work && cd ../writer-work
-curl -O https://raw.githubusercontent.com/MarcoDroll/creativewriter-public/main/docker-compose.yml
+# Instance 2 - Work Projects (using different port)
 echo "PORT=3081" > .env
 docker compose -p writer-work up -d
 ```
@@ -222,11 +237,13 @@ See [README-MULTI-INSTANCE.md](README-MULTI-INSTANCE.md) for detailed multi-inst
 
 ## 📦 Docker Images
 
-Pre-built images available on GitHub Container Registry:
-- `ghcr.io/marcodroll/creativewriter2:latest` - Main application
-- `ghcr.io/marcodroll/creativewriter2-nginx:latest` - Nginx reverse proxy
-- `ghcr.io/marcodroll/creativewriter2-proxy:latest` - Replicate API proxy
-- `ghcr.io/marcodroll/creativewriter2-gemini-proxy:latest` - Gemini API proxy
+> **Note:** Pre-built public images are being set up. Currently, you need to build images locally using the Dockerfiles in this repository.
+
+Docker images to build:
+- `Dockerfile` - Main application
+- `Dockerfile.nginx` - Nginx reverse proxy
+- `Dockerfile.proxy` - Replicate API proxy
+- `Dockerfile.gemini-proxy` - Gemini API proxy
 
 ## 🛠️ Development
 
