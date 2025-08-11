@@ -1,0 +1,198 @@
+name: Release Stable Docker Images
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      pre_release:
+        description: 'Mark as pre-release'
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  BASE_IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  release-images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    strategy:
+      matrix:
+        include:
+          - dockerfile: Dockerfile
+            image_suffix: ""
+            context: .
+            platforms: linux/amd64,linux/arm64
+          - dockerfile: Dockerfile.proxy
+            image_suffix: -proxy
+            context: .
+            platforms: linux/amd64,linux/arm64
+          - dockerfile: Dockerfile.gemini-proxy
+            image_suffix: -gemini-proxy
+            context: .
+            platforms: linux/amd64,linux/arm64
+          - dockerfile: Dockerfile.nginx
+            image_suffix: -nginx
+            context: .
+            platforms: linux/amd64,linux/arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          
+          # Remove 'v' prefix if present
+          VERSION_NUMBER=${VERSION#v}
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version_number=$VERSION_NUMBER" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
+      - name: Update version in package.json
+        if: matrix.dockerfile == 'Dockerfile'
+        run: |
+          VERSION_NUMBER="${{ steps.version.outputs.version_number }}"
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          COMMIT_HASH=$(git rev-parse HEAD)
+          COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')
+          
+          # Update package.json version
+          node -e "
+            const pkg = require('./package.json');
+            pkg.version = '$VERSION_NUMBER';
+            require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          
+          # Create version.json for the main app
+          mkdir -p src/assets
+          cat > src/assets/version.json << EOF
+          {
+            "version": "$VERSION_NUMBER",
+            "commitHash": "$COMMIT_HASH",
+            "commitMessage": "$COMMIT_MESSAGE",
+            "buildDate": "$BUILD_DATE",
+            "release": true,
+            "stable": true
+          }
+          EOF
+          
+          echo "Updated package.json and created version.json for stable release"
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.BASE_IMAGE_NAME }}${{ matrix.image_suffix }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=stable,enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=${{ github.event.repository.name }}${{ matrix.image_suffix }}
+            org.opencontainers.image.description=Stable release of ${{ github.event.repository.name }}${{ matrix.image_suffix }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.source=${{ github.event.repository.html_url }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp || github.event.release.created_at }}
+            org.opencontainers.image.url=${{ github.event.repository.html_url }}
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+            stable=true
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ./${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platforms }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.dockerfile }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.dockerfile }}
+          provenance: true
+          sbom: true
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.BASE_IMAGE_NAME }}${{ matrix.image_suffix }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  create-release-summary:
+    needs: release-images
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Create release summary
+        run: |
+          echo "# 🚀 Stable Docker Images Released" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 Released Images" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          
+          REGISTRY="${{ env.REGISTRY }}"
+          REPO="${{ env.BASE_IMAGE_NAME }}"
+          
+          echo "| Image | Tags | Registry |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Main App | \`$VERSION\`, \`stable\`, \`latest\` | [\`$REGISTRY/$REPO\`](https://github.com/${{ github.repository }}/pkgs/container/$(basename $REPO)) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Proxy | \`$VERSION\`, \`stable\`, \`latest\` | [\`$REGISTRY/$REPO-proxy\`](https://github.com/${{ github.repository }}/pkgs/container/$(basename $REPO)-proxy) |" >> $GITHUB_STEP_SUMMARY  
+          echo "| Gemini Proxy | \`$VERSION\`, \`stable\`, \`latest\` | [\`$REGISTRY/$REPO-gemini-proxy\`](https://github.com/${{ github.repository }}/pkgs/container/$(basename $REPO)-gemini-proxy) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Nginx | \`$VERSION\`, \`stable\`, \`latest\` | [\`$REGISTRY/$REPO-nginx\`](https://github.com/${{ github.repository }}/pkgs/container/$(basename $REPO)-nginx) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔧 Features" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Multi-platform builds (AMD64, ARM64)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Build provenance attestation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Software Bill of Materials (SBOM)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Proper semantic versioning" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Build cache optimization" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎯 Usage" >> $GITHUB_STEP_SUMMARY
+          echo "Pull the stable images:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "docker pull $REGISTRY/$REPO:stable" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull $REGISTRY/$REPO-proxy:stable" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull $REGISTRY/$REPO-gemini-proxy:stable" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull $REGISTRY/$REPO-nginx:stable" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
