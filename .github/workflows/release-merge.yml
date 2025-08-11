@@ -72,8 +72,8 @@ jobs:
           npm run build
           echo "✅ Build completed successfully"
           
-          # Verify critical files exist
-          if [ ! -f "dist/creativewriter2/index.html" ]; then
+          # Verify critical files exist (Angular 17+ uses browser subdirectory)
+          if [ ! -f "dist/creativewriter2/browser/index.html" ]; then
             echo "❌ Build verification failed: index.html not found"
             exit 1
           fi
@@ -163,6 +163,9 @@ jobs:
     name: 🔄 Auto Merge to Release
     runs-on: ubuntu-latest
     needs: [quality-gate]
+    permissions:
+      contents: write
+      pull-requests: write
     if: |
       always() && 
       (needs.quality-gate.result == 'success' || inputs.skip_checks) &&

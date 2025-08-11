@@ -771,13 +771,13 @@ import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole }
 
     /* Entry Modal Styling */
     .entry-modal {
-      --width: 90vw;
-      --max-width: 900px;
-      --height: 92vh;
+      --width: 85vw;
+      --max-width: 750px;
+      --height: 85vh;
       --border-radius: 16px;
-      --background: linear-gradient(135deg, rgba(20, 20, 20, 0.95) 0%, rgba(15, 15, 15, 0.95) 100%);
+      --background: linear-gradient(135deg, rgba(20, 20, 20, 0.92) 0%, rgba(15, 15, 15, 0.92) 100%);
       backdrop-filter: blur(20px) saturate(120%);
-      --box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      --box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
     
     .entry-modal::part(backdrop) {
@@ -840,45 +840,45 @@ import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole }
 
     /* Form Sections */
     .form-section {
-      background: linear-gradient(135deg, rgba(20, 20, 20, 0.3) 0%, rgba(15, 15, 15, 0.3) 100%);
-      margin: 16px;
-      padding: 20px;
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(8px) saturate(120%);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      background: linear-gradient(135deg, rgba(20, 20, 20, 0.4) 0%, rgba(15, 15, 15, 0.4) 100%);
+      margin: 12px;
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(10px) saturate(130%);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
       transition: all 0.3s ease;
     }
     
     .form-section:hover {
-      background: linear-gradient(135deg, rgba(25, 25, 25, 0.4) 0%, rgba(20, 20, 20, 0.4) 100%);
-      border-color: rgba(71, 118, 230, 0.3);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      background: linear-gradient(135deg, rgba(25, 25, 25, 0.5) 0%, rgba(20, 20, 20, 0.5) 100%);
+      border-color: rgba(71, 118, 230, 0.25);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
     }
 
     .form-section:last-of-type {
-      margin-bottom: 100px; /* Space for sticky action buttons */
+      margin-bottom: 80px; /* Space for sticky action buttons */
     }
 
     .section-title {
-      margin: 0 0 16px 0;
-      font-size: 1.1rem;
+      margin: 0 0 12px 0;
+      font-size: 0.95rem;
       font-weight: 600;
-      color: #f8f9fa;
+      color: rgba(248, 249, 250, 0.95);
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       text-transform: uppercase;
-      letter-spacing: 0.8px;
+      letter-spacing: 0.6px;
     }
 
     .section-title::before {
       content: '';
-      width: 4px;
-      height: 24px;
+      width: 3px;
+      height: 18px;
       background: linear-gradient(135deg, #4776E6 0%, #8E54E9 100%);
       border-radius: 2px;
-      box-shadow: 0 0 8px rgba(71, 118, 230, 0.4);
+      box-shadow: 0 0 6px rgba(71, 118, 230, 0.3);
     }
 
     .section-header {
@@ -892,7 +892,7 @@ import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole }
 
     /* Form Groups and Items */
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
 
     .form-group:last-child {
@@ -915,24 +915,24 @@ import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole }
 
     .form-item ion-label {
       font-weight: 500;
-      color: #e0e0e0;
-      margin-bottom: 8px;
-      font-size: 0.95rem;
-      letter-spacing: 0.3px;
+      color: rgba(224, 224, 224, 0.9);
+      margin-bottom: 4px;
+      font-size: 0.9rem;
+      letter-spacing: 0.2px;
     }
 
     .form-item ion-input,
     .form-item ion-textarea,
     .form-item ion-select {
-      --background: rgba(0, 0, 0, 0.2);
-      --padding-start: 16px;
-      --padding-end: 16px;
-      --padding-top: 14px;
-      --padding-bottom: 14px;
-      font-size: 0.95rem;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      margin-top: 8px;
+      --background: rgba(0, 0, 0, 0.25);
+      --padding-start: 12px;
+      --padding-end: 12px;
+      --padding-top: 10px;
+      --padding-bottom: 10px;
+      font-size: 0.93rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      margin-top: 4px;
       color: #f8f9fa;
       transition: all 0.3s ease;
     }
@@ -940,16 +940,16 @@ import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole }
     .form-item ion-input:hover,
     .form-item ion-textarea:hover,
     .form-item ion-select:hover {
-      --background: rgba(0, 0, 0, 0.3);
-      border-color: rgba(255, 255, 255, 0.15);
+      --background: rgba(0, 0, 0, 0.35);
+      border-color: rgba(255, 255, 255, 0.12);
     }
     
     .form-item ion-input:focus,
     .form-item ion-textarea:focus,
     .form-item ion-select:focus {
-      --background: rgba(0, 0, 0, 0.3);
-      border-color: rgba(71, 118, 230, 0.5);
-      box-shadow: 0 0 0 2px rgba(71, 118, 230, 0.15);
+      --background: rgba(0, 0, 0, 0.4);
+      border-color: rgba(71, 118, 230, 0.4);
+      box-shadow: 0 0 0 2px rgba(71, 118, 230, 0.1);
     }
 
     .required {
@@ -964,13 +964,13 @@ import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole }
     }
 
     .content-item {
-      --min-height: 120px;
+      --min-height: 100px;
     }
 
     .content-textarea {
-      min-height: 120px;
+      min-height: 100px;
       font-family: 'Georgia', serif;
-      line-height: 1.6;
+      line-height: 1.5;
     }
 
     /* Tags Styling */
@@ -1037,11 +1037,11 @@ import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole }
 
     /* Image Preview */
     .image-preview {
-      margin-top: 12px;
-      padding: 16px;
-      background: rgba(0, 0, 0, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
+      margin-top: 8px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
       text-align: center;
       transition: all 0.3s ease;
     }
@@ -1053,26 +1053,26 @@ import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole }
 
     .image-preview img {
       max-width: 100%;
-      max-height: 240px;
+      max-height: 200px;
       height: auto;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     /* Custom Fields Styling */
     .custom-fields-container {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 12px;
     }
 
     .custom-field-item {
-      background: rgba(0, 0, 0, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      padding: 16px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       transition: all 0.3s ease;
     }
     
@@ -1127,25 +1127,25 @@ import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole }
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 16px;
-      padding: 20px 24px;
-      background: linear-gradient(135deg, rgba(20, 20, 20, 0.95) 0%, rgba(15, 15, 15, 0.95) 100%);
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      gap: 12px;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, rgba(20, 20, 20, 0.98) 0%, rgba(15, 15, 15, 0.98) 100%);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
       position: sticky;
       bottom: 0;
       z-index: 10;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(15px) saturate(150%);
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
     }
 
     .modal-actions ion-button {
-      --padding-start: 24px;
-      --padding-end: 24px;
-      --height: 48px;
+      --padding-start: 20px;
+      --padding-end: 20px;
+      --height: 42px;
       font-weight: 600;
-      font-size: 0.95rem;
-      letter-spacing: 0.5px;
-      --border-radius: 12px;
+      font-size: 0.92rem;
+      letter-spacing: 0.4px;
+      --border-radius: 10px;
       transition: all 0.3s ease;
     }
     

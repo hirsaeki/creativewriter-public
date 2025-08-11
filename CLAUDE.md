@@ -6,4 +6,6 @@
 - Keep the App modular!
 - ALWAYS: Before implementing any feature, do a web research for best practices in 2025.
 - ALWAYS: Before implementing any feature, do a web research if a framework component (angular, ionic) exists that covers the requirements
+- !!!ALWAYS work on the main branch in the private repository!!!!
+- NEVER MERGE TO release branch on your own!
 ---
