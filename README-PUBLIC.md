@@ -12,6 +12,20 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/MarcoDroll/creativewriter-public)](https://github.com/MarcoDroll/creativewriter-public/releases)
 
+## 📚 Table of Contents
+
+- [☕ Support the Developer](#-support-the-developer)
+- [🚀 Quick Start for Self-Hosters](#-quick-start-for-self-hosters)
+  - [Zero-Configuration Deployment](#zero-configuration-deployment)
+  - [Alternative: Build Locally (Optional)](#alternative-build-locally-optional)
+  - [Multiple Instances](#multiple-instances)
+- [📦 Docker Images](#-docker-images)
+- [🔧 Configuration](#-configuration)
+- [📋 Requirements](#-requirements)
+- [🆘 Support & Issues](#-support--issues)
+- [📄 License](#-license)
+- [🤖 Built with AI-Powered Development](#-built-with-ai-powered-development)
+
 ## ☕ Support the Developer
 
 Enjoying CreativeWriter? Consider supporting its development:

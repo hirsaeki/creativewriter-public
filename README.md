@@ -13,6 +13,23 @@ A powerful, AI-enhanced creative writing application that helps authors craft co
 ![Docker](https://img.shields.io/badge/Docker-Ready-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
+## 📚 Table of Contents
+
+- [☕ Support the Project](#-support-the-project)
+- [🎯 What is CreativeWriter?](#-what-is-creativewriter)
+- [📷 Screenshots](#-screenshots)
+- [✨ Features](#-features)
+- [🏗️ Architecture](#️-architecture)
+- [🚀 Getting Started](#-getting-started)
+- [🐳 Docker Deployment](#-docker-deployment)
+- [📦 Docker Images](#-docker-images)
+- [🛠️ Development](#️-development)
+- [📝 Usage Tips](#-usage-tips)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+- [📚 Documentation](#-documentation)
+
 ## ☕ Support the Project
 
 If you find CreativeWriter helpful and want to support its development:
