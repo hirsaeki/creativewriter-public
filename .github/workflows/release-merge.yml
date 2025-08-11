@@ -230,6 +230,14 @@ jobs:
           echo "🚀 Pushing merged changes to release branch..."
           git push origin ${{ env.RELEASE_BRANCH }}
           echo "✅ Changes pushed successfully"
+          
+      - name: 📤 Trigger public repository sync
+        run: |
+          echo "🔄 Triggering sync to public repository..."
+          gh workflow run sync-public.yml --repo ${{ github.repository }}
+          echo "✅ Public sync triggered successfully"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 📊 Generate summary
         run: |
