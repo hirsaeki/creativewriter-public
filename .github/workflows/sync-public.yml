@@ -100,6 +100,21 @@ jobs:
     if: needs.sync-public.result == 'success'
     
     steps:
+      - name: Trigger image builds in public repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          VERSION="${{ needs.sync-public.outputs.version }}"
+          
+          # Trigger the workflow in the public repository if it exists
+          echo "Attempting to trigger Docker image builds in public repository..."
+          
+          # Check if the workflow exists and trigger it
+          gh workflow run docker-build.yml \
+            --repo MarcoDroll/creativewriter-public \
+            --field version="v${VERSION}" \
+            2>/dev/null || echo "Note: Could not trigger workflow (may not exist yet)"
+      
       - name: Create release in public repository
         env:
           GITHUB_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
