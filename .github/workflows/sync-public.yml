@@ -34,13 +34,18 @@ jobs:
           echo "Syncing release branch to public repository..."
           git remote add public https://x-access-token:${GITHUB_TOKEN}@github.com/MarcoDroll/creativewriter-public.git
           
-          # Create a temporary branch without development files for public sync
+          # Store the original commit info before making changes
+          ORIGINAL_COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')
+          ORIGINAL_COMMIT_HASH=$(git rev-parse --short HEAD)
+          echo "ORIGINAL_COMMIT_MESSAGE=$ORIGINAL_COMMIT_MESSAGE" >> $GITHUB_ENV
+          echo "ORIGINAL_COMMIT_HASH=$ORIGINAL_COMMIT_HASH" >> $GITHUB_ENV
+          
+          # Create a temporary branch and filter files for public sync
           git checkout -b temp-public-sync
           
           # Copy the public docker-compose.yml to replace the private one
           if [ -f "docker-compose.public.yml" ]; then
             cp docker-compose.public.yml docker-compose.yml
-            git add docker-compose.yml
             echo "✅ Replaced docker-compose.yml with public version"
           fi
           
@@ -51,20 +56,22 @@ jobs:
             echo "✅ Copied public Docker workflow"
           fi
           
-          git rm -r .github/ || true  # Remove workflow files
-          git rm -r .claude/ || true  # Remove Claude development files
-          git rm -r .vscode/ || true  # Remove VS Code settings
-          git rm -r .claudescreenshots/ || true  # Remove Claude screenshots
-          git rm docker-compose.public.yml || true  # Remove the public compose file itself
+          # Remove private development directories and files
+          rm -rf .github/ || true  # Remove workflow files
+          rm -rf .claude/ || true  # Remove Claude development files
+          rm -rf .vscode/ || true  # Remove VS Code settings
+          rm -rf .claudescreenshots/ || true  # Remove Claude screenshots
+          rm -f docker-compose.public.yml || true  # Remove the public compose file itself
           
           # Move the public workflow back to .github
           if [ -d ".github-public" ]; then
             mv .github-public .github
-            git add .github/
             echo "✅ Added public workflow files"
           fi
           
-          git commit -m "Remove private development files and update docker-compose for public sync" || true
+          # Add all changes and force push without creating a commit in history
+          git add -A
+          git commit --amend --no-edit  # Amend the current commit instead of creating new one
           
           git push public temp-public-sync:main --force
           echo "✅ Successfully synced release branch to public repository main branch (without private development files)"
@@ -80,9 +87,9 @@ jobs:
           MAJOR_MINOR=$(echo $CURRENT_VERSION | cut -d. -f1-2)
           NEW_VERSION="${MAJOR_MINOR}.${TIMESTAMP}"
           
-          # Get commit info
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-          COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')
+          # Use the preserved original commit info
+          COMMIT_HASH="${ORIGINAL_COMMIT_HASH}"
+          COMMIT_MESSAGE="${ORIGINAL_COMMIT_MESSAGE}"
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           
           # Set outputs

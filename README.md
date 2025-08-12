@@ -83,7 +83,9 @@ CreativeWriter is a modern web-based writing tool designed for fiction authors w
 - **Auto-Save**: Never lose your work with automatic saving to local database
 
 ### 🤖 AI Integration
-- **Multiple AI Providers**: Support for OpenRouter, Google Gemini, and other LLMs
+- **Multiple AI Providers**: Support for OpenRouter, Google Gemini, and **Ollama (Local LLMs)**
+- **Local AI Support**: Connect to self-hosted models via Ollama for complete privacy
+- **Real-time Streaming**: Live text generation with streaming responses
 - **Beat AI Assistant**: Get intelligent suggestions for plot development
 - **Scene Enhancement**: AI-powered scene expansion and refinement
 - **Character Consistency**: Maintain character voice and traits with AI assistance
@@ -198,7 +200,14 @@ For development or customization, clone the repository:
 Configure your AI providers in the application settings:
 - **OpenRouter**: Add your API key for access to multiple models
 - **Google Gemini**: Direct integration with Gemini models
+- **Ollama (New!)**: Connect to local LLMs for complete privacy and offline usage
 - **Custom Endpoints**: Support for self-hosted models
+
+##### Ollama Setup (Local AI)
+1. Install Ollama: https://ollama.com/
+2. Run a model: `ollama run llama3.2`
+3. Configure in Settings → AI Providers → Ollama
+4. Set URL (default: `http://localhost:11434`) and select model
 
 #### Database
 The application uses PouchDB for local storage with optional CouchDB sync:
@@ -305,7 +314,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🙏 Acknowledgments
 
 - Built with Angular and Ionic frameworks
-- AI integrations powered by OpenRouter and Google Gemini
+- AI integrations powered by OpenRouter, Google Gemini, and Ollama
 - ProseMirror for the editing experience
 - Developed using AI-powered pair programming with [Claude Code](https://claude.ai/code) (paid subscription)
 - Significant human expertise and effort guiding the AI development
