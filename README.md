@@ -204,10 +204,34 @@ Configure your AI providers in the application settings:
 - **Custom Endpoints**: Support for self-hosted models
 
 ##### Ollama Setup (Local AI)
-1. Install Ollama: https://ollama.com/
-2. Run a model: `ollama run llama3.2`
-3. Configure in Settings → AI Providers → Ollama
-4. Set URL (default: `http://localhost:11434`) and select model
+1. **Install Ollama**: https://ollama.com/
+2. **Configure CORS** (required for web access):
+   ```bash
+   # Set environment variable to allow web access
+   export OLLAMA_ORIGINS="*"
+   # Or for more security, specify your CreativeWriter URL:
+   # export OLLAMA_ORIGINS="http://localhost:3080"
+   ```
+   
+   **Alternative methods:**
+   - **Linux/macOS**: Add to `~/.bashrc` or `~/.zshrc`
+   - **Windows**: Set via System Properties → Environment Variables
+   - **Docker**: Add `-e OLLAMA_ORIGINS="*"` to your Ollama container
+   - **Systemd**: Edit `/etc/systemd/system/ollama.service` and add `Environment="OLLAMA_ORIGINS=*"`
+
+3. **Start Ollama** and run a model:
+   ```bash
+   ollama serve  # Start the server (if not auto-started)
+   ollama run llama3.2  # Download and run a model
+   ```
+
+4. **Configure in CreativeWriter**:
+   - Go to Settings → AI Providers → Ollama
+   - Set URL (default: `http://localhost:11434`)
+   - Test connection and select your model
+
+**⚠️ CORS Troubleshooting:**
+If you see "CORS" errors in browser console, ensure `OLLAMA_ORIGINS` is set correctly and restart Ollama.
 
 #### Database
 The application uses PouchDB for local storage with optional CouchDB sync:
