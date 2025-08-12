@@ -211,10 +211,10 @@ export class BeatAINodeView implements NodeView {
 
     // Add selectedScenes and includeStoryOutline if they exist
     if (beatData.selectedScenes !== undefined) {
-      attrs.selectedScenes = JSON.stringify(beatData.selectedScenes);
+      attrs['selectedScenes'] = JSON.stringify(beatData.selectedScenes);
     }
     if (beatData.includeStoryOutline !== undefined) {
-      attrs.includeStoryOutline = beatData.includeStoryOutline;
+      attrs['includeStoryOutline'] = beatData.includeStoryOutline;
     }
 
     const tr = this.view.state.tr.setNodeMarkup(pos, undefined, attrs);
