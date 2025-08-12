@@ -113,10 +113,7 @@ export class OllamaApiService {
     const topP = options.topP !== undefined ? options.topP : settings.ollama.topP;
 
     const headers = new HttpHeaders({
-      'Content-Type': 'application/json',
-      'User-Agent': 'NovelCrafter/1.0',
-      'X-Client-Name': 'NovelCrafter',
-      'X-Client-Version': '1.0'
+      'Content-Type': 'application/json'
     });
 
     // Create abort subject for this request
