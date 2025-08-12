@@ -236,7 +236,7 @@ import { CustomBackground } from '../shared/services/synced-custom-background.se
                     fill="outline"
                     (click)="loadModels()" 
                     [disabled]="!settings.replicate.enabled || !settings.replicate.apiKey || loadingModels"
-                    title="Modelle von Replicate laden">
+                    title="Load models from Replicate">
                     {{ loadingModels ? 'Loading...' : 'Load Models' }}
                   </ion-button>
                 </div>

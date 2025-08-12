@@ -246,7 +246,7 @@ import { Subscription } from 'rxjs';
                       
                       <ion-select 
                         [(ngModel)]="selectedModel"
-                        placeholder="AI-Modell wählen..."
+                        placeholder="Choose AI model..."
                         interface="popover"
                         class="model-select"
                         aria-label="Select AI model for summary"

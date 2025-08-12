@@ -1098,7 +1098,7 @@ export class StoryListComponent implements OnInit {
         showOnMobile: true,
         showOnDesktop: true,
         cssClass: this.reorderingEnabled ? 'reorder-active' : '',
-        tooltip: this.reorderingEnabled ? 'Sortierung beenden' : 'Stories sortieren'
+        tooltip: this.reorderingEnabled ? 'End sorting' : 'Sort stories'
       });
     }
     

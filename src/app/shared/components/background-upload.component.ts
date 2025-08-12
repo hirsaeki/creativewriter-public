@@ -61,7 +61,7 @@ import { SyncedCustomBackgroundService, CustomBackground } from '../services/syn
             <!-- Upload Progress -->
             <div class="upload-progress" *ngIf="isUploading()">
               <ion-spinner name="crescent"></ion-spinner>
-              <p>Wird hochgeladen...</p>
+              <p>Uploading...</p>
             </div>
           </div>
 
@@ -140,7 +140,7 @@ import { SyncedCustomBackgroundService, CustomBackground } from '../services/syn
               <p>Synced as: {{ getCurrentUser()?.displayName }}</p>
             </ion-text>
             <ion-text color="medium" *ngIf="!isUserLoggedIn()">
-              <p>Melden Sie sich an für geräteübergreifende Synchronisation</p>
+              <p>Sign in for cross-device synchronization</p>
             </ion-text>
           </div>
           

@@ -9,9 +9,9 @@ import { CodexEntry, Codex } from '../../stories/models/codex.interface';
   imports: [CommonModule],
   template: `
     <div class="codex-debug" *ngIf="showDebug">
-      <h4>Codex Debug für Story: {{storyId}}</h4>
+      <h4>Codex Debug for Story: {{storyId}}</h4>
       <div *ngIf="codexEntries.length > 0">
-        <p><strong>{{codexEntries.length}} Einträge gefunden:</strong></p>
+        <p><strong>{{codexEntries.length}} entries found:</strong></p>
         <ul>
           <li *ngFor="let entry of codexEntries">
             <strong>{{entry.title}}</strong>
@@ -22,7 +22,7 @@ import { CodexEntry, Codex } from '../../stories/models/codex.interface';
         </ul>
       </div>
       <div *ngIf="codexEntries.length === 0">
-        <p>Keine Codex-Einträge gefunden.</p>
+        <p>No Codex entries found.</p>
       </div>
     </div>
   `,

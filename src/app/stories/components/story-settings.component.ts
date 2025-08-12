@@ -193,7 +193,7 @@ import { ImageUploadComponent, ImageUploadResult } from '../../shared/components
 
                 <ion-item class="radio-section">
                   <ion-label>
-                    <h3>Beat Anweisung</h3>
+                    <h3>Beat Instruction</h3>
                     <p>Default instruction for Beat AI generation.</p>
                   </ion-label>
                 </ion-item>
@@ -247,7 +247,7 @@ import { ImageUploadComponent, ImageUploadResult } from '../../shared/components
                           <ion-text color="primary">
                             <h3>{{ databaseStats.totalImages }}</h3>
                           </ion-text>
-                          <ion-note>Bilder</ion-note>
+                          <ion-note>Images</ion-note>
                         </div>
                       </ion-col>
                       <ion-col size="6" size-md="3">
@@ -255,7 +255,7 @@ import { ImageUploadComponent, ImageUploadResult } from '../../shared/components
                           <ion-text color="warning">
                             <h3>{{ databaseStats.orphanedImages }}</h3>
                           </ion-text>
-                          <ion-note>Verwaiste Bilder</ion-note>
+                          <ion-note>Orphaned Images</ion-note>
                         </div>
                       </ion-col>
                       <ion-col size="6" size-md="3">

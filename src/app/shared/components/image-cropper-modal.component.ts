@@ -20,7 +20,7 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
   template: `
     <ion-header>
       <ion-toolbar>
-        <ion-title>Bild zuschneiden</ion-title>
+        <ion-title>Crop Image</ion-title>
         <ion-buttons slot="end">
           <ion-button (click)="dismiss()">
             <ion-icon name="close-outline"></ion-icon>

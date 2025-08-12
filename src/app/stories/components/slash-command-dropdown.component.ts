@@ -14,7 +14,7 @@ import { SlashCommand, SlashCommandAction, SlashCommandResult } from '../models/
       <div class="slash-dropdown-content">
         <div class="slash-dropdown-header">
           <span class="slash-icon">/</span>
-          <span class="slash-title">Einfügen</span>
+          <span class="slash-title">Insert</span>
         </div>
         
         <div class="slash-commands">
@@ -151,8 +151,8 @@ export class SlashCommandDropdownComponent implements OnInit, OnDestroy {
     },
     {
       id: 'image',
-      label: 'Bild einfügen',
-      description: 'Füge ein Bild oder eine Beschreibung ein',
+      label: 'Insert image',
+      description: 'Insert an image or description',
       icon: '🖼️',
       action: SlashCommandAction.INSERT_IMAGE
     }
