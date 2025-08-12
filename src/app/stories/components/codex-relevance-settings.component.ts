@@ -12,10 +12,10 @@ import { Subscription } from 'rxjs';
   template: `
     <div class="relevance-settings">
       <div class="settings-header">
-        <h4>Codex Relevance Einstellungen</h4>
+        <h4>Codex Relevance Settings</h4>
         <p class="description">
-          Wähle aus, welche Einträge immer an die AI gesendet werden sollen (Global) 
-          und welche nur bei Relevanz einbezogen werden.
+          Choose which entries should always be sent to the AI (Global) 
+          and which should only be included when relevant.
         </p>
       </div>
       

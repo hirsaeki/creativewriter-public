@@ -16,7 +16,7 @@ import { CodexRelevanceService, CodexEntry, RelevanceScore } from '../../core/se
       
       <div class="demo-content">
         <div class="left-panel">
-          <h4>Beispiel Codex-Einträge</h4>
+          <h4>Sample Codex Entries</h4>
           <div class="sample-entries">
             <div class="entry-card" *ngFor="let entry of sampleEntries">
               <div class="entry-header">
@@ -40,7 +40,7 @@ import { CodexRelevanceService, CodexEntry, RelevanceScore } from '../../core/se
         </div>
         
         <div class="right-panel">
-          <h4>Test-Kontext</h4>
+          <h4>Test Context</h4>
           <div class="form-group">
             <label for="scene-text">Szenen-Text:</label>
             <textarea 
@@ -66,14 +66,14 @@ import { CodexRelevanceService, CodexEntry, RelevanceScore } from '../../core/se
           </button>
           
           <div class="results" *ngIf="selectedEntries">
-            <h4>Ausgewählte Einträge ({{ selectedEntries.length }}):</h4>
+            <h4>Selected Entries ({{ selectedEntries.length }}):</h4>
             <div class="selected-entry" *ngFor="let entry of selectedEntries">
               <strong>{{ entry.title }}</strong>
               <span class="score">Score: {{ getScore(entry.id) }}</span>
             </div>
             
             <div class="token-info">
-              <strong>Geschätzte Tokens:</strong> ~{{ estimatedTokens }}
+              <strong>Estimated Tokens:</strong> ~{{ estimatedTokens }}
             </div>
           </div>
         </div>

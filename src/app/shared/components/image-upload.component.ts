@@ -47,8 +47,8 @@ export interface ImageUploadResult {
           <div *ngIf="!currentImage" class="upload-prompt">
             <ion-icon name="cloud-upload-outline" class="upload-icon"></ion-icon>
             <ion-text>
-              <h3>Cover-Bild hochladen</h3>
-              <p>Klicken Sie oder ziehen Sie ein Bild hierher</p>
+              <h3>Upload Cover Image</h3>
+              <p>Click or drag an image here</p>
             </ion-text>
             <ion-note>JPG, PNG, WebP • Max. 5MB</ion-note>
           </div>

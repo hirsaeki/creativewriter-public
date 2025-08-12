@@ -17,14 +17,14 @@ export interface ImageInsertResult {
   template: `
     <div class="dialog-overlay" role="button" tabindex="0" (click)="cancel()" (keyup.escape)="cancel()">
       <div class="dialog-content" role="button" tabindex="0" (click)="$event.stopPropagation()" (keyup.enter)="$event.stopPropagation()">
-        <h3>Bild einfügen</h3>
+        <h3>Insert Image</h3>
         
         <div class="upload-tabs">
           <button 
             class="tab-button" 
             [class.active]="activeTab === 'upload'"
             (click)="activeTab = 'upload'">
-            Hochladen
+            Upload
           </button>
           <button 
             class="tab-button" 
@@ -91,7 +91,7 @@ export interface ImageInsertResult {
             <input 
               type="text" 
               [(ngModel)]="titleText"
-              placeholder="Bildtitel">
+              placeholder="Image title">
           </label>
         </div>
 

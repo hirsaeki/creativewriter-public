@@ -205,7 +205,7 @@ interface SceneContext {
         <ion-content>
           <ion-searchbar 
             [(ngModel)]="sceneSearchTerm" 
-            placeholder="Szene suchen..."
+            placeholder="Search scene..."
             animated="true">
           </ion-searchbar>
           
