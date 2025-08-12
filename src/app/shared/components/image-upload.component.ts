@@ -354,7 +354,7 @@ export class ImageUploadComponent {
 
     // Validate file size
     if (file.size > this.maxFileSize) {
-      this.errorMessage = 'Die Datei ist zu groß. Maximum: 5MB';
+      this.errorMessage = 'The file is too large. Maximum: 5MB';
       return;
     }
 
@@ -398,7 +398,7 @@ export class ImageUploadComponent {
     };
 
     reader.onerror = () => {
-      this.errorMessage = 'Fehler beim Lesen der Datei.';
+      this.errorMessage = 'Error reading the file.';
     };
 
     reader.readAsDataURL(file);

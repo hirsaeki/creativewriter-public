@@ -1550,7 +1550,7 @@ The summary should capture the most important plot points and character developm
           // Check if response was truncated due to max_tokens limit
           if (response.choices[0].finish_reason === 'length') {
             console.warn('Summary was truncated due to token limit. Consider increasing maxTokens.');
-            summary += ' [Zusammenfassung wurde aufgrund der Token-Begrenzung gekürzt]';
+            summary += ' [Summary was truncated due to token limit]';
           }
           
           // Update the scene summary in the local object first
@@ -1596,15 +1596,15 @@ The summary should capture the most important plot points and character developm
         
         // Check for specific error types
         if (error.status === 400) {
-          errorMessage = 'Ungültige Anfrage. Bitte überprüfen Sie Ihre API-Einstellungen.';
+          errorMessage = 'Invalid request. Please check your API settings.';
         } else if (error.status === 401) {
-          errorMessage = 'API-Schlüssel ungültig. Bitte überprüfen Sie Ihren OpenRouter API-Key in den Einstellungen.';
+          errorMessage = 'Invalid API key. Please check your OpenRouter API key in settings.';
         } else if (error.status === 403) {
-          errorMessage = 'Zugriff verweigert. Ihr API-Schlüssel hat möglicherweise nicht die erforderlichen Berechtigungen.';
+          errorMessage = 'Access denied. Your API key may not have the required permissions.';
         } else if (error.status === 429) {
-          errorMessage = 'Rate-Limit erreicht. Bitte warten Sie einen Moment und versuchen Sie es erneut.';
+          errorMessage = 'Rate limit reached. Please wait a moment and try again.';
         } else if (error.status === 500) {
-          errorMessage = 'Server-Fehler bei OpenRouter. Bitte versuchen Sie es später erneut.';
+          errorMessage = 'OpenRouter server error. Please try again later.';
         } else if (error.message?.includes('nicht aktiviert')) {
           errorMessage = error.message;
         }
@@ -1821,15 +1821,15 @@ Respond only with the title, without further explanations or quotation marks.`;
         
         // Check for specific error types
         if (error.status === 400) {
-          errorMessage = 'Ungültige Anfrage. Bitte überprüfen Sie Ihre API-Einstellungen.';
+          errorMessage = 'Invalid request. Please check your API settings.';
         } else if (error.status === 401) {
-          errorMessage = 'API-Schlüssel ungültig. Bitte überprüfen Sie Ihren OpenRouter API-Key in den Einstellungen.';
+          errorMessage = 'Invalid API key. Please check your OpenRouter API key in settings.';
         } else if (error.status === 403) {
-          errorMessage = 'Zugriff verweigert. Ihr API-Schlüssel hat möglicherweise nicht die erforderlichen Berechtigungen.';
+          errorMessage = 'Access denied. Your API key may not have the required permissions.';
         } else if (error.status === 429) {
-          errorMessage = 'Rate-Limit erreicht. Bitte warten Sie einen Moment und versuchen Sie es erneut.';
+          errorMessage = 'Rate limit reached. Please wait a moment and try again.';
         } else if (error.status === 500) {
-          errorMessage = 'Server-Fehler bei OpenRouter. Bitte versuchen Sie es später erneut.';
+          errorMessage = 'OpenRouter server error. Please try again later.';
         } else if (error.message?.includes('nicht aktiviert')) {
           errorMessage = error.message;
         }
@@ -2080,15 +2080,15 @@ Respond only with the title, without further explanations or quotation marks.`;
   private removeEmbeddedImages(content: string): string {
     // Remove base64 encoded images
     // Matches: <img src="data:image/[type];base64,[data]" ...>
-    let cleanedContent = content.replace(/<img[^>]*src="data:image\/[^"]*"[^>]*>/gi, '[Bild entfernt]');
+    let cleanedContent = content.replace(/<img[^>]*src="data:image\/[^"]*"[^>]*>/gi, '[Image removed]');
     
     // Also remove markdown-style base64 images
     // Matches: ![alt](data:image/[type];base64,[data])
-    cleanedContent = cleanedContent.replace(/!\[[^\]]*\]\(data:image\/[^)]*\)/gi, '[Bild entfernt]');
+    cleanedContent = cleanedContent.replace(/!\[[^\]]*\]\(data:image\/[^)]*\)/gi, '[Image removed]');
     
     // Remove any remaining large base64 strings that might be in the content
     // This catches base64 strings that are at least 1000 characters long
-    cleanedContent = cleanedContent.replace(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/]{1000,}={0,2}/g, '[Bild-Daten entfernt]');
+    cleanedContent = cleanedContent.replace(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/]{1000,}={0,2}/g, '[Image data removed]');
     
     return cleanedContent;
   }

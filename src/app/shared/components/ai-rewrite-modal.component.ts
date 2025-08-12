@@ -45,7 +45,7 @@ interface SceneContext {
   template: `
     <ion-header>
       <ion-toolbar>
-        <ion-title>Text mit KI neu formulieren</ion-title>
+        <ion-title>Rewrite Text with AI</ion-title>
         <ion-buttons slot="end">
           <ion-button fill="clear" (click)="dismiss()">
             <ion-icon name="close-outline" slot="icon-only"></ion-icon>
@@ -135,7 +135,7 @@ interface SceneContext {
       <!-- Rewritten Text -->
       <div *ngIf="rewrittenText" class="rewritten-section">
         <ion-item class="rewritten-text-item">
-          <ion-label position="stacked">Neu formulierter Text</ion-label>
+          <ion-label position="stacked">Rewritten Text</ion-label>
           <div class="rewritten-text">{{ rewrittenText }}</div>
         </ion-item>
       </div>
@@ -143,7 +143,7 @@ interface SceneContext {
       <!-- Loading -->
       <div *ngIf="isRewriting" class="loading-section">
         <ion-spinner name="dots"></ion-spinner>
-        <p>KI formuliert den Text neu...</p>
+        <p>AI is rewriting the text...</p>
       </div>
 
       <!-- Action Buttons -->
@@ -155,7 +155,7 @@ interface SceneContext {
           (click)="rewriteText()"
           [disabled]="isRewriting || !selectedText.trim()">
           <ion-icon name="send-outline" slot="start"></ion-icon>
-          Neu formulieren
+          Rewrite
         </ion-button>
 
         <div class="button-row" *ngIf="rewrittenText">
@@ -404,7 +404,7 @@ export class AIRewriteModalComponent implements OnInit {
     'Emotionaler schreiben',
     'Sachlicher schreiben',
     'Verbessere die Grammatik',
-    'Einfacher ausdrücken'
+    'Express more simply'
   ];
 
   constructor() {
@@ -451,20 +451,20 @@ export class AIRewriteModalComponent implements OnInit {
       // Build context text
       let contextText = '';
       if (storyOutline) {
-        contextText += `Geschichte-Überblick:\n${storyOutline}\n\n`;
+        contextText += `Story Overview:\n${storyOutline}\n\n`;
       }
       if (sceneContext) {
-        contextText += `Szenen-Kontext:\n${sceneContext}\n\n`;
+        contextText += `Scene Context:\n${sceneContext}\n\n`;
       }
 
       // Build the rewrite prompt with context
       const basePrompt = contextText 
-        ? `${contextText}Basierend auf dem obigen Kontext, formuliere folgenden Text neu: "${this.selectedText}"`
-        : `Formuliere folgenden Text neu: "${this.selectedText}"`;
+        ? `${contextText}Based on the above context, rewrite the following text: "${this.selectedText}"`
+        : `Rewrite the following text: "${this.selectedText}"`;
       
       const fullPrompt = this.customPrompt 
-        ? `${basePrompt}\n\nZusätzliche Anweisung: ${this.customPrompt}\n\nBitte achte darauf, dass der umformulierte Text zum Stil und Kontext der Geschichte passt.`
-        : `${basePrompt}\n\nBitte achte darauf, dass der umformulierte Text zum Stil und Kontext der Geschichte passt.`;
+        ? `${basePrompt}\n\nAdditional instruction: ${this.customPrompt}\n\nPlease ensure that the rewritten text fits the style and context of the story.`
+        : `${basePrompt}\n\nPlease ensure that the rewritten text fits the style and context of the story.`;
 
       // Generate a unique beat ID for this rewrite request
       const beatId = `rewrite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -487,7 +487,7 @@ export class AIRewriteModalComponent implements OnInit {
         },
         error: (error) => {
           console.error('Error rewriting text:', error);
-          this.rewrittenText = 'Fehler beim Neu-Formulieren des Textes. Bitte versuchen Sie es erneut.';
+          this.rewrittenText = 'Error rewriting text. Please try again.';
           this.isRewriting = false;
         }
       });
@@ -697,7 +697,7 @@ export class AIRewriteModalComponent implements OnInit {
     
     if (!useGoogleGemini && !useOpenRouter) {
       console.warn('No AI API configured or no model selected');
-      return of('Entschuldigung, keine AI API konfiguriert oder kein Modell ausgewählt.');
+      return of('Sorry, no AI API configured or no model selected.');
     }
     
     // For direct calls, we bypass the beat AI service and call the API directly

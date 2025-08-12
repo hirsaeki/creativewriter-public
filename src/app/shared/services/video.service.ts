@@ -16,12 +16,12 @@ export class VideoService {
   async uploadVideo(file: File): Promise<string> {
     // Validate file size
     if (file.size > this.MAX_VIDEO_SIZE) {
-      throw new Error(`Video ist zu groß. Maximale Größe: ${this.formatFileSize(this.MAX_VIDEO_SIZE)}`);
+      throw new Error(`Video is too large. Maximum size: ${this.formatFileSize(this.MAX_VIDEO_SIZE)}`);
     }
 
     // Validate file type
     if (!file.type.startsWith('video/')) {
-      throw new Error('Nur Videodateien sind erlaubt');
+      throw new Error('Only video files are allowed');
     }
 
     try {
@@ -274,7 +274,7 @@ export class VideoService {
           const db = await this.databaseService.getDatabase();
           await db.put(video);
         } catch {
-          throw new Error('Nicht genügend Speicherplatz verfügbar. Versuchen Sie, alte Videos zu löschen.');
+          throw new Error('Not enough storage space available. Try deleting old videos.');
         }
       } else {
         throw error;

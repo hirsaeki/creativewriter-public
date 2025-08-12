@@ -893,7 +893,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
           console.error('Error generating response:', error);
           this.messages.push({
             role: 'assistant',
-            content: 'Entschuldigung, es ist ein Fehler aufgetreten. Bitte versuche es erneut.',
+            content: 'Sorry, an error occurred. Please try again.',
             timestamp: new Date()
           });
           this.isGenerating = false;
@@ -1083,9 +1083,9 @@ Structure the answer clearly separated by characters.`
 
 **Name:** [Location name]
 **Type:** [City, Building, Room, Landscape, etc.]
-**Beschreibung:** [Physische Beschreibung, Atmosphäre, wichtige Details]
-**Bedeutung:** [Warum ist dieser Ort wichtig für die Geschichte]
-**Stimmung:** [Welche Stimmung/Atmosphäre herrscht hier]
+**Description:** [Physical description, atmosphere, important details]
+**Significance:** [Why is this location important for the story]
+**Mood:** [What mood/atmosphere prevails here]
 
 Strukturiere die Antwort klar nach Orten getrennt.`
       },
@@ -1099,10 +1099,10 @@ Strukturiere die Antwort klar nach Orten getrennt.`
 
 **Name:** [Object name]
 **Type:** [Weapon, Tool, Jewelry, Document, etc.]
-**Beschreibung:** [Physische Beschreibung, Material, Aussehen]
-**Bedeutung:** [Warum ist dieser Gegenstand wichtig]
-**Besitzer:** [Wem gehört der Gegenstand]
-**Eigenschaften:** [Besondere Fähigkeiten oder Eigenschaften]
+**Description:** [Physical description, material, appearance]
+**Significance:** [Why is this object important]
+**Owner:** [Who owns the object]
+**Properties:** [Special abilities or characteristics]
 
 Strukturiere die Antwort klar nach Gegenständen getrennt.`
       }
@@ -1160,7 +1160,7 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
       // Show success message
       this.messages.push({
         role: 'assistant',
-        content: `✅ ${entries.length} ${this.getExtractionTypeLabel(message.extractionType)} wurden erfolgreich zum Codex hinzugefügt!`,
+        content: `✅ ${entries.length} ${this.getExtractionTypeLabel(message.extractionType)} successfully added to Codex!`,
         timestamp: new Date()
       });
       
@@ -1241,7 +1241,7 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
     
     if (!useGoogleGemini && !useOpenRouter) {
       console.warn('No AI API configured or no model selected');
-      return of('Entschuldigung, keine AI API konfiguriert oder kein Modell ausgewählt.');
+      return of('Sorry, no AI API configured or no model selected.');
     }
     
     // For direct calls, we bypass the beat AI service and call the API directly
