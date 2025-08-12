@@ -62,11 +62,11 @@ export class SyncedCustomBackgroundService {
   async uploadBackground(file: File, customName?: string): Promise<CustomBackground> {
     // Validate file
     if (!this.isValidImageFile(file)) {
-      throw new Error('Ungültiger Dateityp. Nur PNG, JPG, JPEG und WebP sind erlaubt.');
+      throw new Error('Invalid file type. Only PNG, JPG, JPEG and WebP are allowed.');
     }
 
     if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      throw new Error('Datei ist zu groß. Maximum 5MB erlaubt.');
+      throw new Error('File is too large. Maximum 5MB allowed.');
     }
 
     const currentUser = this.authService.getCurrentUser();
@@ -291,7 +291,7 @@ export class SyncedCustomBackgroundService {
     try {
       const currentUser = this.authService.getCurrentUser();
       if (!currentUser) {
-        throw new Error('Sie müssen angemeldet sein.');
+        throw new Error('You must be logged in.');
       }
 
       const db = await this.databaseService.getDatabase();

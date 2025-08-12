@@ -578,7 +578,7 @@ export class BackgroundSelectorComponent implements OnInit, OnChanges {
       },
       {
         filename: 'pirate-ship-captain.png',
-        displayName: 'Piraten Kapitän',
+        displayName: 'Pirate Captain',
         previewPath: 'assets/backgrounds/pirate-ship-captain.png'
       },
       {

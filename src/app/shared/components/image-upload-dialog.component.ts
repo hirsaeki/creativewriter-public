@@ -102,7 +102,7 @@ export interface ImageInsertResult {
             class="insert-btn" 
             [disabled]="!canInsert()"
             (click)="insert()">
-            Einfügen
+            Insert
           </button>
         </div>
       </div>
@@ -439,7 +439,7 @@ export class ImageUploadDialogComponent {
 
       this.imageInserted.emit({
         url: imageUrl,
-        alt: this.altText || 'Bild',
+        alt: this.altText || 'Image',
         title: this.titleText || undefined,
         imageId: imageId
       });

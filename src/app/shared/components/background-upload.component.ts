@@ -383,12 +383,12 @@ export class BackgroundUploadComponent {
     
     // Validate file
     if (!this.isValidImageFile(file)) {
-      this.errorMessage.set('Ungültiger Dateityp. Nur PNG, JPG, JPEG und WebP sind erlaubt.');
+      this.errorMessage.set('Invalid file type. Only PNG, JPG, JPEG and WebP are allowed.');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      this.errorMessage.set('Datei ist zu groß. Maximum 5MB erlaubt.');
+      this.errorMessage.set('File is too large. Maximum 5MB allowed.');
       return;
     }
 
@@ -477,7 +477,7 @@ export class BackgroundUploadComponent {
   async clearAllBackgrounds(): Promise<void> {
     try {
       await this.customBackgroundService.clearAllBackgrounds();
-      this.showSuccessToast('Alle Hintergründe gelöscht');
+      this.showSuccessToast('All backgrounds deleted');
       this.clearSelection();
     } catch {
       this.showErrorToast('Error deleting');

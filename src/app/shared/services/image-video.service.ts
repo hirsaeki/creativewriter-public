@@ -114,7 +114,7 @@ export class ImageVideoService {
     
     // Add title attribute for user guidance
     const currentTitle = imageElement.title;
-    const videoTitle = 'Klicken Sie um das zugehörige Video anzusehen';
+    const videoTitle = 'Click to view the associated video';
     imageElement.title = currentTitle ? `${currentTitle} - ${videoTitle}` : videoTitle;
   }
 
@@ -127,8 +127,8 @@ export class ImageVideoService {
     
     // Remove video-related title
     const currentTitle = imageElement.title;
-    if (currentTitle && currentTitle.includes('Klicken Sie um das zugehörige Video anzusehen')) {
-      imageElement.title = currentTitle.replace(/ - Klicken Sie um das zugehörige Video anzusehen/, '');
+    if (currentTitle && currentTitle.includes('Click to view the associated video')) {
+      imageElement.title = currentTitle.replace(/ - Click to view the associated video/, '');
     }
   }
 

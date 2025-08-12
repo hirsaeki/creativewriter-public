@@ -109,7 +109,7 @@ interface ColorPreset {
             placeholder="#000000"
             maxlength="7"
             class="hex-input">
-          <button class="copy-btn" (click)="copyToClipboard()" title="In Zwischenablage kopieren">
+          <button class="copy-btn" (click)="copyToClipboard()" title="Copy to clipboard">
             📋
           </button>
         </div>
@@ -441,7 +441,7 @@ export class ColorPickerComponent implements OnInit {
     
     // Pastel colors (readable on dark background)
     { name: 'Pastellblau', value: '#a8c7ff', contrast: 'dark' },
-    { name: 'Pastellgrün', value: '#a8f0a8', contrast: 'dark' },
+    { name: 'Pastel Green', value: '#a8f0a8', contrast: 'dark' },
     { name: 'Pastellgelb', value: '#f0f0a8', contrast: 'dark' },
     { name: 'Pastellrosa', value: '#ffa8d0', contrast: 'dark' },
     { name: 'Pastelllila', value: '#d0a8ff', contrast: 'dark' },
@@ -451,7 +451,7 @@ export class ColorPickerComponent implements OnInit {
     { name: 'Cyan', value: '#00ffff', contrast: 'dark' },
     { name: 'Magenta', value: '#ff00ff', contrast: 'dark' },
     { name: 'Gelb', value: '#ffff00', contrast: 'dark' },
-    { name: 'Weiß', value: '#ffffff', contrast: 'dark' },
+    { name: 'White', value: '#ffffff', contrast: 'dark' },
     
     // Developer Colors
     { name: 'Terminal Green', value: '#00ff00', contrast: 'dark' },

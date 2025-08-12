@@ -31,12 +31,12 @@ export class ImageService {
   async uploadImageWithId(file: File): Promise<ImageUploadResult> {
     // Validate file size
     if (file.size > this.MAX_IMAGE_SIZE) {
-      throw new Error(`Datei ist zu groß. Maximale Größe: ${this.formatFileSize(this.MAX_IMAGE_SIZE)}`);
+      throw new Error(`File is too large. Maximum size: ${this.formatFileSize(this.MAX_IMAGE_SIZE)}`);
     }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      throw new Error('Nur Bilddateien sind erlaubt');
+      throw new Error('Only image files are allowed');
     }
 
     try {
@@ -82,12 +82,12 @@ export class ImageService {
   async uploadImage(file: File): Promise<string> {
     // Validate file size
     if (file.size > this.MAX_IMAGE_SIZE) {
-      throw new Error(`Datei ist zu groß. Maximale Größe: ${this.formatFileSize(this.MAX_IMAGE_SIZE)}`);
+      throw new Error(`File is too large. Maximum size: ${this.formatFileSize(this.MAX_IMAGE_SIZE)}`);
     }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      throw new Error('Nur Bilddateien sind erlaubt');
+      throw new Error('Only image files are allowed');
     }
 
     try {
@@ -239,7 +239,7 @@ export class ImageService {
       };
       
       reader.onerror = () => {
-        reject(new Error('Fehler beim Lesen der Datei'));
+        reject(new Error('Error reading the file'));
       };
       
       reader.readAsDataURL(file);
@@ -258,7 +258,7 @@ export class ImageService {
           const db = await this.databaseService.getDatabase();
           await db.put(image);
         } catch {
-          throw new Error('Nicht genügend Speicherplatz verfügbar. Versuchen Sie, alte Bilder zu löschen.');
+          throw new Error('Not enough storage space available. Try deleting old images.');
         }
       } else {
         throw error;

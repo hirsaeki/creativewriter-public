@@ -360,10 +360,10 @@ export class StoryStatsService {
           }
         } else if (key.includes('settings') || key.includes('config')) {
           type = 'settings';
-          description = 'App-Einstellungen';
+          description = 'App Settings';
         } else if (key.includes('theme') || key.includes('color')) {
           type = 'settings';
-          description = 'Design-Einstellungen';
+          description = 'Design Settings';
         } else if (key.includes('user') || key.includes('auth')) {
           type = 'settings';
           description = 'Benutzer-Daten';
