@@ -9,9 +9,10 @@ import {
   IonChip, IonItem, IonLabel, IonSelect, IonSelectOption, IonRange, IonTextarea
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, statsChart, warning, checkmarkCircle, globeOutline, logoGoogle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline } from 'ionicons/icons';
+import { arrowBack, statsChart, warning, checkmarkCircle, globeOutline, logoGoogle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, hardwareChip } from 'ionicons/icons';
 import { SettingsService } from '../core/services/settings.service';
 import { ModelService } from '../core/services/model.service';
+import { OllamaApiService } from '../core/services/ollama-api.service';
 import { Settings } from '../core/models/settings.interface';
 import { ModelOption } from '../core/models/model.interface';
 import { NgSelectModule } from '@ng-select/ng-select';
@@ -83,7 +84,7 @@ import { CustomBackground } from '../shared/services/synced-custom-background.se
                     size="small"
                     fill="outline"
                     (click)="loadCombinedModels()" 
-                    [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) || loadingModels"
+                    [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl) || loadingModels"
                     title="Load Models">
                     {{ loadingModels ? 'Loading...' : 'Load Models' }}
                   </ion-button>
@@ -94,7 +95,7 @@ import { CustomBackground } from '../shared/services/synced-custom-background.se
                            bindValue="id"
                            [searchable]="true"
                            [clearable]="true"
-                           [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey)"
+                           [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl)"
                            placeholder="Select or search model..."
                            (ngModelChange)="onGlobalModelChange()"
                            [loading]="loadingModels"
@@ -104,7 +105,13 @@ import { CustomBackground } from '../shared/services/synced-custom-background.se
                   <ng-template ng-option-tmp let-item="item">
                     <div class="model-option">
                       <div class="model-option-header">
-                        <ion-icon [name]="item.provider === 'gemini' ? 'logo-google' : 'globe-outline'" class="provider-icon" [class.gemini]="item.provider === 'gemini'" [class.openrouter]="item.provider === 'openrouter'"></ion-icon>
+                        <ion-icon 
+                          [name]="item.provider === 'gemini' ? 'logo-google' : item.provider === 'ollama' ? 'hardware-chip' : 'globe-outline'" 
+                          class="provider-icon" 
+                          [class.gemini]="item.provider === 'gemini'" 
+                          [class.openrouter]="item.provider === 'openrouter'"
+                          [class.ollama]="item.provider === 'ollama'"
+                          [class.replicate]="item.provider === 'replicate'"></ion-icon>
                         <span class="model-label">{{ item.label }}</span>
                       </div>
                       <div class="model-option-details">
@@ -120,7 +127,7 @@ import { CustomBackground } from '../shared/services/synced-custom-background.se
                   <p *ngIf="!modelLoadError && combinedModels.length > 0" class="info-text">
                     {{ combinedModels.length }} models available. Prices in EUR per 1M tokens.
                   </p>
-                  <p *ngIf="!modelLoadError && combinedModels.length === 0 && (settings.openRouter.enabled || settings.googleGemini.enabled)" class="info-text">
+                  <p *ngIf="!modelLoadError && combinedModels.length === 0 && (settings.openRouter.enabled || settings.googleGemini.enabled || settings.replicate.enabled || settings.ollama.enabled)" class="info-text">
                     Click 'Load Models' to display available models.
                   </p>
                 </div>
@@ -272,6 +279,98 @@ import { CustomBackground } from '../shared/services/synced-custom-background.se
                 labelPlacement="stacked">
               </ion-input>
             </ion-item>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Ollama Settings -->
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>Ollama (Local AI)</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-item>
+              <ion-label>Enable Ollama</ion-label>
+              <ion-toggle 
+                [(ngModel)]="settings.ollama.enabled"
+                (ngModelChange)="onProviderToggle('ollama')"
+                slot="end">
+              </ion-toggle>
+            </ion-item>
+
+            <ion-item [class.disabled]="!settings.ollama.enabled">
+              <ion-input
+                type="url"
+                [(ngModel)]="settings.ollama.baseUrl"
+                (ngModelChange)="onOllamaUrlChange()"
+                placeholder="http://localhost:11434"
+                [disabled]="!settings.ollama.enabled"
+                label="Base URL"
+                labelPlacement="stacked"
+                helperText="URL where your Ollama server is running">
+              </ion-input>
+            </ion-item>
+
+            <div class="connection-test" [class.disabled]="!settings.ollama.enabled">
+              <ion-button 
+                size="small"
+                fill="outline"
+                (click)="testOllamaConnection()" 
+                [disabled]="!settings.ollama.enabled || !settings.ollama.baseUrl || testingOllamaConnection"
+                title="Test Connection">
+                <ion-icon name="checkmark-circle" slot="start" *ngIf="ollamaConnectionStatus === 'success'"></ion-icon>
+                <ion-icon name="warning" slot="start" *ngIf="ollamaConnectionStatus === 'error'"></ion-icon>
+                {{ testingOllamaConnection ? 'Testing...' : 'Test Connection' }}
+              </ion-button>
+              <span *ngIf="ollamaConnectionStatus === 'success'" class="connection-status success">✓ Connected</span>
+              <span *ngIf="ollamaConnectionStatus === 'error'" class="connection-status error">✗ Connection Failed</span>
+            </div>
+
+            <div class="model-info" [class.disabled]="!settings.ollama.enabled">
+              <p class="info-text">Use the global model selection above to choose from your local models. <br>
+                Install models with: <code>ollama pull llama3.2</code></p>
+            </div>
+
+            <div class="settings-row" [class.disabled]="!settings.ollama.enabled">
+              <ion-item>
+                <ion-input
+                  type="number"
+                  [(ngModel)]="settings.ollama.temperature"
+                  (ngModelChange)="onSettingsChange()"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  [disabled]="!settings.ollama.enabled"
+                  label="Temperature"
+                  labelPlacement="stacked">
+                </ion-input>
+              </ion-item>
+              <ion-item>
+                <ion-input
+                  type="number"
+                  [(ngModel)]="settings.ollama.topP"
+                  (ngModelChange)="onSettingsChange()"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  [disabled]="!settings.ollama.enabled"
+                  label="Top P"
+                  labelPlacement="stacked">
+                </ion-input>
+              </ion-item>
+              <ion-item>
+                <ion-input
+                  type="number"
+                  [(ngModel)]="settings.ollama.maxTokens"
+                  (ngModelChange)="onSettingsChange()"
+                  min="100"
+                  max="10000"
+                  step="100"
+                  [disabled]="!settings.ollama.enabled"
+                  label="Max Tokens"
+                  labelPlacement="stacked">
+                </ion-input>
+              </ion-item>
+            </div>
           </ion-card-content>
         </ion-card>
 
@@ -546,7 +645,13 @@ import { CustomBackground } from '../shared/services/synced-custom-background.se
                   <ng-template ng-option-tmp let-item="item">
                     <div class="model-option">
                       <div class="model-option-header">
-                        <ion-icon [name]="item.provider === 'gemini' ? 'logo-google' : 'globe-outline'" class="provider-icon" [class.gemini]="item.provider === 'gemini'" [class.openrouter]="item.provider === 'openrouter'"></ion-icon>
+                        <ion-icon 
+                          [name]="item.provider === 'gemini' ? 'logo-google' : item.provider === 'ollama' ? 'hardware-chip' : 'globe-outline'" 
+                          class="provider-icon" 
+                          [class.gemini]="item.provider === 'gemini'" 
+                          [class.openrouter]="item.provider === 'openrouter'"
+                          [class.ollama]="item.provider === 'ollama'"
+                          [class.replicate]="item.provider === 'replicate'"></ion-icon>
                         <span class="model-label">{{ item.label }}</span>
                       </div>
                       <div class="model-option-details">
@@ -654,7 +759,13 @@ import { CustomBackground } from '../shared/services/synced-custom-background.se
                   <ng-template ng-option-tmp let-item="item">
                     <div class="model-option">
                       <div class="model-option-header">
-                        <ion-icon [name]="item.provider === 'gemini' ? 'logo-google' : 'globe-outline'" class="provider-icon" [class.gemini]="item.provider === 'gemini'" [class.openrouter]="item.provider === 'openrouter'"></ion-icon>
+                        <ion-icon 
+                          [name]="item.provider === 'gemini' ? 'logo-google' : item.provider === 'ollama' ? 'hardware-chip' : 'globe-outline'" 
+                          class="provider-icon" 
+                          [class.gemini]="item.provider === 'gemini'" 
+                          [class.openrouter]="item.provider === 'openrouter'"
+                          [class.ollama]="item.provider === 'ollama'"
+                          [class.replicate]="item.provider === 'replicate'"></ion-icon>
                         <span class="model-label">{{ item.label }}</span>
                       </div>
                       <div class="model-description" *ngIf="item.description">{{ item.description }}</div>
@@ -1430,6 +1541,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   private settingsService = inject(SettingsService);
   private modelService = inject(ModelService);
   private backgroundService = inject(BackgroundService);
+  private ollamaApiService = inject(OllamaApiService);
 
   settings: Settings;
   hasUnsavedChanges = false;
@@ -1440,9 +1552,14 @@ export class SettingsComponent implements OnInit, OnDestroy {
   openRouterModels: ModelOption[] = [];
   replicateModels: ModelOption[] = [];
   geminiModels: ModelOption[] = [];
+  ollamaModels: ModelOption[] = [];
   combinedModels: ModelOption[] = [];
   loadingModels = false;
   modelLoadError: string | null = null;
+  
+  // Ollama connection testing
+  testingOllamaConnection = false;
+  ollamaConnectionStatus: 'success' | 'error' | null = null;
   
   // Tab control
   selectedTab = 'models';
@@ -1456,7 +1573,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   constructor() {
     this.settings = this.settingsService.getSettings();
     // Register Ionic icons
-    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, globeOutline, logoGoogle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline });
+    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, globeOutline, logoGoogle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, hardwareChip });
   }
 
   ngOnInit(): void {
@@ -1566,19 +1683,54 @@ export class SettingsComponent implements OnInit, OnDestroy {
     }
   }
   
-  onProviderToggle(provider: 'openRouter' | 'replicate' | 'googleGemini'): void {
-    // No more mutual exclusion - both can be enabled at the same time
+  onOllamaUrlChange(): void {
+    this.onSettingsChange();
+    this.ollamaConnectionStatus = null; // Reset connection status when URL changes
+    
+    // Auto-load models when URL is entered and provider is enabled
+    if (this.settings.ollama.enabled && this.settings.ollama.baseUrl) {
+      this.modelService.loadOllamaModels().subscribe();
+    }
+  }
+  
+  onProviderToggle(provider: 'openRouter' | 'replicate' | 'googleGemini' | 'ollama'): void {
+    // No more mutual exclusion - providers can be enabled at the same time
     this.onSettingsChange();
     
-    // Load models when provider is enabled and has API key
-    // This ensures models are available when user enables a provider
+    // Load models when provider is enabled and has credentials
     if (provider === 'openRouter' && this.settings.openRouter.enabled && this.settings.openRouter.apiKey) {
       this.modelService.loadOpenRouterModels().subscribe();
     } else if (provider === 'replicate' && this.settings.replicate.enabled && this.settings.replicate.apiKey) {
       this.modelService.loadReplicateModels().subscribe();
     } else if (provider === 'googleGemini' && this.settings.googleGemini.enabled && this.settings.googleGemini.apiKey) {
       this.modelService.loadGeminiModels().subscribe();
+    } else if (provider === 'ollama' && this.settings.ollama.enabled && this.settings.ollama.baseUrl) {
+      this.modelService.loadOllamaModels().subscribe();
+      this.ollamaConnectionStatus = null; // Reset connection status
     }
+  }
+  
+  testOllamaConnection(): void {
+    if (!this.settings.ollama.baseUrl) return;
+    
+    this.testingOllamaConnection = true;
+    this.ollamaConnectionStatus = null;
+    
+    this.ollamaApiService.testConnection().subscribe({
+      next: () => {
+        this.testingOllamaConnection = false;
+        this.ollamaConnectionStatus = 'success';
+        // Auto-load models on successful connection
+        if (this.settings.ollama.enabled) {
+          this.modelService.loadOllamaModels().subscribe();
+        }
+      },
+      error: (error) => {
+        this.testingOllamaConnection = false;
+        this.ollamaConnectionStatus = 'error';
+        console.error('Ollama connection test failed:', error);
+      }
+    });
   }
   
   shouldShowDeprecatedOpenRouterModel(): boolean {

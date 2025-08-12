@@ -10,6 +10,7 @@ import {
   ReplicateModel
 } from '../models/model.interface';
 import { SettingsService } from './settings.service';
+import { OllamaApiService, OllamaModelsResponse } from './ollama-api.service';
 
 @Injectable({
   providedIn: 'root'
@@ -17,6 +18,7 @@ import { SettingsService } from './settings.service';
 export class ModelService {
   private http = inject(HttpClient);
   private settingsService = inject(SettingsService);
+  private ollamaApiService = inject(OllamaApiService);
 
   private readonly OPENROUTER_API_URL = 'https://openrouter.ai/api/v1';
   private readonly REPLICATE_API_URL = 'https://api.replicate.com/v1';
@@ -25,11 +27,13 @@ export class ModelService {
   private openRouterModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private replicateModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private geminiModelsSubject = new BehaviorSubject<ModelOption[]>([]);
+  private ollamaModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private loadingSubject = new BehaviorSubject<boolean>(false);
 
   public openRouterModels$ = this.openRouterModelsSubject.asObservable();
   public replicateModels$ = this.replicateModelsSubject.asObservable();
   public geminiModels$ = this.geminiModelsSubject.asObservable();
+  public ollamaModels$ = this.ollamaModelsSubject.asObservable();
   public loading$ = this.loadingSubject.asObservable();
 
   loadOpenRouterModels(): Observable<ModelOption[]> {
@@ -147,11 +151,36 @@ export class ModelService {
     return of(predefinedModels);
   }
 
-  loadAllModels(): Observable<{ openRouter: ModelOption[], replicate: ModelOption[], gemini: ModelOption[] }> {
+  loadOllamaModels(): Observable<ModelOption[]> {
+    const settings = this.settingsService.getSettings();
+    
+    if (!settings.ollama.enabled || !settings.ollama.baseUrl) {
+      return of([]);
+    }
+
+    this.loadingSubject.next(true);
+
+    return this.ollamaApiService.listModels()
+      .pipe(
+        map(response => this.transformOllamaModels(response)),
+        tap(models => {
+          this.ollamaModelsSubject.next(models);
+          this.loadingSubject.next(false);
+        }),
+        catchError(error => {
+          console.error('Failed to load Ollama models:', error);
+          this.loadingSubject.next(false);
+          return of([]);
+        })
+      );
+  }
+
+  loadAllModels(): Observable<{ openRouter: ModelOption[], replicate: ModelOption[], gemini: ModelOption[], ollama: ModelOption[] }> {
     return forkJoin({
       openRouter: this.loadOpenRouterModels(),
       replicate: this.loadReplicateModels(),
-      gemini: this.loadGeminiModels()
+      gemini: this.loadGeminiModels(),
+      ollama: this.loadOllamaModels()
     });
   }
 
@@ -218,6 +247,82 @@ export class ModelService {
       .sort((a, b) => a.label.localeCompare(b.label));
   }
 
+  private transformOllamaModels(response: OllamaModelsResponse): ModelOption[] {
+    return response.models
+      .map(model => ({
+        id: model.name,
+        label: model.name,
+        description: this.generateOllamaModelDescription(model),
+        costInputEur: 'Free',
+        costOutputEur: 'Free',
+        contextLength: this.estimateOllamaContextLength(model.name),
+        provider: 'ollama' as const
+      }))
+      .sort((a, b) => {
+        // Sort by model family and size
+        const getModelPriority = (name: string) => {
+          const lowerName = name.toLowerCase();
+          if (lowerName.includes('llama')) return 1;
+          if (lowerName.includes('mistral')) return 2;
+          if (lowerName.includes('codellama')) return 3;
+          if (lowerName.includes('qwen')) return 4;
+          if (lowerName.includes('gemma')) return 5;
+          return 10;
+        };
+        
+        const priorityA = getModelPriority(a.label);
+        const priorityB = getModelPriority(b.label);
+        
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+        
+        return a.label.localeCompare(b.label);
+      });
+  }
+
+  private generateOllamaModelDescription(model: { details?: { parameter_size?: string; quantization_level?: string }; size: number }): string {
+    let description = `Local Ollama model`;
+    
+    if (model.details) {
+      const details = model.details;
+      if (details.parameter_size) {
+        description += ` (${details.parameter_size})`;
+      }
+      if (details.quantization_level) {
+        description += ` - ${details.quantization_level}`;
+      }
+    }
+    
+    // Convert size to human-readable format
+    const sizeGB = (model.size / (1024 * 1024 * 1024)).toFixed(1);
+    description += ` - ${sizeGB}GB`;
+    
+    return description;
+  }
+
+  private estimateOllamaContextLength(modelName: string): number {
+    const lowerName = modelName.toLowerCase();
+    
+    // Context length estimates based on model families
+    if (lowerName.includes('llama3') || lowerName.includes('llama-3')) {
+      return 128000; // Llama 3 typically supports 128K
+    } else if (lowerName.includes('llama2') || lowerName.includes('llama-2')) {
+      return 4000; // Llama 2 typically 4K
+    } else if (lowerName.includes('codellama')) {
+      return 16000; // CodeLlama typically 16K
+    } else if (lowerName.includes('mistral')) {
+      return 32000; // Mistral typically 32K
+    } else if (lowerName.includes('qwen')) {
+      return 32000; // Qwen typically 32K
+    } else if (lowerName.includes('gemma')) {
+      return 8000; // Gemma typically 8K
+    }
+    
+    // Default context length
+    return 4000;
+  }
+
   private formatCostInEur(costUsdPer1M: number): string {
     const costEurPer1M = costUsdPer1M * this.USD_TO_EUR_RATE;
     if (costEurPer1M < 0.01) {
@@ -270,13 +375,19 @@ export class ModelService {
     return this.geminiModelsSubject.value;
   }
 
+  getCurrentOllamaModels(): ModelOption[] {
+    return this.ollamaModelsSubject.value;
+  }
+
   /**
    * Get available models based on the currently active API
    */
   getAvailableModels(): Observable<ModelOption[]> {
     const settings = this.settingsService.getSettings();
     
-    if (settings.googleGemini.enabled && settings.googleGemini.apiKey) {
+    if (settings.ollama.enabled && settings.ollama.baseUrl) {
+      return this.loadOllamaModels();
+    } else if (settings.googleGemini.enabled && settings.googleGemini.apiKey) {
       return this.loadGeminiModels();
     } else if (settings.openRouter.enabled && settings.openRouter.apiKey) {
       return this.loadOpenRouterModels();
@@ -300,6 +411,14 @@ export class ModelService {
     
     if (settings.googleGemini.enabled && settings.googleGemini.apiKey) {
       modelsToLoad.push(this.loadGeminiModels());
+    }
+    
+    if (settings.replicate.enabled && settings.replicate.apiKey) {
+      modelsToLoad.push(this.loadReplicateModels());
+    }
+    
+    if (settings.ollama.enabled && settings.ollama.baseUrl) {
+      modelsToLoad.push(this.loadOllamaModels());
     }
     
     if (modelsToLoad.length === 0) {
@@ -326,7 +445,9 @@ export class ModelService {
   getCurrentAvailableModels(): ModelOption[] {
     const settings = this.settingsService.getSettings();
     
-    if (settings.googleGemini.enabled && settings.googleGemini.apiKey) {
+    if (settings.ollama.enabled && settings.ollama.baseUrl) {
+      return this.getCurrentOllamaModels();
+    } else if (settings.googleGemini.enabled && settings.googleGemini.apiKey) {
       return this.getCurrentGeminiModels();
     } else if (settings.openRouter.enabled && settings.openRouter.apiKey) {
       return this.getCurrentOpenRouterModels();
@@ -358,6 +479,22 @@ export class ModelService {
         id: `gemini:${model.id}`
       }));
       allModels.push(...geminiModels);
+    }
+    
+    if (settings.replicate.enabled && settings.replicate.apiKey) {
+      const replicateModels = this.getCurrentReplicateModels().map(model => ({
+        ...model,
+        id: `replicate:${model.id}`
+      }));
+      allModels.push(...replicateModels);
+    }
+    
+    if (settings.ollama.enabled && settings.ollama.baseUrl) {
+      const ollamaModels = this.getCurrentOllamaModels().map(model => ({
+        ...model,
+        id: `ollama:${model.id}`
+      }));
+      allModels.push(...ollamaModels);
     }
     
     return allModels;

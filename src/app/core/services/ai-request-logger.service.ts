@@ -40,7 +40,7 @@ export interface AIRequestLog {
   responseHeaders?: Record<string, unknown>;
   httpStatus?: number;
   retryCount?: number;
-  apiProvider?: 'openrouter' | 'gemini' | 'replicate';
+  apiProvider?: 'openrouter' | 'gemini' | 'replicate' | 'ollama';
   streamingMode?: boolean;
   errorDetails?: Record<string, unknown>;
   networkInfo?: {
@@ -96,7 +96,7 @@ export class AIRequestLoggerService {
     wordCount: number;
     maxTokens: number;
     prompt: string;
-    apiProvider?: 'openrouter' | 'gemini' | 'replicate';
+    apiProvider?: 'openrouter' | 'gemini' | 'replicate' | 'ollama';
     streamingMode?: boolean;
     requestDetails?: AIRequestDetails;
   }): string {

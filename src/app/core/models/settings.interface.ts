@@ -2,6 +2,7 @@ export interface Settings {
   openRouter: OpenRouterSettings;
   replicate: ReplicateSettings;
   googleGemini: GoogleGeminiSettings;
+  ollama: OllamaSettings;
   sceneTitleGeneration: SceneTitleGenerationSettings;
   sceneSummaryGeneration: SceneSummaryGenerationSettings;
   selectedModel: string; // Global selected model (format: "provider:model_id")
@@ -43,6 +44,15 @@ export interface GoogleGeminiSettings {
     dangerousContent: 'BLOCK_NONE' | 'BLOCK_ONLY_HIGH' | 'BLOCK_MEDIUM_AND_ABOVE' | 'BLOCK_LOW_AND_ABOVE';
     civicIntegrity: 'BLOCK_NONE' | 'BLOCK_ONLY_HIGH' | 'BLOCK_MEDIUM_AND_ABOVE' | 'BLOCK_LOW_AND_ABOVE';
   };
+}
+
+export interface OllamaSettings {
+  baseUrl: string;
+  model: string;
+  temperature: number;
+  topP: number;
+  maxTokens: number;
+  enabled: boolean;
 }
 
 export interface SceneTitleGenerationSettings {
@@ -92,6 +102,14 @@ export const DEFAULT_SETTINGS: Settings = {
       dangerousContent: 'BLOCK_NONE',
       civicIntegrity: 'BLOCK_NONE'
     }
+  },
+  ollama: {
+    baseUrl: 'http://localhost:11434',
+    model: '',
+    temperature: 0.7,
+    topP: 1.0,
+    maxTokens: 2000,
+    enabled: false
   },
   sceneTitleGeneration: {
     maxWords: 5,

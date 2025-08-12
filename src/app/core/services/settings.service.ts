@@ -41,6 +41,10 @@ export class SettingsService {
               ...parsed.googleGemini?.contentFilter
             }
           },
+          ollama: {
+            ...DEFAULT_SETTINGS.ollama,
+            ...parsed.ollama
+          },
           sceneTitleGeneration: {
             ...DEFAULT_SETTINGS.sceneTitleGeneration,
             ...parsed.sceneTitleGeneration

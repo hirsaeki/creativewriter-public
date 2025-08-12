@@ -4,6 +4,7 @@ import { BeatAI, BeatAIGenerationEvent } from '../../stories/models/beat-ai.inte
 import { Story } from '../../stories/models/story.interface';
 import { OpenRouterApiService } from '../../core/services/openrouter-api.service';
 import { GoogleGeminiApiService } from '../../core/services/google-gemini-api.service';
+import { OllamaApiService } from '../../core/services/ollama-api.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { StoryService } from '../../stories/services/story.service';
 import { CodexService } from '../../stories/services/codex.service';
@@ -17,6 +18,7 @@ import { CodexEntry, CustomField } from '../../stories/models/codex.interface';
 export class BeatAIService {
   private readonly openRouterApi = inject(OpenRouterApiService);
   private readonly googleGeminiApi = inject(GoogleGeminiApiService);
+  private readonly ollamaApi = inject(OllamaApiService);
   private readonly settingsService = inject(SettingsService);
   private readonly storyService = inject(StoryService);
   private readonly codexService = inject(CodexService);
@@ -58,8 +60,9 @@ export class BeatAIService {
     // Check which API to use based on the model's provider
     const useGoogleGemini = provider === 'gemini' && settings.googleGemini.enabled && settings.googleGemini.apiKey;
     const useOpenRouter = provider === 'openrouter' && settings.openRouter.enabled && settings.openRouter.apiKey;
+    const useOllama = provider === 'ollama' && settings.ollama.enabled && settings.ollama.baseUrl;
     
-    if (!useGoogleGemini && !useOpenRouter) {
+    if (!useGoogleGemini && !useOpenRouter && !useOllama) {
       console.warn('No AI API configured, using fallback content');
       return this.generateFallbackContent(prompt, beatId);
     }
@@ -91,10 +94,15 @@ export class BeatAIService {
         // Update options with the actual model ID
         const updatedOptions = { ...options, model: actualModelId || undefined };
         
-        // Choose API based on configuration (prefer Google Gemini if available)
-        const apiCall = useGoogleGemini 
-          ? this.callGoogleGeminiStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId)
-          : this.callOpenRouterStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
+        // Choose API based on configuration (prioritize local Ollama, then Gemini, then OpenRouter)
+        let apiCall: Observable<string>;
+        if (useOllama) {
+          apiCall = this.callOllamaAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
+        } else if (useGoogleGemini) {
+          apiCall = this.callGoogleGeminiStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
+        } else {
+          apiCall = this.callOpenRouterStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
+        }
 
         return apiCall.pipe(
           catchError(() => {
@@ -264,6 +272,56 @@ export class BeatAIService {
         }
       }),
       map(() => accumulatedContent) // Return full content at the end
+    );
+  }
+
+  private callOllamaAPI(prompt: string, options: { model?: string; temperature?: number; topP?: number }, maxTokens: number, wordCount: number, requestId: string, beatId: string): Observable<string> {
+    // Parse the structured prompt to extract messages
+    const messages = this.parseStructuredPrompt(prompt);
+    
+    return this.ollamaApi.generateText(prompt, {
+      model: options.model,
+      maxTokens: maxTokens,
+      temperature: options.temperature,
+      topP: options.topP,
+      requestId: requestId,
+      messages: messages
+    }).pipe(
+      tap((response: { response?: string; message?: { content: string } }) => {
+        // Handle both generate and chat response formats
+        const text = 'response' in response ? response.response || '' : response.message?.content || '';
+        
+        // For non-streaming responses, emit all content at once
+        this.generationSubject.next({
+          beatId,
+          chunk: text,
+          isComplete: false
+        });
+      }),
+      map((response: { response?: string; message?: { content: string } }) => {
+        // Extract text from response
+        const text = 'response' in response ? response.response || '' : response.message?.content || '';
+        
+        // Post-process to remove duplicate character analyses
+        const processedContent = this.removeDuplicateCharacterAnalyses(text);
+        
+        // Emit completion
+        this.generationSubject.next({
+          beatId,
+          chunk: '',
+          isComplete: true
+        });
+        
+        // Clean up active generation
+        this.activeGenerations.delete(beatId);
+        
+        // Signal streaming stopped if no more active generations
+        if (this.activeGenerations.size === 0) {
+          this.isStreamingSubject.next(false);
+        }
+        
+        return processedContent;
+      })
     );
   }
 
