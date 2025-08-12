@@ -1,8 +1,0 @@
-[2025-08-11 09:15:55] 🚀 Invoking CI/CD Specialist Subagent
-[2025-08-11 09:15:55] Mode: monitor
-[2025-08-11 09:15:55] Workflow: All
-[2025-08-11 09:15:55] Branch: release
-[2025-08-11 09:15:55] Verbose: false
-[2025-08-11 09:15:55] Dry Run: true
-[2025-08-11 09:15:55] 🔍 DRY RUN MODE - No actual changes will be made
-[2025-08-11 09:15:55] ✅ Dry run completed - prompt generated successfully

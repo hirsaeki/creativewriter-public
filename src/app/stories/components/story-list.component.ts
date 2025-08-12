@@ -139,7 +139,7 @@ import { VersionService } from '../../core/services/version.service';
       <ng-template #noStories>
         <div class="no-stories">
           <p>No stories available yet.</p>
-          <p>Beginne mit dem Schreiben deiner ersten Geschichte!</p>
+          <p>Start writing your first story!</p>
         </div>
       </ng-template>
       
