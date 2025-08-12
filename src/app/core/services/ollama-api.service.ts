@@ -166,7 +166,7 @@ export class OllamaApiService {
 
     this.requestMetadata.set(requestId, { logId, startTime });
 
-    return this.http.post<OllamaResponse | OllamaChatResponse>(url, requestBody, { headers })
+    return this.http.post<OllamaResponse | OllamaChatResponse>(url, requestBody)
       .pipe(
         takeUntil(abortSubject),
         tap(response => {
@@ -415,7 +415,7 @@ export class OllamaApiService {
 
     const url = `${settings.ollama.baseUrl}/api/tags`;
 
-    return this.http.get(url, { headers })
+    return this.http.get(url)
       .pipe(
         map(() => true),
         tap(() => console.log('Ollama connection test successful')),
