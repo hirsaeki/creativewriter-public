@@ -187,6 +187,9 @@ export class ProseMirrorEditorService {
         parseDOM: [{
           tag: 'div.beat-ai-node',
           getAttrs: (dom: HTMLElement) => {
+            const selectedScenesStr = dom.getAttribute('data-selected-scenes') || '';
+            const includeStoryOutlineStr = dom.getAttribute('data-include-story-outline') || '';
+            
             const attrs = {
               id: dom.getAttribute('data-id') || '',
               prompt: dom.getAttribute('data-prompt') || '',
@@ -197,7 +200,9 @@ export class ProseMirrorEditorService {
               updatedAt: dom.getAttribute('data-updated') || '',
               wordCount: parseInt(dom.getAttribute('data-word-count') || '400', 10),
               beatType: dom.getAttribute('data-beat-type') || 'story',
-              model: dom.getAttribute('data-model') || ''
+              model: dom.getAttribute('data-model') || '',
+              selectedScenes: selectedScenesStr || '',
+              includeStoryOutline: includeStoryOutlineStr !== '' ? (includeStoryOutlineStr === 'true') : null
             };
             
             return attrs;
