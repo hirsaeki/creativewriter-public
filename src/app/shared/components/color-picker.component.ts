@@ -117,7 +117,7 @@ interface ColorPreset {
 
       <!-- Recent Colors -->
       <div class="recent-colors" *ngIf="recentColors.length > 0">
-        <h4>Zuletzt verwendet</h4>
+        <h4>Recently Used</h4>
         <div class="color-grid">
           <button
             *ngFor="let color of recentColors"

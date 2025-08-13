@@ -523,12 +523,12 @@ export class BackgroundSelectorComponent implements OnInit, OnChanges {
     return [
       {
         filename: 'abstract-energy-lines.png',
-        displayName: 'Energie',
+        displayName: 'Energy',
         previewPath: 'assets/backgrounds/abstract-energy-lines.png'
       },
       {
         filename: 'cosmic-galaxy-burst.png',
-        displayName: 'Galaxie',
+        displayName: 'Galaxy',
         previewPath: 'assets/backgrounds/cosmic-galaxy-burst.png'
       },
       {
@@ -538,7 +538,7 @@ export class BackgroundSelectorComponent implements OnInit, OnChanges {
       },
       {
         filename: 'cyberpunk-asian-street.png',
-        displayName: 'Cyberpunk Asien',
+        displayName: 'Cyberpunk Asian',
         previewPath: 'assets/backgrounds/cyberpunk-asian-street.png'
       },
       {
@@ -548,27 +548,27 @@ export class BackgroundSelectorComponent implements OnInit, OnChanges {
       },
       {
         filename: 'cyberpunk-neon-corridor.png',
-        displayName: 'Cyberpunk Korridor',
+        displayName: 'Cyberpunk Corridor',
         previewPath: 'assets/backgrounds/cyberpunk-neon-corridor.png'
       },
       {
         filename: 'dark-witch-forest.png',
-        displayName: 'Hexenwald',
+        displayName: 'Witch Forest',
         previewPath: 'assets/backgrounds/dark-witch-forest.png'
       },
       {
         filename: 'gothic-dark-moon-woman.png',
-        displayName: 'Gothic Mond',
+        displayName: 'Gothic Moon',
         previewPath: 'assets/backgrounds/gothic-dark-moon-woman.png'
       },
       {
         filename: 'medieval-castle-street.png',
-        displayName: 'Mittelalter',
+        displayName: 'Medieval',
         previewPath: 'assets/backgrounds/medieval-castle-street.png'
       },
       {
         filename: 'modern-dark-apartment.png',
-        displayName: 'Moderne Wohnung',
+        displayName: 'Modern Apartment',
         previewPath: 'assets/backgrounds/modern-dark-apartment.png'
       },
       {
@@ -583,17 +583,17 @@ export class BackgroundSelectorComponent implements OnInit, OnChanges {
       },
       {
         filename: 'sci-fi-laboratory.png',
-        displayName: 'Sci-Fi Labor',
+        displayName: 'Sci-Fi Laboratory',
         previewPath: 'assets/backgrounds/sci-fi-laboratory.png'
       },
       {
         filename: 'space-nebula-stars.png',
-        displayName: 'Weltraum',
+        displayName: 'Space',
         previewPath: 'assets/backgrounds/space-nebula-stars.png'
       },
       {
         filename: 'zombie-apocalypse-scene.png',
-        displayName: 'Apokalypse',
+        displayName: 'Apocalypse',
         previewPath: 'assets/backgrounds/zombie-apocalypse-scene.png'
       }
     ];

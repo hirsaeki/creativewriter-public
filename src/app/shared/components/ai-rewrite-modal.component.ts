@@ -103,7 +103,7 @@ interface SceneContext {
 
       <!-- Original Text -->
       <ion-item class="original-text-item">
-        <ion-label position="stacked">Originaltext</ion-label>
+        <ion-label position="stacked">Original Text</ion-label>
         <div class="original-text">{{ selectedText }}</div>
       </ion-item>
 
@@ -121,7 +121,7 @@ interface SceneContext {
 
       <!-- Quick Prompts -->
       <div class="quick-prompts" *ngIf="!isRewriting">
-        <ion-label>Schnelle Optionen:</ion-label>
+        <ion-label>Quick Options:</ion-label>
         <div class="prompt-chips">
           <ion-chip 
             *ngFor="let prompt of quickPrompts" 
@@ -184,7 +184,7 @@ interface SceneContext {
           fill="solid" 
           color="success"
           (click)="useRewrittenText()">
-          Text verwenden
+          Use Text
         </ion-button>
       </div>
     </ion-content>
@@ -401,9 +401,9 @@ export class AIRewriteModalComponent implements OnInit {
     'Make it more casual',
     'Shorten it',
     'Expand it',
-    'Emotionaler schreiben',
-    'Sachlicher schreiben',
-    'Verbessere die Grammatik',
+    'Write more emotionally',
+    'Write more objectively',
+    'Improve grammar',
     'Express more simply'
   ];
 
@@ -493,7 +493,7 @@ export class AIRewriteModalComponent implements OnInit {
       });
     } catch (error) {
       console.error('Error rewriting text:', error);
-      this.rewrittenText = 'Fehler beim Neu-Formulieren des Textes. Bitte versuchen Sie es erneut.';
+      this.rewrittenText = 'Error rewriting text. Please try again.';
       this.isRewriting = false;
     }
   }
