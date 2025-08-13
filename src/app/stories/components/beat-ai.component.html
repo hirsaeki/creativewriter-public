@@ -1,0 +1,274 @@
+    <div class="beat-ai-container" [class.editing]="beatData.isEditing" [class.generating]="beatData.isGenerating" [style.--beat-ai-text-color]="currentTextColor">
+      <!-- Prompt Input Section -->
+      <div class="beat-prompt-section" [class.collapsed]="!beatData.isEditing && beatData.generatedContent">
+        <div class="beat-header">
+          <div class="beat-icon">
+            <ion-icon name="color-wand-outline"></ion-icon>
+          </div>
+          <div class="beat-title">Beat AI</div>
+          <div class="beat-actions">
+            <button 
+              *ngIf="beatData.isEditing || !beatData.prompt" 
+              class="action-btn context-btn"
+              (click)="showSceneSelector = true; $event.stopPropagation()"
+              title="Select context">
+              <ion-icon name="add-outline"></ion-icon>
+            </button>
+            <button 
+              *ngIf="beatData.isEditing || !beatData.prompt" 
+              class="action-btn outline-btn"
+              [class.active]="includeStoryOutline"
+              (click)="toggleStoryOutline(); $event.stopPropagation()"
+              title="Include/exclude story overview">
+              <ion-icon name="reader-outline"></ion-icon>
+            </button>
+            <button 
+              *ngIf="!beatData.isEditing && beatData.prompt" 
+              class="action-btn edit-btn"
+              (click)="startEditing(); $event.stopPropagation()"
+              title="Edit prompt">
+              <ion-icon name="create-outline"></ion-icon>
+            </button>
+            <button 
+              *ngIf="beatData.generatedContent && !beatData.isGenerating" 
+              class="action-btn regenerate-btn"
+              (click)="regenerateContent(); $event.stopPropagation()"
+              title="Regenerate">
+              <ion-icon name="refresh-outline"></ion-icon>
+            </button>
+            <button 
+              *ngIf="beatData.generatedContent && !beatData.isGenerating" 
+              class="action-btn delete-btn"
+              (click)="deleteContentAfterBeat(); $event.stopPropagation()"
+              title="Delete text after this beat">
+              <ion-icon name="trash-outline"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <!-- Context Chips -->
+        <div class="context-chips" *ngIf="selectedScenes.length > 0 || includeStoryOutline">
+          <ion-chip *ngIf="includeStoryOutline" color="success">
+            <ion-label>Story Overview</ion-label>
+            <ion-icon 
+              name="close-outline" 
+              (click)="removeStoryOutline(); $event.stopPropagation()">
+            </ion-icon>
+          </ion-chip>
+          <ion-chip *ngFor="let scene of selectedScenes" [color]="scene.sceneId === sceneId ? 'primary' : 'medium'">
+            <ion-label>{{ scene.chapterTitle }} - {{ scene.sceneTitle }}</ion-label>
+            <ion-icon 
+              name="close-outline" 
+              (click)="removeSceneContext(scene); $event.stopPropagation()">
+            </ion-icon>
+          </ion-chip>
+        </div>
+        
+        <div class="prompt-input-container" *ngIf="beatData.isEditing || !beatData.prompt">
+          <div
+            #promptInput
+            class="prompt-input prosemirror-container"
+          ></div>
+          
+          <!-- Generation Options -->
+          <div class="generation-options" *ngIf="beatData.isEditing || !beatData.prompt">
+            <div class="options-row">
+              <div class="option-group">
+                <ng-select [(ngModel)]="selectedBeatType"
+                           [items]="beatTypeOptions"
+                           bindLabel="label"
+                           bindValue="value"
+                           [clearable]="false"
+                           [searchable]="false"
+                           placeholder="Choose beat type..."
+                           class="model-select"
+                           appendTo="body"
+                           (change)="onBeatTypeChange()">
+                  <ng-template ng-option-tmp let-item="item">
+                    <div class="beat-type-option">
+                      <span class="beat-type-label">{{ item.label }}</span>
+                      <span class="beat-type-description">{{ item.description }}</span>
+                    </div>
+                  </ng-template>
+                </ng-select>
+              </div>
+              <div class="option-group">
+                <ng-select [(ngModel)]="selectedWordCount"
+                           [items]="wordCountOptions"
+                           bindLabel="label"
+                           bindValue="value"
+                           [clearable]="false"
+                           [searchable]="false"
+                           placeholder="Choose word count..."
+                           class="model-select"
+                           appendTo="body"
+                           (change)="onWordCountChange()">
+                </ng-select>
+                <input 
+                  *ngIf="showCustomWordCount"
+                  type="number"
+                  [(ngModel)]="customWordCount"
+                  class="custom-word-count"
+                  placeholder="Anzahl eingeben..."
+                  min="10"
+                  max="50000"
+                  (blur)="validateCustomWordCount()">
+              </div>
+              <div class="option-group model-selection-group">
+                <!-- Favorite Models Quick Access -->
+                <div class="favorite-models" *ngIf="favoriteModels.length > 0">
+                  <div class="favorite-label">Favoriten:</div>
+                  <div class="favorite-buttons">
+                    <button *ngFor="let model of favoriteModels"
+                            class="favorite-btn"
+                            [class.active]="selectedModel === model.id"
+                            (click)="selectFavoriteModel(model)"
+                            [title]="model.label">
+                      <ion-icon [name]="getProviderIcon(model.provider)" class="provider-icon-inline" [class.gemini]="model.provider === 'gemini'" [class.openrouter]="model.provider === 'openrouter'"></ion-icon>
+                      <span class="model-short-name">{{ getShortModelName(model.label) }}</span>
+                    </button>
+                  </div>
+                </div>
+                <ng-select [(ngModel)]="selectedModel"
+                           [items]="availableModels"
+                           bindLabel="label"
+                           bindValue="id"
+                           [clearable]="false"
+                           [searchable]="true"
+                           placeholder="Select model..."
+                           class="model-select"
+                           appendTo="body"
+                           (change)="onModelChange()">
+                  <ng-template ng-label-tmp let-item="item">
+                    <div class="model-option-inline">
+                      <ion-icon [name]="getProviderIcon(item.provider)" class="provider-icon-inline" [class.gemini]="item.provider === 'gemini'" [class.openrouter]="item.provider === 'openrouter'"></ion-icon>
+                      <span class="model-label">{{ item.label }}</span>
+                      <button class="favorite-toggle"
+                              (click)="toggleFavorite($event, item)"
+                              [class.is-favorite]="isFavorite(item.id)"
+                              title="Mark as favorite">
+                        ⭐
+                      </button>
+                    </div>
+                  </ng-template>
+                  <ng-template ng-option-tmp let-item="item">
+                    <div class="model-option-inline">
+                      <ion-icon [name]="getProviderIcon(item.provider)" class="provider-icon-inline" [class.gemini]="item.provider === 'gemini'" [class.openrouter]="item.provider === 'openrouter'"></ion-icon>
+                      <span class="model-label">{{ item.label }}</span>
+                      <button class="favorite-toggle"
+                              (click)="toggleFavorite($event, item)"
+                              [class.is-favorite]="isFavorite(item.id)"
+                              title="Mark as favorite">
+                        ⭐
+                      </button>
+                    </div>
+                  </ng-template>
+                </ng-select>
+              </div>
+            </div>
+          </div>
+
+          <div class="prompt-actions">
+            <button 
+              class="generate-btn primary"
+              (click)="generateContent(); $event.stopPropagation()"
+              [disabled]="!currentPrompt.trim() || beatData.isGenerating || !selectedModel">
+              Generate
+            </button>
+            <button 
+              class="generate-btn primary"
+              (click)="showPromptPreview(); $event.stopPropagation()"
+              [disabled]="!currentPrompt.trim()"
+              title="Show prompt preview">
+              👁️ Preview
+            </button>
+            <button 
+              class="generate-btn secondary"
+              (click)="showTokenInfo(); $event.stopPropagation()"
+              [disabled]="!currentPrompt.trim() || !selectedModel"
+              title="Token-Analyse anzeigen">
+              <ion-icon name="analytics-outline"></ion-icon>
+            </button>
+            <button 
+              *ngIf="beatData.prompt && beatData.isEditing"
+              class="cancel-btn"
+              (click)="cancelEditing(); $event.stopPropagation()">
+              Cancel
+            </button>
+          </div>
+        </div>
+        
+        <div class="prompt-display" *ngIf="!beatData.isEditing && beatData.prompt">
+          <div class="prompt-text">{{ beatData.prompt }}</div>
+          <div class="beat-info">
+            <span class="beat-type-badge" [class.story-beat]="(beatData.beatType || 'story') === 'story'" [class.scene-beat]="(beatData.beatType || 'story') === 'scene'">
+              {{ (beatData.beatType || 'story') === 'story' ? 'StoryBeat' : 'SceneBeat' }}
+            </span>
+            <span class="model-badge" *ngIf="beatData.model" title="Verwendetes AI-Modell">
+              {{ getModelDisplayName(beatData.model) }}
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Generation Status -->
+      <div class="generation-status" *ngIf="beatData.isGenerating">
+        <div class="generation-indicator">
+          <span class="generating-text">Text wird gestreamt...</span>
+          <div class="typing-indicator">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+        <button 
+          class="stop-btn"
+          (click)="stopGeneration(); $event.stopPropagation()"
+          title="Stop generation">
+          ⏹️ Stop
+        </button>
+      </div>
+    </div>
+
+
+    <!-- Scene Selector Modal -->
+    <ion-modal [isOpen]="showSceneSelector" (didDismiss)="showSceneSelector = false">
+      <ng-template>
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Add Scenes as Context</ion-title>
+            <ion-buttons slot="end">
+              <ion-button (click)="showSceneSelector = false">
+                <ion-icon name="close-outline" slot="icon-only"></ion-icon>
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content>
+          <ion-searchbar 
+            [(ngModel)]="sceneSearchTerm" 
+            placeholder="Search scene..."
+            animated="true">
+          </ion-searchbar>
+          
+          <ion-list>
+            <div *ngFor="let chapter of story?.chapters">
+              <ion-item-divider>
+                <ion-label>C{{ chapter.chapterNumber || chapter.order }}:{{ chapter.title }}</ion-label>
+              </ion-item-divider>
+              <ion-item 
+                *ngFor="let scene of getFilteredScenes(chapter)" 
+                [button]="true"
+                (click)="toggleSceneSelection(chapter.id, scene.id)">
+                <ion-checkbox 
+                  slot="start" 
+                  [checked]="isSceneSelected(scene.id)">
+                </ion-checkbox>
+                <ion-label>
+                  <h3>C{{ chapter.chapterNumber || chapter.order }}S{{ scene.sceneNumber || scene.order }}:{{ scene.title }}</h3>
+                  <p>{{ getScenePreview(scene) }}</p>
+                </ion-label>
+              </ion-item>
+            </div>
+          </ion-list>
+        </ion-content>
+      </ng-template>
+    </ion-modal>
