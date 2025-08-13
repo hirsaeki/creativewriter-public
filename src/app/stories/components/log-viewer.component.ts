@@ -9,7 +9,7 @@ import {
 import { addIcons } from 'ionicons';
 import { arrowBack } from 'ionicons/icons';
 import { AILogTabComponent } from './ai-log-tab/ai-log-tab.component';
-import { SyncLogTabComponent } from './sync-log-tab.component';
+import { SyncLogTabComponent } from './sync-log-tab/sync-log-tab.component';
 
 @Component({
   selector: 'app-log-viewer',
