@@ -15,7 +15,7 @@ import {
 import { StoryService } from '../../services/story.service';
 import { Story, Scene } from '../../models/story.interface';
 import { StoryStructureComponent } from '../story-structure/story-structure.component';
-import { SlashCommandDropdownComponent } from '../slash-command-dropdown.component';
+import { SlashCommandDropdownComponent } from '../slash-command-dropdown/slash-command-dropdown.component';
 import { StoryStatsComponent } from '../story-stats/story-stats.component';
 import { SlashCommandResult, SlashCommandAction } from '../../models/slash-command.interface';
 import { Subscription, debounceTime, Subject, throttleTime } from 'rxjs';
