@@ -1,0 +1,214 @@
+<div class="ion-page">
+  <ion-header>
+    <ion-toolbar >
+      <ion-buttons slot="start">
+        <ion-button (click)="goBack()">
+          <ion-icon name="arrow-back" slot="icon-only"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+      <ion-title>Image Generation</ion-title>
+      <ion-buttons slot="end">
+        <ion-button (click)="clearHistory()">
+          <ion-icon name="refresh-outline" slot="icon-only"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-header>
+  
+  <ion-content >
+    <div class="container">
+      <!-- Model Selection -->
+      <ion-card >
+        <ion-card-header>
+          <ion-card-title>
+            <ion-icon name="settings-outline"></ion-icon>
+            Modell Auswahl
+          </ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-item >
+            <ion-label>Modell</ion-label>
+            <ion-select [(ngModel)]="selectedModelId" (ionChange)="onModelChange()">
+              <ion-select-option *ngFor="let model of availableModels" [value]="model.id">
+                {{ model.name }}
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+          <p *ngIf="selectedModel" class="model-description">
+            {{ selectedModel.description }}
+          </p>
+        </ion-card-content>
+      </ion-card>
+
+      <!-- Generation Parameters -->
+      <ion-card  *ngIf="selectedModel">
+        <ion-card-header>
+          <ion-card-title>
+            <ion-icon name="image-outline"></ion-icon>
+            Parameter
+          </ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <div *ngFor="let input of selectedModel.inputs" class="parameter-item">
+            <!-- String inputs -->
+            <ion-item  *ngIf="input.type === 'string' && input.name !== 'prompt'">
+              <ion-label position="stacked">{{ input.description }}</ion-label>
+              <ion-input 
+                [(ngModel)]="parameters[input.name]" 
+                [placeholder]="input.default || ''"
+                type="text">
+              </ion-input>
+            </ion-item>
+
+            <!-- Prompt (textarea) -->
+            <ion-item  *ngIf="input.name === 'prompt'">
+              <ion-label position="stacked">{{ input.description }} *</ion-label>
+              <ion-textarea 
+                [(ngModel)]="parameters[input.name]" 
+                [placeholder]="'Describe the image you want to generate...'"
+                rows="3"
+                required>
+              </ion-textarea>
+            </ion-item>
+
+            <!-- Number/Integer inputs -->
+            <ion-item  *ngIf="input.type === 'number' || input.type === 'integer'">
+              <ion-label position="stacked">
+                {{ input.description }}
+                <span *ngIf="input.minimum !== undefined && input.maximum !== undefined">
+                  ({{ input.minimum }} - {{ input.maximum }})
+                </span>
+              </ion-label>
+              <ion-range 
+                [(ngModel)]="parameters[input.name]"
+                [min]="input.minimum || 0"
+                [max]="input.maximum || 100"
+                [step]="getStepSize(input)"
+                color="primary"
+                [pin]="true">
+                <ion-label slot="start">{{ input.minimum || 0 }}</ion-label>
+                <ion-label slot="end">{{ input.maximum || 100 }}</ion-label>
+              </ion-range>
+              <div class="range-value">Wert: {{ parameters[input.name] }}</div>
+            </ion-item>
+
+            <!-- Boolean inputs -->
+            <ion-item  *ngIf="input.type === 'boolean'">
+              <ion-checkbox [(ngModel)]="parameters[input.name]"></ion-checkbox>
+              <ion-label class="ion-margin-start">{{ input.description }}</ion-label>
+            </ion-item>
+
+            <!-- Array/Options inputs -->
+            <ion-item  *ngIf="input.options && input.options.length > 0">
+              <ion-label>{{ input.description }}</ion-label>
+              <ion-select [(ngModel)]="parameters[input.name]">
+                <ion-select-option *ngFor="let option of input.options" [value]="option">
+                  {{ option }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+          </div>
+
+          <!-- Generate Button -->
+          <ion-button 
+            expand="block" 
+            color="primary" 
+            (click)="generateImage()"
+            [disabled]="isGenerating || !parameters['prompt']">
+            <ion-icon name="image-outline" slot="start"></ion-icon>
+            <span *ngIf="!isGenerating">Generate Image</span>
+            <span *ngIf="isGenerating">
+              <ion-spinner name="crescent"></ion-spinner>
+              Generating...
+            </span>
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
+
+      <!-- Generation History -->
+      <ion-card  *ngIf="jobs.length > 0">
+        <ion-card-header>
+          <ion-card-title>
+            <ion-icon name="time-outline"></ion-icon>
+            History
+          </ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-grid>
+            <ion-row>
+              <ion-col size="12" size-md="6" size-lg="4" *ngFor="let job of jobs">
+                <div class="job-card">
+                  <div class="job-header">
+                    <ion-chip [color]="getStatusColor(job.status)">
+                      <ion-icon [name]="getStatusIcon(job.status)"></ion-icon>
+                      <ion-label>{{ getStatusText(job.status) }}</ion-label>
+                    </ion-chip>
+                    <small>{{ formatDate(job.createdAt) }}</small>
+                  </div>
+                  
+                  <div class="job-prompt">
+                    <strong>Prompt:</strong> {{ job.prompt }}
+                  </div>
+
+                  <div class="job-progress" *ngIf="job.status === 'processing'">
+                    <ion-progress-bar type="indeterminate" color="primary"></ion-progress-bar>
+                  </div>
+
+                  <!-- Multiple images gallery -->
+                  <div class="job-images" *ngIf="job.imageUrls && job.imageUrls.length > 1">
+                    <div class="images-header">
+                      <span class="image-count">{{ job.imageUrls.length }} images generated</span>
+                    </div>
+                    <div class="images-grid">
+                      <div 
+                        class="image-item" 
+                        *ngFor="let imageUrl of job.imageUrls; let i = index"
+                      >
+                        <ion-img 
+                          [src]="imageUrl" 
+                          [alt]="job.prompt + ' - Image ' + (i + 1)"
+                          (click)="viewImage(imageUrl)"
+                          class="thumbnail-image">
+                        </ion-img>
+                        <div class="image-overlay">
+                          <ion-button fill="clear" size="small" (click)="downloadImage(imageUrl, job.prompt + '_' + (i + 1))">
+                            <ion-icon name="download-outline" slot="icon-only"></ion-icon>
+                          </ion-button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Single image (fallback) -->
+                  <div class="job-image" *ngIf="job.imageUrl && (!job.imageUrls || job.imageUrls.length <= 1)">
+                    <ion-img 
+                      [src]="job.imageUrl" 
+                      [alt]="job.prompt"
+                      (click)="viewImage(job.imageUrl)"
+                      class="thumbnail-image">
+                    </ion-img>
+                    <ion-button fill="clear" size="small" (click)="downloadImage(job.imageUrl, job.prompt)">
+                      <ion-icon name="download-outline" slot="icon-only"></ion-icon>
+                    </ion-button>
+                  </div>
+
+                  <div class="job-error" *ngIf="job.error">
+                    <p class="error-text">{{ job.error }}</p>
+                  </div>
+                </div>
+              </ion-col>
+            </ion-row>
+          </ion-grid>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
+    <!-- Toast for notifications -->
+    <ion-toast
+      [isOpen]="showToast"
+      [message]="toastMessage"
+      [duration]="3000"
+      (didDismiss)="showToast = false">
+    </ion-toast>
+  </ion-content>
+</div>

@@ -1,0 +1,287 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  min-height: 100vh;
+  background: transparent;
+}
+
+.ion-page {
+  background: transparent;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+ion-header {
+  backdrop-filter: blur(15px);
+  background: rgba(45, 45, 45, 0.85);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
+  position: relative;
+  z-index: 100;
+}
+
+ion-toolbar {
+  --background: transparent;
+  --color: #f8f9fa;
+}
+
+ion-title {
+  background: linear-gradient(135deg, #f8f9fa 0%, #8bb4f8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+ion-content {
+  --background: transparent !important;
+  background: transparent !important;
+  --overflow: auto;
+}
+
+ion-content::part(background) {
+  background: transparent !important;
+}
+
+.container {
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-bottom: 4rem; /* Extra space for scrolling */
+}
+
+ion-card {
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, rgba(20, 20, 20, 0.3) 0%, rgba(15, 15, 15, 0.3) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  --color: #f8f9fa;
+}
+
+ion-card:hover {
+  background: linear-gradient(135deg, rgba(25, 25, 25, 0.4) 0%, rgba(20, 20, 20, 0.4) 100%);
+  border-color: rgba(71, 118, 230, 0.3);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+ion-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #f8f9fa;
+}
+
+.model-description {
+  color: #adb5bd;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+.parameter-item {
+  margin-bottom: 1rem;
+}
+
+.range-value {
+  text-align: center;
+  color: #adb5bd;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+ion-item {
+  --background: transparent;
+  --color: #f8f9fa;
+}
+
+ion-input, ion-textarea, ion-select {
+  --color: #f8f9fa;
+  --placeholder-color: #6c757d;
+}
+
+.job-card {
+  background: #343a40;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.job-header small {
+  color: #6c757d;
+}
+
+.job-prompt {
+  color: #e0e0e0;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.job-progress {
+  margin: 0.5rem 0;
+}
+
+/* Multiple images gallery */
+.job-images {
+  margin-top: 0.5rem;
+}
+
+.images-header {
+  margin-bottom: 0.5rem;
+}
+
+.image-count {
+  color: #0d6efd;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.image-item {
+  position: relative;
+  aspect-ratio: 1;
+}
+
+.image-item ion-img {
+  border-radius: 6px;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #1a1a1a;
+  border: 1px solid #404040;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.image-item ion-img:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: #0d6efd;
+}
+
+.image-overlay {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.image-item:hover .image-overlay {
+  opacity: 1;
+}
+
+.image-overlay ion-button {
+  --background: rgba(0, 0, 0, 0.8);
+  --color: white;
+  width: 32px;
+  height: 32px;
+}
+
+/* Single image (existing styles) */
+.job-image {
+  position: relative;
+  margin-top: 0.5rem;
+}
+
+.job-image ion-img {
+  border-radius: 8px;
+  width: 100%;
+  height: 200px;
+  object-fit: contain;
+  background-color: #1a1a1a;
+  border: 1px solid #404040;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.job-image ion-img:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: #0d6efd;
+}
+
+.job-image ion-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  --background: rgba(0, 0, 0, 0.7);
+}
+
+.job-error {
+  background: #dc3545;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+
+.error-text {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+ion-button[disabled] {
+  opacity: 0.6;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0.5rem;
+    padding-bottom: 6rem; /* More space on mobile */
+  }
+  
+  ion-card {
+    margin-bottom: 0.5rem;
+  }
+
+  .job-image ion-img {
+    height: 180px;
+  }
+
+  .images-grid {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    max-height: 300px;
+  }
+
+  .image-overlay ion-button {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* Ensure grid doesn't break scrolling */
+ion-grid {
+  padding: 0;
+}
+
+ion-row, ion-col {
+  padding: 0;
+  margin: 0;
+}
+
+/* Fix potential scroll issues with absolute positioned elements */
+.job-card {
+  position: relative;
+  overflow: visible;
+}
