@@ -1,7 +1,7 @@
 import { ComponentRef, Injector, ApplicationRef, createComponent, EnvironmentInjector } from '@angular/core';
 import { EditorView, NodeView } from 'prosemirror-view';
 import { Node as ProseMirrorNode } from 'prosemirror-model';
-import { BeatAIComponent } from '../../stories/components/beat-ai.component';
+import { BeatAIComponent } from '../../stories/components/beat-ai/beat-ai.component';
 import { BeatAI, BeatAIPromptEvent } from '../../stories/models/beat-ai.interface';
 import { ProseMirrorEditorService } from './prosemirror-editor.service';
 
