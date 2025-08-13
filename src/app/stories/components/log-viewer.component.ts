@@ -8,7 +8,7 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { arrowBack } from 'ionicons/icons';
-import { AILogTabComponent } from './ai-log-tab.component';
+import { AILogTabComponent } from './ai-log-tab/ai-log-tab.component';
 import { SyncLogTabComponent } from './sync-log-tab.component';
 
 @Component({
