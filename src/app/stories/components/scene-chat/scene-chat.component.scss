@@ -1,0 +1,427 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  min-height: 100vh;
+  background: transparent;
+}
+
+.ion-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: transparent;
+}
+
+
+ion-content {
+  --background: transparent !important;
+  background: transparent !important;
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  flex: 1;
+}
+
+ion-content::part(background) {
+  background: transparent !important;
+}
+
+ion-content::part(scroll) {
+  background: transparent !important;
+}
+
+.chat-content {
+  --background: transparent !important;
+  background: transparent !important;
+}
+
+.context-chips {
+  padding: 8px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: rgba(45, 45, 45, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+}
+
+.context-chips ion-chip {
+  margin: 0;
+}
+
+.chat-messages {
+  padding: 16px;
+  padding-bottom: 80px; /* Further reduced padding for footer */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.message {
+  display: flex;
+  gap: 12px;
+  max-width: 80%;
+}
+
+.user-message {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.assistant-message {
+  align-self: flex-start;
+}
+
+.message-avatar ion-avatar {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ion-color-primary);
+  color: white;
+}
+
+.assistant-message .message-avatar ion-avatar {
+  background: var(--ion-color-tertiary);
+}
+
+.message-content {
+  background: linear-gradient(135deg, rgba(42, 42, 42, 0.4) 0%, rgba(31, 31, 31, 0.4) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 12px 16px;
+  max-width: 100%;
+  backdrop-filter: blur(8px);
+  color: #f8f9fa;
+}
+
+.user-message .message-content {
+  background: linear-gradient(135deg, rgba(71, 118, 230, 0.6) 0%, rgba(143, 84, 233, 0.6) 100%);
+  border-color: rgba(71, 118, 230, 0.3);
+  color: white;
+}
+
+.message-text {
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.message-time {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
+.message-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.message-actions ion-button {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  font-size: 0.875rem;
+}
+
+.message-actions ion-button[fill="clear"] {
+  --color: var(--ion-color-medium);
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.message-actions ion-button[fill="clear"]:hover {
+  opacity: 1;
+  --color: var(--ion-color-primary);
+}
+
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.typing-indicator span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ion-color-medium);
+  animation: typing 1.4s infinite;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    opacity: 0.3;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+.chat-footer {
+  background: rgba(45, 45, 45, 0.3);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 16px;
+  padding-bottom: max(env(safe-area-inset-bottom, 20px), 40px);
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  margin-bottom: env(keyboard-inset-height, 0px);
+}
+
+.input-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(20, 20, 20, 0.2) 0%, rgba(15, 15, 15, 0.2) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  padding: 4px 4px 4px 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.message-input {
+  flex: 1;
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+  --background: transparent;
+  --color: #f8f9fa;
+  --placeholder-color: #adb5bd;
+  min-height: 40px;
+  max-height: 120px;
+}
+
+.send-button {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  margin: 0;
+}
+
+ion-searchbar {
+  --background: rgba(20, 20, 20, 0.4);
+  --color: #f8f9fa;
+  --placeholder-color: #adb5bd;
+  --icon-color: #8bb4f8;
+  --clear-button-color: #8bb4f8;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+}
+
+ion-item-divider {
+  font-weight: 600;
+}
+
+ion-modal {
+  --backdrop-opacity: 0.6;
+}
+
+ion-modal ion-content {
+  --background: rgba(0, 0, 0, 0.8);
+}
+
+ion-modal ion-header {
+  backdrop-filter: blur(15px);
+  background: rgba(45, 45, 45, 0.85);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
+}
+
+ion-modal ion-toolbar {
+  --background: transparent;
+  --color: #f8f9fa;
+}
+
+ion-modal ion-title {
+  background: linear-gradient(135deg, #f8f9fa 0%, #8bb4f8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+ion-modal ion-list {
+  background: transparent;
+  padding-bottom: 200px; /* Much more padding at bottom of modal list */
+}
+
+ion-modal ion-item {
+  --background: linear-gradient(135deg, rgba(20, 20, 20, 0.3) 0%, rgba(15, 15, 15, 0.3) 100%);
+  --color: #f8f9fa;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin: 8px 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+ion-modal ion-item:hover {
+  --background: linear-gradient(135deg, rgba(71, 118, 230, 0.3) 0%, rgba(139, 180, 248, 0.3) 100%);
+  border-color: rgba(71, 118, 230, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(71, 118, 230, 0.3);
+}
+
+ion-modal ion-item-divider {
+  --background: rgba(45, 45, 45, 0.8);
+  --color: #8bb4f8;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-weight: 600;
+  margin: 8px 16px;
+  border-radius: 8px;
+}
+
+
+.model-selection-container {
+  width: 100%;
+}
+
+.model-select {
+  --ng-select-height: 38px;
+  --ng-select-value-font-size: 14px;
+  --ng-select-bg: rgba(45, 45, 45, 0.3) !important;
+  --ng-select-border-color: rgba(255, 255, 255, 0.15);
+  --ng-select-border-radius: 8px;
+  --ng-select-highlight: #8bb4f8;
+  --ng-select-dropdown-bg: rgba(45, 45, 45, 0.3) !important;
+  --ng-select-dropdown-border-color: rgba(255, 255, 255, 0.15);
+  --ng-select-option-bg: transparent;
+  --ng-select-option-hover-bg: rgba(71, 118, 230, 0.3);
+  --ng-select-option-selected-bg: rgba(71, 118, 230, 0.4);
+  --ng-select-color: #f8f9fa;
+}
+
+/* Aggressive ng-select styling overrides */
+::ng-deep ng-select.model-select {
+  background: rgba(45, 45, 45, 0.3) !important;
+}
+
+::ng-deep ng-select.model-select .ng-select-container {
+  background-color: rgba(45, 45, 45, 0.3) !important;
+  background: rgba(45, 45, 45, 0.3) !important;
+  backdrop-filter: blur(15px) !important;
+  -webkit-backdrop-filter: blur(15px) !important;
+}
+
+::ng-deep ng-select.model-select .ng-select-container .ng-value-container {
+  background: transparent !important;
+}
+
+::ng-deep ng-select.model-select .ng-select-container .ng-value-container .ng-input {
+  background: transparent !important;
+}
+
+::ng-deep ng-select.model-select .ng-select-container .ng-arrow-wrapper {
+  background: transparent !important;
+}
+
+::ng-deep .ng-dropdown-panel {
+  background-color: rgba(45, 45, 45, 0.3) !important;
+  background: rgba(45, 45, 45, 0.3) !important;
+  backdrop-filter: blur(15px) !important;
+  -webkit-backdrop-filter: blur(15px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+::ng-deep .ng-dropdown-panel .ng-dropdown-panel-items {
+  background: transparent !important;
+}
+
+::ng-deep .ng-dropdown-panel .ng-dropdown-panel-items .ng-option {
+  background: transparent !important;
+}
+
+::ng-deep .ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-highlighted {
+  background: rgba(71, 118, 230, 0.3) !important;
+}
+
+:host-context(.dark) .model-select {
+  --ng-select-bg: var(--ion-color-dark);
+  --ng-select-dropdown-bg: var(--ion-color-dark);
+  --ng-select-option-bg: var(--ion-color-dark);
+  --ng-select-option-hover-bg: var(--ion-color-medium);
+}
+
+.model-option-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.provider-icon-inline {
+  font-size: 16px;
+  color: var(--ion-color-medium);
+}
+
+.provider-icon-inline.gemini {
+  color: #4285f4;
+}
+
+.provider-icon-inline.openrouter {
+  color: #00a67e;
+}
+
+.model-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .message {
+    max-width: 90%;
+  }
+  
+  .chat-messages {
+    padding-bottom: 180px; /* Further reduced padding for mobile keyboards */
+  }
+  
+  .chat-footer {
+    padding-bottom: max(env(safe-area-inset-bottom, 20px), 60px);
+    transform: translateY(calc(-1 * env(keyboard-inset-height, 0px)));
+  }
+  
+  .chat-footer.keyboard-visible {
+    transform: translateY(-250px);
+  }
+
+  .message-actions ion-button[fill="clear"] {
+    opacity: 1; /* Always visible on mobile */
+  }
+
+  .model-toolbar {
+    padding: 4px 8px;
+  }
+
+  .model-select {
+    --ng-select-height: 36px;
+    --ng-select-value-font-size: 13px;
+  }
+}
