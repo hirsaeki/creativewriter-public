@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { StoryListComponent } from './stories/components/story-list/story-list.component';
-import { LogViewerComponent } from './stories/components/log-viewer.component';
+import { LogViewerComponent } from './stories/components/log-viewer/log-viewer.component';
 
 export const routes: Routes = [
   {
