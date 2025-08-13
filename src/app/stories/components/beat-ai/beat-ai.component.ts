@@ -8,19 +8,19 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { logoGoogle, globeOutline, createOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline } from 'ionicons/icons';
-import { BeatAIModalService } from '../../shared/services/beat-ai-modal.service';
-import { TokenInfoPopoverComponent } from '../../shared/components/token-info-popover.component';
-import { TokenCounterService, SupportedModel } from '../../shared/services/token-counter.service';
-import { BeatAI, BeatAIPromptEvent } from '../models/beat-ai.interface';
+import { BeatAIModalService } from '../../../shared/services/beat-ai-modal.service';
+import { TokenInfoPopoverComponent } from '../../../shared/components/token-info-popover.component';
+import { TokenCounterService, SupportedModel } from '../../../shared/services/token-counter.service';
+import { BeatAI, BeatAIPromptEvent } from '../../models/beat-ai.interface';
 import { Subscription } from 'rxjs';
-import { ModelOption } from '../../core/models/model.interface';
-import { ModelService } from '../../core/services/model.service';
-import { SettingsService } from '../../core/services/settings.service';
-import { BeatAIService } from '../../shared/services/beat-ai.service';
-import { ProseMirrorEditorService, SimpleEditorConfig } from '../../shared/services/prosemirror-editor.service';
+import { ModelOption } from '../../../core/models/model.interface';
+import { ModelService } from '../../../core/services/model.service';
+import { SettingsService } from '../../../core/services/settings.service';
+import { BeatAIService } from '../../../shared/services/beat-ai.service';
+import { ProseMirrorEditorService, SimpleEditorConfig } from '../../../shared/services/prosemirror-editor.service';
 import { EditorView } from 'prosemirror-view';
-import { StoryService } from '../services/story.service';
-import { Story, Scene, Chapter } from '../models/story.interface';
+import { StoryService } from '../../services/story.service';
+import { Story, Scene, Chapter } from '../../models/story.interface';
 
 interface SceneContext {
   chapterId: string;
