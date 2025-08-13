@@ -1,0 +1,480 @@
+    <div class="ion-page">
+      <!-- Header -->
+      <app-header 
+        title="Codex" 
+        [showBackButton]="true"
+        [backAction]="goBack.bind(this)"
+        [rightActions]="headerActions"
+        [showSecondaryToolbar]="true"
+        [secondaryContent]="searchToolbar">
+      </app-header>
+      
+      <ng-template #searchToolbar>
+        <ion-searchbar
+          placeholder="Search by title, content, or tags..."
+          [(ngModel)]="searchQuery"
+          (ionInput)="onSearch()"
+          debounce="300">
+        </ion-searchbar>
+      </ng-template>
+
+      <!-- Content -->
+      <ion-content>
+        <ion-grid class="codex-grid">
+          <ion-row>
+            <!-- Sidebar with categories -->
+            <ion-col size="12" size-md="3" class="categories-sidebar">
+              <ion-card>
+                <ion-card-header>
+                  <ion-card-title>Categories</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                  <ion-list>
+                    <ion-item 
+                      *ngFor="let category of sortedCategories()" 
+                      button
+                      [class.active-category]="selectedCategoryId() === category.id"
+                      (click)="selectCategory(category.id)">
+                      <ion-icon [name]="getDefaultIcon()" slot="start"></ion-icon>
+                      <ion-label>
+                        <h3>{{ category.icon }} {{ category.title }}</h3>
+                        <p>{{ category.entries.length }} entries</p>
+                      </ion-label>
+                      <ion-button 
+                        fill="clear" 
+                        size="small"
+                        (click)="$event.stopPropagation(); toggleCategoryMenu(category.id)"
+                        slot="end">
+                        <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+                      </ion-button>
+                      
+                      <!-- Category menu -->
+                      <ion-list *ngIf="categoryMenuId() === category.id" class="category-menu">
+                        <ion-item button (click)="editCategory()">
+                          <ion-icon name="create" slot="start"></ion-icon>
+                          <ion-label>Edit</ion-label>
+                        </ion-item>
+                        <ion-item button (click)="deleteCategory(category.id)" color="danger">
+                          <ion-icon name="trash" slot="start"></ion-icon>
+                          <ion-label>Delete</ion-label>
+                        </ion-item>
+                      </ion-list>
+                    </ion-item>
+                  </ion-list>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+
+            <!-- Main content area -->
+            <ion-col size="12" size-md="9" class="entries-main">
+              <div *ngIf="searchQuery(); else normalView">
+                <ion-card>
+                  <ion-card-header>
+                    <ion-card-title>Search results for "{{ searchQuery() }}"</ion-card-title>
+                  </ion-card-header>
+                  <ion-card-content>
+                    <ion-grid>
+                      <ion-row>
+                        <ion-col *ngFor="let entry of searchResults()" size="12" size-md="6" size-lg="4">
+                          <ion-card button (click)="selectEntry(entry)" class="entry-card">
+                            <ion-card-header>
+                              <ion-card-title>{{ entry.title }}</ion-card-title>
+                            </ion-card-header>
+                            <ion-card-content>
+                              <ion-text color="medium">
+                                <p>{{ getContentPreview(entry.content) }}</p>
+                              </ion-text>
+                              <div class="entry-meta">
+                                <ion-chip color="primary">
+                                  <ion-label>{{ getCategoryName(entry.categoryId) }}</ion-label>
+                                </ion-chip>
+                                <ion-chip *ngIf="entry.alwaysInclude" color="warning">
+                                  <ion-icon name="star"></ion-icon>
+                                  <ion-label>Always included</ion-label>
+                                </ion-chip>
+                                <ion-chip *ngIf="entry.metadata?.['storyRole']" color="success">
+                                  <ion-icon name="person"></ion-icon>
+                                  <ion-label>{{ entry.metadata?.['storyRole'] }}</ion-label>
+                                </ion-chip>
+                                <ion-chip *ngFor="let field of getCustomFields(entry)" color="secondary">
+                                  <ion-label>{{ field.name }}: {{ getFieldValuePreview(field.value) }}</ion-label>
+                                </ion-chip>
+                                <ion-chip *ngFor="let tag of entry.tags" color="medium">
+                                  <ion-icon name="pricetag"></ion-icon>
+                                  <ion-label>{{ tag }}</ion-label>
+                                </ion-chip>
+                              </div>
+                            </ion-card-content>
+                          </ion-card>
+                        </ion-col>
+                      </ion-row>
+                    </ion-grid>
+                  </ion-card-content>
+                </ion-card>
+              </div>
+
+              <ng-template #normalView>
+                <div *ngIf="selectedCategory(); else selectCategoryPrompt">
+                  <ion-card>
+                    <ion-card-header>
+                      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <ion-card-title>
+                          {{ selectedCategory()!.icon }} {{ selectedCategory()!.title }}
+                        </ion-card-title>
+                        <ion-button 
+                          fill="outline" 
+                          size="small" 
+                          (click)="createNewEntry()">
+                          <ion-icon name="add" slot="start"></ion-icon>
+                          Add Entry
+                        </ion-button>
+                      </div>
+                    </ion-card-header>
+                    <ion-card-content>
+                      <ion-grid>
+                        <ion-row>
+                          <ion-col 
+                            *ngFor="let entry of sortedEntries()" 
+                            size="12" 
+                            size-md="6" 
+                            size-lg="4">
+                            <ion-card button (click)="selectEntry(entry)" class="entry-card">
+                              <ion-card-header>
+                                <ion-card-title>{{ entry.title }}</ion-card-title>
+                              </ion-card-header>
+                              <ion-card-content>
+                                <ion-text color="medium">
+                                  <p>{{ getContentPreview(entry.content) }}</p>
+                                </ion-text>
+                                <div class="entry-meta">
+                                  <ion-chip *ngIf="entry.alwaysInclude" color="warning">
+                                    <ion-icon name="star"></ion-icon>
+                                    <ion-label>Always included</ion-label>
+                                  </ion-chip>
+                                  <ion-chip *ngIf="entry.metadata?.['storyRole']" color="success">
+                                    <ion-icon name="person"></ion-icon>
+                                    <ion-label>{{ entry.metadata?.['storyRole'] }}</ion-label>
+                                  </ion-chip>
+                                  <ion-chip *ngFor="let field of getCustomFields(entry)" color="secondary">
+                                    <ion-label>{{ field.name }}: {{ getFieldValuePreview(field.value) }}</ion-label>
+                                  </ion-chip>
+                                  <ion-chip *ngFor="let tag of entry.tags" color="medium">
+                                    <ion-icon name="tag"></ion-icon>
+                                    <ion-label>{{ tag }}</ion-label>
+                                  </ion-chip>
+                                  <ion-note>{{ formatDate(entry.updatedAt) }}</ion-note>
+                                </div>
+                              </ion-card-content>
+                            </ion-card>
+                          </ion-col>
+                        </ion-row>
+                      </ion-grid>
+                    </ion-card-content>
+                  </ion-card>
+                </div>
+              </ng-template>
+
+              <ng-template #selectCategoryPrompt>
+                <ion-card>
+                  <ion-card-content class="ion-text-center">
+                    <ion-text color="medium">
+                      <h2>Choose a category</h2>
+                      <p>Choose a category from the sidebar to see the entries.</p>
+                    </ion-text>
+                  </ion-card-content>
+                </ion-card>
+              </ng-template>
+            </ion-col>
+          </ion-row>
+        </ion-grid>
+      </ion-content>
+
+      <!-- Entry Modal -->
+      <ion-modal [isOpen]="!!selectedEntry()" (didDismiss)="closeEntryModal()" class="entry-modal">
+        <ng-template>
+          <ion-header>
+            <ion-toolbar>
+              <ion-title>{{ editingEntry.title || 'Edit Entry' }}</ion-title>
+              <ion-buttons slot="end">
+                <ion-button (click)="closeEntryModal()">
+                  <ion-icon name="close" slot="icon-only"></ion-icon>
+                </ion-button>
+              </ion-buttons>
+            </ion-toolbar>
+          </ion-header>
+          
+          <ion-content class="entry-modal-content">
+            <div class="modal-form-container">
+              <!-- Basic Information Section -->
+              <div class="form-section">
+                <h3 class="section-title">Basic Information</h3>
+                
+                <div class="form-group">
+                  <ion-item lines="none" class="form-item">
+                    <ion-label position="stacked">Title <span class="required">*</span></ion-label>
+                    <ion-input 
+                      [(ngModel)]="editingEntry.title" 
+                      placeholder="Enter title..."
+                      type="text"
+                      class="title-input">
+                    </ion-input>
+                  </ion-item>
+                </div>
+
+                <!-- Tags Section -->
+                <div class="form-group">
+                  <ion-item lines="none" class="form-item">
+                    <ion-label position="stacked">Tags</ion-label>
+                    <ion-input 
+                      [(ngModel)]="tagInput" 
+                      (ionBlur)="parseAndAddTags()"
+                      placeholder="Enter tags (comma-separated)..."
+                      class="tag-input">
+                    </ion-input>
+                  </ion-item>
+                  <ion-note class="tag-help-text">
+                    Tags for identification in Beat-AI (e.g. Combat, Romance, Conflict)
+                  </ion-note>
+                  <div class="tags-container" *ngIf="editingEntry.tags?.length">
+                    <ion-chip 
+                      *ngFor="let tag of editingEntry.tags" 
+                      (click)="removeTag(tag)"
+                      color="primary"
+                      class="tag-chip">
+                      <ion-label>{{ tag }}</ion-label>
+                      <ion-icon name="close" size="small"></ion-icon>
+                    </ion-chip>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Media Section -->
+              <div class="form-section" *ngIf="editingEntry.imageUrl || !editingEntry.imageUrl">
+                <h3 class="section-title">Media</h3>
+                
+                <div class="form-group">
+                  <ion-item lines="none" class="form-item">
+                    <ion-label position="stacked">Image URL</ion-label>
+                    <ion-input 
+                      [(ngModel)]="editingEntry.imageUrl" 
+                      placeholder="https://example.com/image.jpg"
+                      type="url"
+                      class="url-input">
+                    </ion-input>
+                  </ion-item>
+                  <div class="image-preview" *ngIf="editingEntry.imageUrl">
+                    <img 
+                      [src]="editingEntry.imageUrl" 
+                      alt="Preview"
+                      (error)="editingEntry.imageUrl = ''">
+                  </div>
+                </div>
+              </div>
+                
+              <!-- Story Role Section -->
+              <div class="form-section" *ngIf="isCharacterEntry()">
+                <h3 class="section-title">Story Settings</h3>
+                
+                <div class="form-group">
+                  <ion-item lines="none" class="form-item">
+                    <ion-label position="stacked">Story Role</ion-label>
+                    <ion-select 
+                      [(ngModel)]="editingEntry.storyRole"
+                      placeholder="Select role..."
+                      interface="popover"
+                      class="role-select">
+                      <ion-select-option value="">No Role</ion-select-option>
+                      <ion-select-option 
+                        *ngFor="let role of storyRoles" 
+                        [value]="role.value">
+                        {{ role.label }}
+                      </ion-select-option>
+                    </ion-select>
+                  </ion-item>
+                </div>
+              </div>
+              
+              <!-- Always Include Section -->
+              <div class="form-section">
+                <h3 class="section-title">AI Settings</h3>
+                
+                <div class="form-group">
+                  <ion-item lines="none" class="form-item">
+                    <ion-label position="stacked">Always include in beat prompt</ion-label>
+                    <ion-toggle 
+                      [(ngModel)]="editingEntry.alwaysInclude"
+                      slot="end"
+                      color="primary">
+                    </ion-toggle>
+                  </ion-item>
+                  <ion-note color="medium" style="padding: 0 16px; font-size: 0.9rem;">
+                    When enabled, this entry will always be included in the beat prompt, regardless of relevance scoring.
+                  </ion-note>
+                </div>
+              </div>
+                
+              <!-- Custom Fields Section -->
+              <div class="form-section">
+                <div class="section-header">
+                  <h3 class="section-title">Custom Fields</h3>
+                  <ion-button 
+                    size="small" 
+                    fill="outline" 
+                    color="primary"
+                    [disabled]="!newCustomFieldName.trim()"
+                    (click)="addCustomField()">
+                    <ion-icon name="add" slot="start"></ion-icon>
+                    Add Field
+                  </ion-button>
+                </div>
+                  
+                <!-- Existing custom fields -->
+                <div class="custom-fields-container">
+                  <div *ngFor="let field of editingEntry.customFields" class="custom-field-item">
+                    <div class="custom-field-header">
+                      <ion-item lines="none" class="form-item field-name-item">
+                        <ion-label position="stacked">Field Name</ion-label>
+                        <ion-input 
+                          [(ngModel)]="field.name" 
+                          placeholder="Enter field name...">
+                        </ion-input>
+                      </ion-item>
+                      <ion-button 
+                        fill="clear" 
+                        color="danger"
+                        size="small"
+                        (click)="removeCustomField(field.id)"
+                        class="remove-field-btn">
+                        <ion-icon name="trash" slot="icon-only"></ion-icon>
+                      </ion-button>
+                    </div>
+                    <ion-item lines="none" class="form-item">
+                      <ion-label position="stacked">Field Value</ion-label>
+                      <ion-textarea 
+                        [(ngModel)]="field.value" 
+                        placeholder="Enter field value..."
+                        rows="3"
+                        [autoGrow]="true"
+                        class="scrollable-textarea"
+                        (ionInput)="onTextareaInput($event)">
+                      </ion-textarea>
+                    </ion-item>
+                  </div>
+                  
+                  <!-- Add new custom field form -->
+                  <div class="new-custom-field">
+                    <ion-item lines="none" class="form-item">
+                      <ion-label position="stacked">New Field Name</ion-label>
+                      <ion-input 
+                        [(ngModel)]="newCustomFieldName" 
+                        placeholder="Enter field name...">
+                      </ion-input>
+                    </ion-item>
+                    <ion-item lines="none" class="form-item">
+                      <ion-label position="stacked">Field Value</ion-label>
+                      <ion-textarea 
+                        [(ngModel)]="newCustomFieldValue" 
+                        placeholder="Enter field value..."
+                        rows="3"
+                        [autoGrow]="true"
+                        class="scrollable-textarea"
+                        (ionInput)="onTextareaInput($event)">
+                      </ion-textarea>
+                    </ion-item>
+                  </div>
+                </div>
+              </div>
+                
+              <!-- Content Section -->
+              <div class="form-section">
+                <h3 class="section-title">Content</h3>
+                
+                <div class="form-group">
+                  <ion-item lines="none" class="form-item content-item">
+                    <ion-label position="stacked">Description</ion-label>
+                    <ion-textarea 
+                      [(ngModel)]="editingEntry.content" 
+                      placeholder="Description, details, notes..."
+                      rows="8"
+                      [autoGrow]="true"
+                      class="content-textarea scrollable-textarea"
+                      (ionInput)="onTextareaInput($event)">
+                    </ion-textarea>
+                  </ion-item>
+                </div>
+              </div>
+                
+              <!-- Action Buttons -->
+              <div class="modal-actions">
+                <ion-button (click)="deleteEntry()" fill="outline" color="danger" size="default">
+                  <ion-icon name="trash" slot="start"></ion-icon>
+                  Delete
+                </ion-button>
+                <ion-button (click)="saveEntry()" color="primary" size="default">
+                  <ion-icon name="save" slot="start"></ion-icon>
+                  Save
+                </ion-button>
+              </div>
+            </div>
+          </ion-content>
+        </ng-template>
+      </ion-modal>
+
+      <!-- Add Category Modal -->
+      <ion-modal [isOpen]="showAddCategoryModal()" (didDismiss)="showAddCategoryModal.set(false)" class="category-modal">
+        <ng-template>
+          <ion-header>
+            <ion-toolbar>
+              <ion-title>New Category</ion-title>
+              <ion-buttons slot="end">
+                <ion-button (click)="addCategory()" color="primary">
+                  <ion-icon name="save" slot="start"></ion-icon>
+                  Create
+                </ion-button>
+                <ion-button (click)="showAddCategoryModal.set(false)">
+                  <ion-icon name="close" slot="icon-only"></ion-icon>
+                </ion-button>
+              </ion-buttons>
+            </ion-toolbar>
+          </ion-header>
+          
+          <ion-content>
+            <ion-card>
+              <ion-card-content>
+                <ion-item>
+                  <ion-label position="stacked">Category Name</ion-label>
+                  <ion-input 
+                    [(ngModel)]="newCategory.title" 
+                    placeholder="Category Name"
+                    type="text">
+                  </ion-input>
+                </ion-item>
+                
+                <ion-item>
+                  <ion-label position="stacked">Icon (Emoji)</ion-label>
+                  <ion-input 
+                    [(ngModel)]="newCategory.icon" 
+                    placeholder="🏷️"
+                    maxlength="2"
+                    type="text">
+                  </ion-input>
+                </ion-item>
+                
+                <ion-item>
+                  <ion-label position="stacked">Description (optional)</ion-label>
+                  <ion-textarea 
+                    [(ngModel)]="newCategory.description" 
+                    placeholder="Description..."
+                    rows="3"
+                    [autoGrow]="true"
+                    class="scrollable-textarea"
+                    (ionInput)="onTextareaInput($event)">
+                  </ion-textarea>
+                </ion-item>
+              </ion-card-content>
+            </ion-card>
+          </ion-content>
+        </ng-template>
+      </ion-modal>
+
+    </div>

@@ -5,7 +5,7 @@ import { SharedModule } from '../shared/shared.module';
 import { StoryListComponent } from './components/story-list/story-list.component';
 import { StoryEditorComponent } from './components/story-editor/story-editor.component';
 import { BeatAIComponent } from './components/beat-ai/beat-ai.component';
-import { CodexComponent } from './components/codex.component';
+import { CodexComponent } from './components/codex/codex.component';
 import { ImageGenerationComponent } from './components/image-generation.component';
 import { SceneChatComponent } from './components/scene-chat/scene-chat.component';
 
