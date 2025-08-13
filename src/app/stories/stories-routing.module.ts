@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { StoryEditorComponent } from './components/story-editor.component';
+import { StoryEditorComponent } from './components/story-editor/story-editor.component';
 import { StorySettingsComponent } from './components/story-settings.component';
 import { CodexComponent } from './components/codex.component';
 import { NovelCrafterImportComponent } from './components/novelcrafter-import.component';
