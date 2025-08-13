@@ -1,0 +1,520 @@
+<div class="ion-page">
+  <ion-header>
+    <ion-toolbar>
+      <ion-buttons slot="start">
+        <ion-button (click)="goBack()">
+          <ion-icon name="arrow-back" slot="icon-only"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+      <ion-title>Story Settings</ion-title>
+      <ion-buttons slot="end">
+        <ion-chip [color]="hasUnsavedChanges ? 'warning' : 'success'">
+          <ion-icon [name]="hasUnsavedChanges ? 'warning-outline' : 'checkmark-circle-outline'"></ion-icon>
+          <ion-label>{{ hasUnsavedChanges ? 'Not saved' : 'Saved' }}</ion-label>
+        </ion-chip>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-content *ngIf="story">
+    <!-- Tab Navigation -->
+    <app-settings-tabs 
+      [tabs]="tabItems" 
+      [(selectedTab)]="selectedTab">
+    </app-settings-tabs>
+
+    <app-settings-content>
+      <!-- Tab Content -->
+      <div [ngSwitch]="selectedTab">
+        
+        <!-- General Tab -->
+        <div *ngSwitchCase="'general'">
+        <ion-card class="story-info-card">
+          <ion-card-header>
+            <ion-card-title>{{ story.title || 'Untitled Story' }}</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-note>
+              Created: {{ story.createdAt | date:'short' }} | Last edited: {{ story.updatedAt | date:'short' }}
+            </ion-note>
+          </ion-card-content>
+        </ion-card>
+      </div>
+
+      <!-- Cover Image Tab -->
+      <div *ngSwitchCase="'cover-image'">
+        <ion-card class="settings-section">
+          <ion-card-header>
+            <ion-card-title>Cover Image</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-text color="medium">
+              <p>Set a cover image for your story. The image will be displayed in the story list and editor header.</p>
+            </ion-text>
+            
+            <app-image-upload
+              [currentImage]="getCoverImageDataUrl()"
+              [fileName]="getCoverImageFileName()"
+              [fileSize]="getCoverImageFileSize()"
+              (imageSelected)="onCoverImageSelected($event)"
+              (imageRemoved)="onCoverImageRemoved()">
+            </app-image-upload>
+          </ion-card-content>
+        </ion-card>
+      </div>
+      
+      <!-- AI System Tab -->
+      <div *ngSwitchCase="'ai-system'">
+        <ion-card class="settings-section">
+          <ion-card-header>
+            <ion-card-title>AI System Message</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-text color="medium">
+              <p>This message defines the context and personality of the AI assistant for this story.</p>
+            </ion-text>
+            <ion-textarea
+              [(ngModel)]="settings.systemMessage"
+              (ionInput)="onSettingsChange()"
+              placeholder="Geben Sie die System-Nachricht ein..."
+              rows="6"
+              class="settings-textarea"
+              auto-grow="true">
+            </ion-textarea>
+            <ion-note class="char-count">{{ settings.systemMessage.length }} Zeichen</ion-note>
+          </ion-card-content>
+        </ion-card>
+        
+        <ion-card class="settings-section">
+          <ion-card-header>
+            <ion-card-title>Beat Generation Template</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-text color="medium">
+              <p>XML template for beat generation in messages format. Available placeholders:</p>
+            </ion-text>
+            
+            <div class="template-placeholders">
+              <ion-grid>
+                <ion-row>
+                  <ion-col size="12" size-md="6" size-lg="4" *ngFor="let placeholder of placeholders">
+                    <ion-chip color="warning" class="placeholder-chip">
+                      <ion-icon name="code-slash-outline"></ion-icon>
+                      <ion-label>{{ placeholder }}</ion-label>
+                    </ion-chip>
+                  </ion-col>
+                </ion-row>
+              </ion-grid>
+            </div>
+            
+            <ion-textarea
+              [(ngModel)]="settings.beatGenerationTemplate"
+              (ionInput)="onSettingsChange()"
+              placeholder="Geben Sie das Beat-Template ein..."
+              rows="12"
+              class="settings-textarea large"
+              auto-grow="true">
+            </ion-textarea>
+            
+            <ion-note class="char-count">{{ settings.beatGenerationTemplate.length }} Zeichen</ion-note>
+            
+            <ion-item *ngIf="!settings.beatGenerationTemplate.includes('{prompt}')" class="template-warning">
+              <ion-icon name="warning-outline" color="warning" slot="start"></ion-icon>
+              <ion-label color="warning">
+                The template should contain {{ '{prompt}' }} to insert the user prompt.
+              </ion-label>
+            </ion-item>
+          </ion-card-content>
+        </ion-card>
+      </div>
+      
+      <!-- Beat Config Tab -->
+      <div *ngSwitchCase="'beat-config'">
+        <ion-card class="settings-section">
+          <ion-card-header>
+            <ion-card-title>Beat AI Configuration</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-text color="medium">
+              <p>Configuration for Beat AI generation.</p>
+            </ion-text>
+            
+            <ion-item class="setting-item">
+              <ion-checkbox
+                [(ngModel)]="settings.useFullStoryContext"
+                (ionChange)="onSettingsChange()"
+                slot="start">
+              </ion-checkbox>
+              <ion-label>
+                <h3>Use Complete Story Context</h3>
+                <p>When enabled, the complete text of all scenes is used as context. Otherwise, only summaries are used (if available).</p>
+              </ion-label>
+            </ion-item>
+
+            <ion-item class="radio-section">
+              <ion-label>
+                <h3>Beat Instruction</h3>
+                <p>Default instruction for Beat AI generation.</p>
+              </ion-label>
+            </ion-item>
+            
+            <ion-radio-group
+              [(ngModel)]="settings.beatInstruction"
+              (ionChange)="onSettingsChange()">
+              <ion-item>
+                <ion-radio slot="start" value="continue"></ion-radio>
+                <ion-label>Continue the story</ion-label>
+              </ion-item>
+              <ion-item>
+                <ion-radio slot="start" value="stay"></ion-radio>
+                <ion-label>Stay in the moment</ion-label>
+              </ion-item>
+            </ion-radio-group>
+          </ion-card-content>
+        </ion-card>
+      </div>
+
+      <!-- DB Maintenance Tab -->
+      <div *ngSwitchCase="'db-maintenance'">
+        <!-- Database Statistics -->
+        <ion-card class="settings-section">
+          <ion-card-header>
+            <ion-card-title>Database Statistics</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-button
+              fill="outline"
+              size="small"
+              (click)="loadDatabaseStats()"
+              [disabled]="isScanning">
+              <ion-icon name="stats-chart-outline" slot="start"></ion-icon>
+              Load Statistics
+            </ion-button>
+
+            <div *ngIf="databaseStats" class="stats-grid">
+              <ion-grid>
+                <ion-row>
+                  <ion-col size="6" size-md="3">
+                    <div class="stat-item">
+                      <ion-text color="primary">
+                        <h3>{{ databaseStats.totalStories }}</h3>
+                      </ion-text>
+                      <ion-note>Stories</ion-note>
+                    </div>
+                  </ion-col>
+                  <ion-col size="6" size-md="3">
+                    <div class="stat-item">
+                      <ion-text color="primary">
+                        <h3>{{ databaseStats.totalImages }}</h3>
+                      </ion-text>
+                      <ion-note>Images</ion-note>
+                    </div>
+                  </ion-col>
+                  <ion-col size="6" size-md="3">
+                    <div class="stat-item">
+                      <ion-text color="warning">
+                        <h3>{{ databaseStats.orphanedImages }}</h3>
+                      </ion-text>
+                      <ion-note>Orphaned Images</ion-note>
+                    </div>
+                  </ion-col>
+                  <ion-col size="6" size-md="3">
+                    <div class="stat-item">
+                      <ion-text color="medium">
+                        <h3>{{ formatBytes(databaseStats.databaseSizeEstimate) }}</h3>
+                      </ion-text>
+                      <ion-note>Total size (approx.)</ion-note>
+                    </div>
+                  </ion-col>
+                </ion-row>
+              </ion-grid>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Progress Display -->
+        <ion-card *ngIf="isScanning" class="settings-section progress-card">
+          <ion-card-content>
+            <div class="progress-container">
+              <ion-text color="primary">
+                <h4>{{ scanProgress.operation }}</h4>
+              </ion-text>
+              <ion-progress-bar [value]="scanProgress.progress / 100"></ion-progress-bar>
+              <ion-note>{{ scanProgress.message }}</ion-note>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Orphaned Images -->
+        <ion-card class="settings-section">
+          <ion-card-header>
+            <ion-card-title>Orphaned Images</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-text color="medium">
+              <p>Images that are no longer used in stories.</p>
+            </ion-text>
+
+            <div class="action-buttons">
+              <ion-button
+                fill="outline"
+                size="small"
+                (click)="scanOrphanedImages()"
+                [disabled]="isScanning">
+                <ion-icon name="scan-outline" slot="start"></ion-icon>
+                Scan
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                size="small"
+                color="secondary"
+                (click)="selectAllOrphanedImages()"
+                [disabled]="orphanedImages.length === 0">
+                <ion-icon name="checkbox-outline" slot="start"></ion-icon>
+                Select All
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                size="small"
+                color="medium"
+                (click)="deselectAllOrphanedImages()"
+                [disabled]="selectedOrphanedImages.size === 0">
+                <ion-icon name="square-outline" slot="start"></ion-icon>
+                Deselect All
+              </ion-button>
+
+              <ion-button
+                fill="solid"
+                size="small"
+                color="danger"
+                (click)="deleteSelectedOrphanedImages()"
+                [disabled]="selectedOrphanedImages.size === 0 || isScanning">
+                <ion-icon name="trash-outline" slot="start"></ion-icon>
+                Delete ({{ selectedOrphanedImages.size }})
+              </ion-button>
+            </div>
+
+            <ion-list *ngIf="orphanedImages.length > 0" class="media-list">
+              <ion-item
+                *ngFor="let image of orphanedImages"
+                button
+                (click)="toggleOrphanedImageSelection(image.id)">
+                <ion-checkbox
+                  slot="start"
+                  [checked]="selectedOrphanedImages.has(image.id)">
+                </ion-checkbox>
+                <ion-thumbnail slot="start">
+                  <img [src]="'data:' + image.mimeType + ';base64,' + image.base64Data" [alt]="image.name">
+                </ion-thumbnail>
+                <ion-label>
+                  <h3>{{ image.name }}</h3>
+                  <p>{{ formatBytes(image.size) }} • {{ image.createdAt | date:'short' }}</p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+
+            <div *ngIf="orphanedImages.length === 0 && !isScanning" class="empty-state">
+              <ion-text color="medium">
+                <p>No orphaned images found or not yet scanned.</p>
+              </ion-text>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Duplicate Images -->
+        <ion-card class="settings-section">
+          <ion-card-header>
+            <ion-card-title>Duplicate Images</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-text color="medium">
+              <p>Identical images with different IDs.</p>
+            </ion-text>
+
+            <div class="action-buttons">
+              <ion-button
+                fill="outline"
+                size="small"
+                (click)="scanDuplicateImages()"
+                [disabled]="isScanning">
+                <ion-icon name="copy-outline" slot="start"></ion-icon>
+                Duplikate suchen
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                size="small"
+                color="secondary"
+                (click)="selectAllDuplicates()"
+                [disabled]="duplicateImages.length === 0">
+                <ion-icon name="checkbox-outline" slot="start"></ion-icon>
+                Select All
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                size="small"
+                color="medium"
+                (click)="deselectAllDuplicates()"
+                [disabled]="selectedDuplicates.size === 0">
+                <ion-icon name="square-outline" slot="start"></ion-icon>
+                Deselect All
+              </ion-button>
+
+              <ion-button
+                fill="solid"
+                size="small"
+                color="danger"
+                (click)="deleteSelectedDuplicates()"
+                [disabled]="selectedDuplicates.size === 0 || isScanning">
+                <ion-icon name="trash-outline" slot="start"></ion-icon>
+                Delete Duplicates ({{ selectedDuplicates.size }})
+              </ion-button>
+            </div>
+
+            <ion-list *ngIf="duplicateImages.length > 0" class="media-list">
+              <ion-item
+                *ngFor="let duplicate of duplicateImages"
+                button
+                (click)="toggleDuplicateSelection(duplicate.originalId)">
+                <ion-checkbox
+                  slot="start"
+                  [checked]="selectedDuplicates.has(duplicate.originalId)">
+                </ion-checkbox>
+                <ion-thumbnail slot="start">
+                  <img [src]="'data:image/jpeg;base64,' + duplicate.base64Data" [alt]="duplicate.name">
+                </ion-thumbnail>
+                <ion-label>
+                  <h3>{{ duplicate.name }}</h3>
+                  <p>
+                    {{ formatBytes(duplicate.size) }} •
+                    <ion-badge color="warning">{{ duplicate.duplicateIds.length }} Duplikate</ion-badge>
+                  </p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+
+            <div *ngIf="duplicateImages.length === 0 && !isScanning" class="empty-state">
+              <ion-text color="medium">
+                <p>No duplicates found or not yet scanned.</p>
+              </ion-text>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Story Integrity -->
+        <ion-card class="settings-section">
+          <ion-card-header>
+            <ion-card-title>Story Integrity</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-text color="medium">
+              <p>Check for damaged or incomplete stories.</p>
+            </ion-text>
+
+            <ion-button
+              fill="outline"
+              size="small"
+              (click)="checkIntegrity()"
+              [disabled]="isScanning">
+              <ion-icon name="search-outline" slot="start"></ion-icon>
+              Check Integrity
+            </ion-button>
+
+            <ion-list *ngIf="integrityIssues.length > 0" class="integrity-list">
+              <ion-item *ngFor="let issue of integrityIssues">
+                <ion-icon
+                  [name]="issue.severity === 'high' ? 'close-circle-outline' : 'warning-outline'"
+                  [color]="issue.severity === 'high' ? 'danger' : 'warning'"
+                  slot="start">
+                </ion-icon>
+                <ion-label>
+                  <h3>{{ issue.storyTitle }}</h3>
+                  <p>{{ issue.description }}</p>
+                  <ion-note>Schweregrad: {{ issue.severity }}</ion-note>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+
+            <div *ngIf="integrityIssues.length === 0 && !isScanning" class="empty-state">
+              <ion-text color="success">
+                <p>All stories are intact or not yet checked.</p>
+              </ion-text>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Database Operations -->
+        <ion-card class="settings-section">
+          <ion-card-header>
+            <ion-card-title>Database Operations</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="db-operations">
+              <ion-button
+                fill="outline"
+                expand="block"
+                (click)="compactDatabase()"
+                [disabled]="isScanning"
+                class="operation-button">
+                <ion-icon name="refresh-outline" slot="start"></ion-icon>
+                Datenbank komprimieren
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                expand="block"
+                color="secondary"
+                (click)="exportDatabase()"
+                [disabled]="isScanning"
+                class="operation-button">
+                <ion-icon name="download-outline" slot="start"></ion-icon>
+                Create Complete Export
+              </ion-button>
+            </div>
+
+            <ion-text color="medium">
+              <p>
+                <strong>Compress:</strong> Removes deleted data and reduces database size.<br>
+                <strong>Export:</strong> Creates a JSON file with all stories and images.
+              </p>
+            </ion-text>
+          </ion-card-content>
+        </ion-card>
+      </div>
+    </div>
+    </app-settings-content>
+
+    <div class="settings-actions">
+    <ion-button 
+      expand="block" 
+      color="primary" 
+      (click)="saveSettings()" 
+      [disabled]="!hasUnsavedChanges"
+      class="save-button">
+      <ion-icon name="save-outline" slot="start"></ion-icon>
+      Save Settings
+    </ion-button>
+    
+    <ion-button 
+      expand="block" 
+      fill="outline" 
+      color="medium" 
+      (click)="resetToDefaults()"
+      class="reset-button">
+      <ion-icon name="refresh-outline" slot="start"></ion-icon>
+      Reset to Default
+    </ion-button>
+    </div>
+  </ion-content>
+
+  <ion-content *ngIf="!story">
+    <div class="no-story">
+      <ion-text color="medium">
+        <p>Story not found.</p>
+      </ion-text>
+    </div>
+  </ion-content>
+</div>
