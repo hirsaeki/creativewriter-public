@@ -5,7 +5,7 @@ import { StorySettingsComponent } from './components/story-settings.component';
 import { CodexComponent } from './components/codex.component';
 import { NovelCrafterImportComponent } from './components/novelcrafter-import.component';
 import { ImageGenerationComponent } from './components/image-generation.component';
-import { SceneChatComponent } from './components/scene-chat.component';
+import { SceneChatComponent } from './components/scene-chat/scene-chat.component';
 
 const routes: Routes = [
   {
