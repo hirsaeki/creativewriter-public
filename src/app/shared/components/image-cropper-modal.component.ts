@@ -34,21 +34,34 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
         <image-cropper
           *ngIf="showCropper"
           [imageBase64]="imageBase64"
-          [maintainAspectRatio]="true"
+          [maintainAspectRatio]="aspectRatio !== 0"
           [aspectRatio]="aspectRatio"
           [cropperMinWidth]="100"
           [cropperMinHeight]="100"
           [roundCropper]="false"
           [canvasRotation]="canvasRotation"
           [transform]="transform"
-          [alignImage]="'left'"
-          [backgroundColor]="'#000'"
+          [alignImage]="'center'"
+          [backgroundColor]="'#1a1a1a'"
           [format]="'png'"
+          [autoCrop]="true"
+          [containWithinAspectRatio]="false"
+          [resizeToWidth]="0"
+          [resizeToHeight]="0"
+          [cropperStaticWidth]="0"
+          [cropperStaticHeight]="0"
+          [onlyScaleDown]="false"
+          [cropperFrameAriaLabel]="'Image crop area'"
           (imageCropped)="imageCropped($event)"
           (imageLoaded)="imageLoaded($event)"
           (cropperReady)="cropperReady()"
           (loadImageFailed)="loadImageFailed()">
         </image-cropper>
+        
+        <div *ngIf="!showCropper" class="loading-container">
+          <div class="loading-spinner"></div>
+          <p>Loading image...</p>
+        </div>
       </div>
 
       <div class="aspect-ratio-buttons">
@@ -118,16 +131,53 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
 
     .cropper-wrapper {
       height: calc(100% - 60px);
+      min-height: 400px;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #000;
+      background: #1a1a1a;
       position: relative;
+      overflow: hidden;
     }
 
     :host ::ng-deep image-cropper {
-      max-height: 100%;
+      width: 100%;
+      height: 100%;
+      min-height: 400px;
+    }
+
+    :host ::ng-deep image-cropper .ng2-imgcrop {
+      background-color: #1a1a1a !important;
+    }
+
+    :host ::ng-deep image-cropper .source-image {
       max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 400px;
+      color: #e0e0e0;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #404040;
+      border-top: 4px solid #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
 
     .aspect-ratio-buttons {
@@ -174,10 +224,14 @@ export class ImageCropperModalComponent implements OnInit {
 
   ngOnInit() {
     this.aspectRatio = this.initialAspectRatio;
-    // Show cropper after a short delay to ensure proper initialization
-    setTimeout(() => {
+    console.log('ImageCropperModal initialized with base64:', this.imageBase64 ? 'present' : 'missing');
+    
+    // Show cropper immediately if we have the image
+    if (this.imageBase64) {
       this.showCropper = true;
-    }, 100);
+    } else {
+      console.error('No image base64 data provided to cropper modal');
+    }
   }
 
   imageCropped(event: ImageCroppedEvent) {
@@ -201,11 +255,6 @@ export class ImageCropperModalComponent implements OnInit {
   imageLoaded(image: LoadedImage) {
     console.log('Image loaded:', image);
     this.isReady = true;
-    // Trigger initial crop
-    setTimeout(() => {
-      const event = new Event('crop');
-      document.querySelector('image-cropper')?.dispatchEvent(event);
-    }, 200);
   }
 
   cropperReady() {
