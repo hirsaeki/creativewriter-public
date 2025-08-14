@@ -161,29 +161,39 @@ export class SimpleCodexAwarenessDirective implements OnInit, OnDestroy {
       return;
     }
     
-    // Sort matches by position (descending to avoid index shifting)
-    matches.sort((a, b) => b.start - a.start);
+    // Clear the element and rebuild with safe DOM manipulation
+    element.textContent = '';
     
-    let html = content;
+    // Sort matches by position (ascending for proper reconstruction)
+    matches.sort((a, b) => a.start - b.start);
     
-    // Apply highlights from end to beginning to avoid index shifting
+    let lastIndex = 0;
+    
     for (const match of matches) {
-      const before = html.slice(0, match.start);
-      const matchText = html.slice(match.start, match.end);
-      const after = html.slice(match.end);
+      // Add text before the match
+      if (match.start > lastIndex) {
+        const textNode = document.createTextNode(content.slice(lastIndex, match.start));
+        element.appendChild(textNode);
+      }
       
-      const highlightClass = `codex-highlight codex-${match.type}`;
-      const title = `${match.entry.title} (${match.type})`;
-      const color = this.getHighlightColor(match.type);
+      // Create highlighted span using DOM methods
+      const span = document.createElement('span');
+      span.className = `codex-highlight codex-${match.type}`;
+      span.title = `${match.entry.title} (${match.type})`;
+      span.style.textDecoration = 'underline';
+      span.style.textDecorationStyle = 'dotted';
+      span.style.textDecorationColor = this.getHighlightColor(match.type);
+      span.style.cursor = 'help';
+      span.textContent = content.slice(match.start, match.end);
+      element.appendChild(span);
       
-      const highlightedText = `<span class="${highlightClass}" title="${title}" style="text-decoration: underline; text-decoration-style: dotted; text-decoration-color: ${color}; cursor: help;">${matchText}</span>`;
-      
-      html = before + highlightedText + after;
+      lastIndex = match.end;
     }
     
-    // Only update if there are highlights
-    if (html !== content) {
-      element.innerHTML = html;
+    // Add remaining text after last match
+    if (lastIndex < content.length) {
+      const textNode = document.createTextNode(content.slice(lastIndex));
+      element.appendChild(textNode);
     }
   }
 

@@ -2,6 +2,7 @@ import { Component, OnInit, ViewChild, ElementRef, OnDestroy, TemplateRef, injec
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { 
   IonContent, IonFooter, IonItem, IonLabel, IonTextarea, IonList,
   IonChip, IonAvatar, IonSearchbar, IonModal, IonCheckbox, IonItemDivider,
@@ -77,6 +78,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
   private codexService = inject(CodexService);
   private aiLogger = inject(AIRequestLoggerService);
   private modelService = inject(ModelService);
+  private sanitizer = inject(DomSanitizer);
 
   @ViewChild('scrollContainer') scrollContainer!: ElementRef;
   @ViewChild('messageInput') messageInput!: ElementRef;
@@ -291,12 +293,13 @@ export class SceneChatComponent implements OnInit, OnDestroy {
     }
   }
 
-  formatMessage(content: string): string {
-    // Basic markdown-like formatting
-    return content
+  formatMessage(content: string): SafeHtml {
+    // Basic markdown-like formatting with safe HTML sanitization
+    const formatted = content
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/\n/g, '<br>');
+    return this.sanitizer.sanitize(1, formatted) || ''; // 1 = SecurityContext.HTML
   }
 
   formatTime(date: Date): string {

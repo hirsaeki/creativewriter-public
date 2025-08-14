@@ -2,6 +2,7 @@ import { Component, OnInit, TemplateRef, ViewChild, inject } from '@angular/core
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer } from '@angular/platform-browser';
 import { 
   IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonChip, IonIcon, IonButton, 
   IonContent, IonLabel
@@ -36,6 +37,7 @@ export class StoryListComponent implements OnInit {
   private router = inject(Router);
   private authService = inject(AuthService);
   private headerNavService = inject(HeaderNavigationService);
+  private sanitizer = inject(DomSanitizer);
   versionService = inject(VersionService);
 
   @ViewChild('burgerMenuFooter', { static: true }) burgerMenuFooter!: TemplateRef<unknown>;
@@ -246,12 +248,12 @@ export class StoryListComponent implements OnInit {
     // First remove Beat AI nodes completely (they are editor-only components)
     const cleanHtml = html.replace(/<div[^>]*class="beat-ai-node"[^>]*>.*?<\/div>/gs, '');
     
-    // Create a temporary DOM element to safely strip remaining HTML tags
-    const div = document.createElement('div');
-    div.innerHTML = cleanHtml;
+    // Use DOMParser for safe HTML parsing instead of innerHTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(cleanHtml, 'text/html');
     
-    // Get text content and normalize whitespace
-    const textContent = div.textContent || div.innerText || '';
+    // Get text content safely
+    const textContent = doc.body.textContent || '';
     
     // Remove any remaining Beat AI artifacts that might appear as plain text
     return textContent

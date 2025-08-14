@@ -478,12 +478,12 @@ export class StoryService {
     // Remove Beat AI nodes completely (they are editor-only components)
     const cleanHtml = html.replace(/<div[^>]*class="beat-ai-node"[^>]*>.*?<\/div>/gs, '');
     
-    // Create a temporary DOM element to safely strip remaining HTML tags
-    const div = document.createElement('div');
-    div.innerHTML = cleanHtml;
+    // Use DOMParser for safe HTML parsing instead of innerHTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(cleanHtml, 'text/html');
     
-    // Get text content and normalize whitespace
-    const textContent = div.textContent || div.innerText || '';
+    // Get text content safely
+    const textContent = doc.body.textContent || '';
     
     // Remove any remaining Beat AI artifacts
     return textContent

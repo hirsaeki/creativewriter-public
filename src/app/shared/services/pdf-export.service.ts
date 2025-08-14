@@ -189,9 +189,10 @@ export class PDFExportService {
   }
   
   private extractPlainText(htmlContent: string): string {
-    // Create a temporary element to parse HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
+    // Use DOMParser for safe HTML parsing
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+    const tempDiv = doc.body;
     
     // Remove Beat AI components
     const beatAIElements = tempDiv.querySelectorAll('.beat-ai-wrapper, .beat-ai-container, .beat-ai-node');
@@ -240,9 +241,10 @@ export class PDFExportService {
     this.currentYPosition = startY;
     // const bottomMargin = pageHeight - config.margins.bottom; // Unused in this function
     
-    // Create temporary div to parse HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
+    // Use DOMParser for safe HTML parsing
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+    const tempDiv = doc.body;
     
     // Remove Beat AI components first
     const beatAIElements = tempDiv.querySelectorAll('.beat-ai-wrapper, .beat-ai-container, .beat-ai-node');

@@ -95,12 +95,12 @@ export class StoryStatsService {
    * @returns Plain text content without formatting or Beat AI suggestions
    */
   private stripHtmlTags(html: string): string {
-    // Create a temporary div element to parse HTML and extract text content
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = html;
+    // Use DOMParser for safe HTML parsing instead of innerHTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
     
     // Remove Beat AI elements before extracting text
-    const beatAIElements = tempDiv.querySelectorAll(
+    const beatAIElements = doc.querySelectorAll(
       '.beat-ai-wrapper, .beat-ai-node, .beat-ai-container, .beat-ai-suggestion, ' +
       '.beat-ai-input, .ai-suggestion, .beat-suggestion, [data-beat-ai], ' +
       '[class*="beat-ai"], [class*="ai-beat"]'
@@ -109,7 +109,7 @@ export class StoryStatsService {
     beatAIElements.forEach(element => element.remove());
     
     // Also remove any elements with Beat AI specific attributes or content
-    const allElements = tempDiv.querySelectorAll('*');
+    const allElements = doc.querySelectorAll('*');
     allElements.forEach(element => {
       // Remove elements that contain Beat AI markers in their attributes
       if (element.getAttribute('data-type') === 'beat-ai' ||
@@ -119,7 +119,7 @@ export class StoryStatsService {
       }
     });
     
-    return tempDiv.textContent || tempDiv.innerText || '';
+    return doc.body.textContent || '';
   }
 
   /**
