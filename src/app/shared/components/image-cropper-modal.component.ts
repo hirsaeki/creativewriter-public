@@ -133,6 +133,7 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
     :host ::ng-deep image-cropper {
       max-height: 100%;
       max-width: 100%;
+      --cropper-overlay-color: rgba(0, 0, 0, 0.8);
     }
 
     .aspect-ratio-buttons {
