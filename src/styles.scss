@@ -427,9 +427,13 @@ button:hover {
   }
 }
 
-/* Minimal global override - just the wrapper background */
+/* Global override for image cropper modal backgrounds */
 app-image-cropper-modal .cropper-wrapper {
   background: #1a1a1a !important;
+}
+
+app-image-cropper-modal image-cropper {
+  background-color: #1a1a1a !important;
 }
 
 /* Mobile keyboard handling */
