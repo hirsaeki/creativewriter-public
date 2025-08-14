@@ -225,6 +225,17 @@ export class ImageCropperModalComponent implements OnInit {
 
   setAspectRatio(ratio: number) {
     this.aspectRatio = ratio;
+    
+    // Force cropper to reinitialize when switching between fixed and free ratios
+    if (this.imageCropper) {
+      // Trigger a change detection to reinitialize the cropper with new settings
+      setTimeout(() => {
+        this.showCropper = false;
+        setTimeout(() => {
+          this.showCropper = true;
+        }, 50);
+      }, 10);
+    }
   }
 
   confirmCrop() {
