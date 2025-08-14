@@ -427,17 +427,23 @@ button:hover {
   }
 }
 
-/* Global cropper background override using ViewEncapsulation.None approach */
+/* Global cropper background override - target container, not image */
 app-image-cropper-modal image-cropper {
   background-color: #1a1a1a !important;
 }
 
-app-image-cropper-modal .ngx-ic-main {
+/* Target the main wrapper div, not image elements */
+app-image-cropper-modal image-cropper > div {
   background-color: #1a1a1a !important;
 }
 
-app-image-cropper-modal .ngx-ic-overlay {
-  background-color: rgba(26, 26, 26, 0.8) !important;
+/* Ensure image and cropper elements stay transparent */
+app-image-cropper-modal .ngx-ic-source-image {
+  background-color: transparent !important;
+}
+
+app-image-cropper-modal .ngx-ic-cropper {
+  background-color: transparent !important;
 }
 
 /* Mobile keyboard handling */
