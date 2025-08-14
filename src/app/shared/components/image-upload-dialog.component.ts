@@ -125,12 +125,30 @@ export interface ImageInsertResult {
               placeholder="Image title">
           </label>
           
-          <div *ngIf="originalSize && compressedSize" class="size-info">
-            <small>
-              Original: {{ formatFileSize(originalSize) }} → 
-              Compressed: {{ formatFileSize(compressedSize) }} 
-              ({{ getSizeReduction() }}% reduction)
-            </small>
+          <div *ngIf="originalSize" class="size-info">
+            <div class="size-comparison">
+              <div class="size-item">
+                <span class="size-label">Original:</span>
+                <span class="size-value">{{ formatFileSize(originalSize) }}</span>
+              </div>
+              
+              <div class="size-item" *ngIf="compressedSize > 0">
+                <span class="size-label">Compressed:</span>
+                <span class="size-value">{{ formatFileSize(compressedSize) }}</span>
+              </div>
+              
+              <div class="size-item" *ngIf="!compressedSize">
+                <span class="size-label">Estimated:</span>
+                <span class="size-value estimated">{{ formatFileSize(getEstimatedSize()) }}</span>
+              </div>
+              
+              <div class="size-item" *ngIf="getSizeReduction() > 0 || getEstimatedReduction() > 0">
+                <span class="size-label">Reduction:</span>
+                <span class="size-value" [class.good-compression]="(getSizeReduction() || getEstimatedReduction()) > 30">
+                  {{ getSizeReduction() || getEstimatedReduction() }}%
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -366,15 +384,43 @@ export interface ImageInsertResult {
     }
 
     .size-info {
-      margin-top: 0.5rem;
-      padding: 0.5rem;
+      margin-top: 0.8rem;
+      padding: 0.8rem;
       background: #1e1e1e;
-      border-radius: 4px;
-      text-align: center;
+      border-radius: 8px;
+      text-align: left;
     }
 
-    .size-info small {
-      color: #adb5bd;
+    .size-comparison {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .size-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .size-label {
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .size-value {
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .size-value.estimated {
+      color: rgba(255, 255, 255, 0.6);
+      font-style: italic;
+    }
+
+    .size-value.good-compression {
+      color: #28a745;
     }
 
     .dialog-actions {
@@ -557,6 +603,22 @@ export class ImageUploadDialogComponent {
   getSizeReduction(): number {
     if (!this.originalSize || !this.compressedSize) return 0;
     return Math.round(((this.originalSize - this.compressedSize) / this.originalSize) * 100);
+  }
+
+  getEstimatedSize(): number {
+    if (!this.originalSize) return 0;
+    // Rough estimation based on quality setting
+    // WebP typically achieves 25-35% size reduction at quality 0.8
+    // JPEG achieves 10-20% size reduction at quality 0.8
+    const qualityMultiplier = this.compressionQuality;
+    const formatReduction = 0.7; // Assume 30% reduction for WebP format
+    return Math.round(this.originalSize * qualityMultiplier * formatReduction);
+  }
+
+  getEstimatedReduction(): number {
+    if (!this.originalSize) return 0;
+    const estimated = this.getEstimatedSize();
+    return Math.round(((this.originalSize - estimated) / this.originalSize) * 100);
   }
 
   onUrlChange(): void {

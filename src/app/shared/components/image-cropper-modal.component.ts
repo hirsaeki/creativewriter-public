@@ -44,7 +44,7 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
           [alignImage]="'center'"
           [backgroundColor]="'#000'"
           [format]="'webp'"
-          [autoCrop]="false"
+          [autoCrop]="true"
           [hideResizeSquares]="isMobile && aspectRatio > 0"
           [onlyScaleDown]="true"
           [resizeToWidth]="1920"
