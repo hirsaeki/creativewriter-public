@@ -43,7 +43,7 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
           [transform]="transform"
           [alignImage]="'center'"
           [backgroundColor]="'#000'"
-          [format]="'png'"
+          [format]="'webp'"
           [autoCrop]="true"
           [hideResizeSquares]="isMobile && aspectRatio > 0"
           [onlyScaleDown]="true"
