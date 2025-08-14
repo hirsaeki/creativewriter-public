@@ -146,14 +146,51 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
       min-height: 400px;
     }
 
+    :host ::ng-deep image-cropper {
+      background-color: #1a1a1a !important;
+    }
+
+    :host ::ng-deep image-cropper .ngx-ic-main {
+      background-color: #1a1a1a !important;
+    }
+
+    :host ::ng-deep image-cropper .ngx-ic-overlay {
+      background-color: rgba(26, 26, 26, 0.8) !important;
+    }
+
+    :host ::ng-deep image-cropper .ngx-ic-cropper {
+      background-color: transparent !important;
+    }
+
+    :host ::ng-deep image-cropper .ngx-ic-source-image {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      background-color: transparent !important;
+    }
+
+    :host ::ng-deep image-cropper canvas {
+      background-color: transparent !important;
+    }
+
+    /* Legacy ng2 class names fallback */
     :host ::ng-deep image-cropper .ng2-imgcrop {
       background-color: #1a1a1a !important;
+    }
+
+    :host ::ng-deep image-cropper .ng2-imgcrop .overlay {
+      background-color: rgba(26, 26, 26, 0.8) !important;
+    }
+
+    :host ::ng-deep image-cropper .ng2-imgcrop .crop-marquee {
+      background-color: transparent !important;
     }
 
     :host ::ng-deep image-cropper .source-image {
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
+      background-color: transparent !important;
     }
 
     .loading-container {

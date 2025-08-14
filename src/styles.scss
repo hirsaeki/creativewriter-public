@@ -425,6 +425,61 @@ button:hover {
   .modal-wrapper {
     background: rgba(0, 0, 0, 0.8);
   }
+  
+  /* Global image cropper background fixes */
+  image-cropper {
+    background-color: #1a1a1a !important;
+  }
+  
+  image-cropper .ngx-ic-main {
+    background-color: #1a1a1a !important;
+  }
+  
+  image-cropper .ngx-ic-overlay {
+    background-color: rgba(26, 26, 26, 0.8) !important;
+  }
+  
+  image-cropper .ngx-ic-cropper {
+    background-color: transparent !important;
+  }
+  
+  image-cropper .ngx-ic-source-image {
+    background-color: transparent !important;
+  }
+  
+  image-cropper canvas {
+    background-color: transparent !important;
+  }
+  
+  /* Legacy ng2 class names fallback */
+  image-cropper .ng2-imgcrop {
+    background-color: #1a1a1a !important;
+  }
+  
+  image-cropper .ng2-imgcrop .overlay {
+    background-color: rgba(26, 26, 26, 0.8) !important;
+  }
+  
+  image-cropper .ng2-imgcrop .crop-marquee {
+    background-color: transparent !important;
+  }
+  
+  image-cropper .source-image {
+    background-color: transparent !important;
+  }
+  
+  /* Additional comprehensive background fixes */
+  image-cropper div {
+    background-color: inherit !important;
+  }
+  
+  image-cropper * {
+    background-color: inherit;
+  }
+  
+  image-cropper > div {
+    background-color: #1a1a1a !important;
+  }
 }
 
 /* Mobile keyboard handling */
