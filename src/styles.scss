@@ -427,23 +427,9 @@ button:hover {
   }
 }
 
-/* Global cropper background override - target container, not image */
-app-image-cropper-modal image-cropper {
-  background-color: #1a1a1a !important;
-}
-
-/* Target the main wrapper div, not image elements */
-app-image-cropper-modal image-cropper > div {
-  background-color: #1a1a1a !important;
-}
-
-/* Ensure image and cropper elements stay transparent */
-app-image-cropper-modal .ngx-ic-source-image {
-  background-color: transparent !important;
-}
-
-app-image-cropper-modal .ngx-ic-cropper {
-  background-color: transparent !important;
+/* Minimal global override - just the wrapper background */
+app-image-cropper-modal .cropper-wrapper {
+  background: #1a1a1a !important;
 }
 
 /* Mobile keyboard handling */
