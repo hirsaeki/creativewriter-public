@@ -101,17 +101,17 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
         </ion-button>
       </div>
 
-      <div class="image-size-info" *ngIf="croppedImageSize.bytes > 0">
+      <div class="image-size-info" *ngIf="originalImageSize.bytes > 0">
         <div class="size-details">
           <div class="size-item">
             <span class="size-label">Original:</span>
             <span class="size-value">{{ formatFileSize(originalImageSize) }}</span>
           </div>
-          <div class="size-item">
+          <div class="size-item" *ngIf="croppedImageSize.bytes > 0">
             <span class="size-label">Cropped:</span>
             <span class="size-value">{{ formatFileSize(croppedImageSize) }}</span>
           </div>
-          <div class="size-item" *ngIf="compressionRatio > 0">
+          <div class="size-item" *ngIf="compressionRatio > 0 && croppedImageSize.bytes > 0">
             <span class="size-label">Size:</span>
             <span class="size-value" [class.compression-good]="compressionRatio < 50" [class.compression-moderate]="compressionRatio >= 50 && compressionRatio < 80">
               {{ compressionRatio }}% of original
@@ -286,6 +286,7 @@ export class ImageCropperModalComponent implements OnInit {
     
     // Calculate original image size
     this.originalImageSize = this.calculateBase64ImageSize(this.imageBase64);
+    console.log('Original image size calculated:', this.originalImageSize);
     
     // Show cropper after a short delay to ensure proper initialization
     setTimeout(() => {
@@ -320,6 +321,7 @@ export class ImageCropperModalComponent implements OnInit {
     this.compressionRatio = this.originalImageSize.bytes > 0 
       ? Math.round((this.croppedImageSize.bytes / this.originalImageSize.bytes) * 100) 
       : 0;
+    console.log('Cropped image size updated:', this.croppedImageSize, 'Compression ratio:', this.compressionRatio);
   }
 
   imageLoaded(image: LoadedImage) {
