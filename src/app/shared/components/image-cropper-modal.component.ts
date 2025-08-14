@@ -145,14 +145,14 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
       height: 100%;
       min-height: 400px;
     }
-
-    /* Minimal CSS - only style the wrapper background without touching the image */
-    .cropper-wrapper {
-      background: #1a1a1a !important;
+    
+    /* Fix the white background visible in screenshot */
+    :host ::ng-deep image-cropper > div {
+      background-color: #1a1a1a !important;
     }
     
-    /* Only override the overlay darkness, not the image */
-    .ngx-ic-overlay {
+    /* Keep overlay semi-transparent */
+    :host ::ng-deep .ngx-ic-overlay {
       background-color: rgba(0, 0, 0, 0.7) !important;
     }
 
