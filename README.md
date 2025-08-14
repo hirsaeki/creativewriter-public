@@ -4,7 +4,7 @@
 
 > **🔗 Self-Hosters: Looking for the public version? Visit [creativewriter-public](https://github.com/MarcoDroll/creativewriter-public) for easy deployment!**
 
-A powerful, AI-enhanced creative writing application that helps authors craft compelling stories with intelligent assistance for plot development, character creation, and narrative structure.
+A powerful, AI-enhanced creative writing application that helps authors craft compelling stories with intelligent assistance for plot development, character creation, narrative structure, and **rich media integration including images within text**.
 
 > **🤖 Built with AI:** This entire application was developed using AI-powered pair programming with [Claude Code](https://claude.ai/code), demonstrating the power of human-AI collaboration in modern software development. While AI accelerates development, it still requires significant human expertise, effort, and a paid Claude subscription to guide the AI, make architectural decisions, and ensure quality.
 
@@ -78,9 +78,10 @@ CreativeWriter is a modern web-based writing tool designed for fiction authors w
 
 ### 📝 Story Management
 - **Multi-Story Support**: Manage multiple writing projects simultaneously
-- **Rich Text Editor**: Full-featured ProseMirror-based editor with formatting tools
+- **Rich Text Editor**: Full-featured ProseMirror-based editor with formatting tools and **inline image support**
 - **Story Structure**: Organize your narrative with acts, chapters, scenes, and beats
 - **Auto-Save**: Never lose your work with automatic saving to local database
+- **📸 Images Within Text**: Seamlessly embed images directly within your story text for enhanced storytelling
 
 ### 🤖 AI Integration
 - **Multiple AI Providers**: Support for OpenRouter, Google Gemini, and **Ollama (Local LLMs)**
@@ -116,10 +117,12 @@ AI tends to "understand" XML-tags better than simple text as context structuring
 - **PDF Export**: Generate formatted PDFs of your stories
 - **Version History**: Track changes and revisions
 
-### 🖼️ Media Support
+### 🖼️ Rich Media Support
+- **📸 Images Within Text**: **Embed images directly within your story text** - perfect for visual storytelling, character references, or scene inspiration
 - **Image Generation**: Integration with Replicate for AI image generation
-- **Image Management**: Upload and manage story-related images
+- **Image Management**: Upload and manage story-related images with full editor integration
 - **Video Support**: Embed and manage video content
+- **Visual Storytelling**: Enhance your narrative with inline media that flows naturally with your text
 
 ## 🏗️ Architecture
 
@@ -324,8 +327,9 @@ src/
 1. **Start with Story Structure**: Define your acts and chapters before diving into scenes
 2. **Build Your Codex**: Add characters and locations early for better AI context
 3. **Use Beat AI**: Let AI help with writer's block on individual beats
-4. **Customize Prompts**: Tailor AI responses to your writing style
-5. **Regular Exports**: Backup your work regularly using export features
+4. **📸 Leverage Visual Storytelling**: Embed images directly within your text to enhance scenes, character descriptions, or provide visual inspiration
+5. **Customize Prompts**: Tailor AI responses to your writing style
+6. **Regular Exports**: Backup your work regularly using export features
 
 ## 🤝 Contributing
 

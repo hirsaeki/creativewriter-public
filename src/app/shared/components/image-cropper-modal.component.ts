@@ -2,7 +2,7 @@ import { Component, Input, ViewChild, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
-  IonContent, IonIcon, ModalController, IonFooter
+  IonContent, IonIcon, ModalController, IonFooter, Platform
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { closeOutline, checkmarkOutline, cropOutline } from 'ionicons/icons';
@@ -34,7 +34,7 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
         <image-cropper
           *ngIf="showCropper"
           [imageBase64]="imageBase64"
-          [maintainAspectRatio]="aspectRatio !== 0"
+          [maintainAspectRatio]="aspectRatio > 0"
           [aspectRatio]="aspectRatio"
           [cropperMinWidth]="100"
           [cropperMinHeight]="100"
@@ -42,16 +42,12 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
           [canvasRotation]="canvasRotation"
           [transform]="transform"
           [alignImage]="'center'"
-          [backgroundColor]="'#1a1a1a'"
-          [format]="'png'"
+          [backgroundColor]="'#000'"
+          [format]="'webp'"
           [autoCrop]="true"
-          [containWithinAspectRatio]="false"
-          [resizeToWidth]="0"
-          [resizeToHeight]="0"
-          [cropperStaticWidth]="0"
-          [cropperStaticHeight]="0"
-          [onlyScaleDown]="false"
-          [cropperFrameAriaLabel]="'Image crop area'"
+          [hideResizeSquares]="isMobile && aspectRatio > 0"
+          [onlyScaleDown]="true"
+          [imageQuality]="95"
           (imageCropped)="imageCropped($event)"
           (imageLoaded)="imageLoaded($event)"
           (cropperReady)="cropperReady()"
@@ -108,6 +104,25 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
           Frei
         </ion-button>
       </div>
+
+      <div class="image-size-info" *ngIf="originalImageSize.bytes > 0">
+        <div class="size-details">
+          <div class="size-item">
+            <span class="size-label">Original:</span>
+            <span class="size-value">{{ formatFileSize(originalImageSize) }}</span>
+          </div>
+          <div class="size-item" *ngIf="croppedImageSize.bytes > 0">
+            <span class="size-label">Cropped:</span>
+            <span class="size-value">{{ formatFileSize(croppedImageSize) }}</span>
+          </div>
+          <div class="size-item" *ngIf="compressionRatio > 0 && croppedImageSize.bytes > 0">
+            <span class="size-label">Size:</span>
+            <span class="size-value" [class.compression-good]="compressionRatio < 50" [class.compression-moderate]="compressionRatio >= 50 && compressionRatio < 80">
+              {{ compressionRatio }}% of original
+            </span>
+          </div>
+        </div>
+      </div>
     </ion-content>
 
     <ion-footer>
@@ -141,6 +156,7 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
     }
 
     :host ::ng-deep image-cropper {
+<<<<<<< HEAD
       width: 100%;
       height: 100%;
       min-height: 400px;
@@ -180,6 +196,11 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
+=======
+      max-height: 100%;
+      max-width: 100%;
+      --cropper-overlay-color: rgba(0, 0, 0, 0.8);
+>>>>>>> main
     }
 
     .aspect-ratio-buttons {
@@ -204,6 +225,49 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
       --background: transparent;
       --border-width: 0;
     }
+
+    .image-size-info {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 12px;
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+      min-width: 200px;
+    }
+
+    .size-details {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .size-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .size-label {
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 500;
+    }
+
+    .size-value {
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 600;
+      text-align: right;
+    }
+
+    .compression-good {
+      color: #28a745 !important;
+    }
+
+    .compression-moderate {
+      color: #ffc107 !important;
+    }
   `]
 })
 export class ImageCropperModalComponent implements OnInit {
@@ -217,19 +281,70 @@ export class ImageCropperModalComponent implements OnInit {
   aspectRatio = 3/4;
   isReady = false;
   showCropper = false;
+  isMobile = false;
+  
+  // Image size tracking
+  originalImageSize = { bytes: 0, kb: 0, mb: 0 };
+  croppedImageSize = { bytes: 0, kb: 0, mb: 0 };
+  compressionRatio = 0;
 
   private modalCtrl = inject(ModalController);
+  private platform = inject(Platform);
 
   constructor() {
     addIcons({ closeOutline, checkmarkOutline, cropOutline });
   }
 
+  private calculateBase64ImageSize(base64String: string) {
+    if (!base64String) return { bytes: 0, kb: 0, mb: 0 };
+    
+    // Remove the data URL prefix if present
+    const base64 = base64String.split(',')[1] || base64String;
+    
+    // Calculate padding
+    const padding = (base64.endsWith('==') ? 2 : (base64.endsWith('=') ? 1 : 0));
+    
+    // Calculate size in bytes
+    const sizeInBytes = Math.ceil(base64.length / 4) * 3 - padding;
+    
+    // Convert to KB/MB
+    const sizeInKB = sizeInBytes / 1024;
+    const sizeInMB = sizeInKB / 1024;
+    
+    return {
+      bytes: sizeInBytes,
+      kb: Math.round(sizeInKB * 100) / 100,
+      mb: Math.round(sizeInMB * 100) / 100
+    };
+  }
+
+  formatFileSize(sizeObj: { bytes: number; kb: number; mb: number }): string {
+    if (sizeObj.mb >= 1) {
+      return `${sizeObj.mb} MB`;
+    } else if (sizeObj.kb >= 1) {
+      return `${sizeObj.kb} KB`;
+    } else {
+      return `${sizeObj.bytes} bytes`;
+    }
+  }
+
   ngOnInit() {
     this.aspectRatio = this.initialAspectRatio;
+<<<<<<< HEAD
     console.log('ImageCropperModal initialized with base64:', this.imageBase64 ? 'present' : 'missing');
     
     // Show cropper immediately if we have the image
     if (this.imageBase64) {
+=======
+    this.isMobile = this.platform.is('mobile') || this.platform.is('tablet');
+    
+    // Calculate original image size
+    this.originalImageSize = this.calculateBase64ImageSize(this.imageBase64);
+    console.log('Original image size calculated:', this.originalImageSize);
+    
+    // Show cropper after a short delay to ensure proper initialization
+    setTimeout(() => {
+>>>>>>> main
       this.showCropper = true;
     } else {
       console.error('No image base64 data provided to cropper modal');
@@ -241,17 +356,33 @@ export class ImageCropperModalComponent implements OnInit {
     // Use base64 if available, or convert blob to base64
     if (event.base64) {
       this.croppedImage = event.base64;
+      this.updateCroppedImageSize(event.base64);
     } else if (event.blob) {
       // Convert blob to base64 for compatibility with image-upload component
       const reader = new FileReader();
       reader.onload = () => {
         this.croppedImage = reader.result as string;
+        this.updateCroppedImageSize(this.croppedImage);
       };
       reader.readAsDataURL(event.blob);
     } else if (event.objectUrl) {
       // Fallback to objectUrl if neither base64 nor blob is available
       this.croppedImage = event.objectUrl;
+      // Can't calculate size for objectUrl, so reset to 0
+      this.updateCroppedImageSize('');
     }
+  }
+
+  private updateCroppedImageSize(imageData: string) {
+    this.croppedImageSize = this.calculateBase64ImageSize(imageData);
+    this.compressionRatio = this.originalImageSize.bytes > 0 
+      ? Math.round((this.croppedImageSize.bytes / this.originalImageSize.bytes) * 100) 
+      : 0;
+    console.log('🔍 Cropped image size updated:');
+    console.log('  Original:', this.formatFileSize(this.originalImageSize));
+    console.log('  Cropped:', this.formatFileSize(this.croppedImageSize));
+    console.log('  Ratio:', this.compressionRatio + '% of original');
+    console.log('  Reduction:', (100 - this.compressionRatio) + '%');
   }
 
   imageLoaded(image: LoadedImage) {
@@ -273,38 +404,47 @@ export class ImageCropperModalComponent implements OnInit {
     this.aspectRatio = ratio;
   }
 
-  confirmCrop() {
-    console.log('Confirm crop clicked, croppedImage:', this.croppedImage);
+  async confirmCrop() {
+    console.log('Confirm crop clicked');
     
-    // If no cropped image yet, try to get it from the cropper
-    if (!this.croppedImage && this.imageCropper) {
-      console.log('Trying to crop manually');
-      const event = this.imageCropper.crop();
-      console.log('Manual crop event:', event);
-      if (event?.base64) {
-        this.croppedImage = event.base64;
-      } else if (event?.blob) {
-        // Convert blob to base64 for compatibility
-        const reader = new FileReader();
-        reader.onload = () => {
-          this.croppedImage = reader.result as string;
+    // Since autoCrop is disabled, manually trigger the crop
+    if (this.imageCropper) {
+      console.log('Manually triggering crop');
+      try {
+        const event = await this.imageCropper.crop();
+        console.log('Manual crop event:', event);
+        
+        if (event?.base64) {
+          this.croppedImage = event.base64;
+          this.updateCroppedImageSize(event.base64);
           this.modalCtrl.dismiss({
             croppedImage: this.croppedImage
           });
-        };
-        reader.readAsDataURL(event.blob);
-        return; // Exit early to wait for FileReader
-      } else if (event?.objectUrl) {
-        this.croppedImage = event.objectUrl;
+        } else if (event?.blob) {
+          // Convert blob to base64 for compatibility
+          const reader = new FileReader();
+          reader.onload = () => {
+            this.croppedImage = reader.result as string;
+            this.updateCroppedImageSize(this.croppedImage);
+            this.modalCtrl.dismiss({
+              croppedImage: this.croppedImage
+            });
+          };
+          reader.readAsDataURL(event.blob);
+          return; // Exit early to wait for FileReader
+        } else if (event?.objectUrl) {
+          this.croppedImage = event.objectUrl;
+          this.modalCtrl.dismiss({
+            croppedImage: this.croppedImage
+          });
+        } else {
+          console.error('No crop result available');
+        }
+      } catch (error) {
+        console.error('Error cropping image:', error);
       }
-    }
-    
-    if (this.croppedImage) {
-      this.modalCtrl.dismiss({
-        croppedImage: this.croppedImage
-      });
     } else {
-      console.error('No cropped image available');
+      console.error('Image cropper not available');
     }
   }
 
