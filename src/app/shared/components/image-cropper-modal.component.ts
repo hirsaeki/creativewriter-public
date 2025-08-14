@@ -227,38 +227,42 @@ export class ImageCropperModalComponent implements OnInit {
     this.aspectRatio = ratio;
   }
 
-  confirmCrop() {
+  async confirmCrop() {
     console.log('Confirm crop clicked');
     
     // Since autoCrop is disabled, manually trigger the crop
     if (this.imageCropper) {
       console.log('Manually triggering crop');
-      const event = this.imageCropper.crop();
-      console.log('Manual crop event:', event);
-      
-      if (event?.base64) {
-        this.croppedImage = event.base64;
-        this.modalCtrl.dismiss({
-          croppedImage: this.croppedImage
-        });
-      } else if (event?.blob) {
-        // Convert blob to base64 for compatibility
-        const reader = new FileReader();
-        reader.onload = () => {
-          this.croppedImage = reader.result as string;
+      try {
+        const event = await this.imageCropper.crop();
+        console.log('Manual crop event:', event);
+        
+        if (event?.base64) {
+          this.croppedImage = event.base64;
           this.modalCtrl.dismiss({
             croppedImage: this.croppedImage
           });
-        };
-        reader.readAsDataURL(event.blob);
-        return; // Exit early to wait for FileReader
-      } else if (event?.objectUrl) {
-        this.croppedImage = event.objectUrl;
-        this.modalCtrl.dismiss({
-          croppedImage: this.croppedImage
-        });
-      } else {
-        console.error('No crop result available');
+        } else if (event?.blob) {
+          // Convert blob to base64 for compatibility
+          const reader = new FileReader();
+          reader.onload = () => {
+            this.croppedImage = reader.result as string;
+            this.modalCtrl.dismiss({
+              croppedImage: this.croppedImage
+            });
+          };
+          reader.readAsDataURL(event.blob);
+          return; // Exit early to wait for FileReader
+        } else if (event?.objectUrl) {
+          this.croppedImage = event.objectUrl;
+          this.modalCtrl.dismiss({
+            croppedImage: this.croppedImage
+          });
+        } else {
+          console.error('No crop result available');
+        }
+      } catch (error) {
+        console.error('Error cropping image:', error);
       }
     } else {
       console.error('Image cropper not available');
