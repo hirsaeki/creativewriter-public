@@ -147,33 +147,27 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
       min-height: 400px;
     }
 
-    /* Simplified CSS targeting actual ngx-image-cropper v9+ classes */
+    /* Target the main container of the image cropper */
     image-cropper {
       background-color: #1a1a1a !important;
     }
 
-    .ngx-ic-main {
+    /* Target the main wrapper div inside the cropper */
+    image-cropper > div {
       background-color: #1a1a1a !important;
     }
 
-    .ngx-ic-overlay {
-      background-color: rgba(26, 26, 26, 0.8) !important;
+    /* Keep image and cropping area transparent */
+    .ngx-ic-source-image {
+      background-color: transparent !important;
     }
 
     .ngx-ic-cropper {
       background-color: transparent !important;
     }
 
-    .ngx-ic-source-image {
-      background-color: transparent !important;
-    }
-
-    /* Target any remaining white backgrounds */
-    image-cropper * {
-      background-color: inherit !important;
-    }
-
-    image-cropper div:first-child {
+    /* Override any white backgrounds in nested divs but preserve image */
+    image-cropper div:not(.ngx-ic-source-image):not(.ngx-ic-cropper) {
       background-color: #1a1a1a !important;
     }
 
