@@ -34,7 +34,7 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
         <image-cropper
           *ngIf="showCropper"
           [imageBase64]="imageBase64"
-          [maintainAspectRatio]="true"
+          [maintainAspectRatio]="aspectRatio > 0"
           [aspectRatio]="aspectRatio"
           [cropperMinWidth]="100"
           [cropperMinHeight]="100"
