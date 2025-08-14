@@ -1,4 +1,4 @@
-import { Component, Input, ViewChild, inject, OnInit, ViewEncapsulation } from '@angular/core';
+import { Component, Input, ViewChild, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
@@ -17,7 +17,6 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
     IonContent, IonIcon, IonFooter,
     ImageCropperComponent
   ],
-  encapsulation: ViewEncapsulation.None,
   template: `
     <ion-header>
       <ion-toolbar>
@@ -147,28 +146,14 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
       min-height: 400px;
     }
 
-    /* Target the main container of the image cropper */
-    image-cropper {
-      background-color: #1a1a1a !important;
+    /* Minimal CSS - only style the wrapper background without touching the image */
+    .cropper-wrapper {
+      background: #1a1a1a !important;
     }
-
-    /* Target the main wrapper div inside the cropper */
-    image-cropper > div {
-      background-color: #1a1a1a !important;
-    }
-
-    /* Keep image and cropping area transparent */
-    .ngx-ic-source-image {
-      background-color: transparent !important;
-    }
-
-    .ngx-ic-cropper {
-      background-color: transparent !important;
-    }
-
-    /* Override any white backgrounds in nested divs but preserve image */
-    image-cropper div:not(.ngx-ic-source-image):not(.ngx-ic-cropper) {
-      background-color: #1a1a1a !important;
+    
+    /* Only override the overlay darkness, not the image */
+    .ngx-ic-overlay {
+      background-color: rgba(0, 0, 0, 0.7) !important;
     }
 
     .loading-container {
