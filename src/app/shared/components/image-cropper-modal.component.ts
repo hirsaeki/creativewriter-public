@@ -1,4 +1,4 @@
-import { Component, Input, ViewChild, inject, OnInit } from '@angular/core';
+import { Component, Input, ViewChild, inject, OnInit, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
@@ -17,6 +17,7 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
     IonContent, IonIcon, IonFooter,
     ImageCropperComponent
   ],
+  encapsulation: ViewEncapsulation.None,
   template: `
     <ion-header>
       <ion-toolbar>
@@ -146,51 +147,34 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
       min-height: 400px;
     }
 
-    :host ::ng-deep image-cropper {
+    /* Simplified CSS targeting actual ngx-image-cropper v9+ classes */
+    image-cropper {
       background-color: #1a1a1a !important;
     }
 
-    :host ::ng-deep image-cropper .ngx-ic-main {
+    .ngx-ic-main {
       background-color: #1a1a1a !important;
     }
 
-    :host ::ng-deep image-cropper .ngx-ic-overlay {
+    .ngx-ic-overlay {
       background-color: rgba(26, 26, 26, 0.8) !important;
     }
 
-    :host ::ng-deep image-cropper .ngx-ic-cropper {
+    .ngx-ic-cropper {
       background-color: transparent !important;
     }
 
-    :host ::ng-deep image-cropper .ngx-ic-source-image {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
+    .ngx-ic-source-image {
       background-color: transparent !important;
     }
 
-    :host ::ng-deep image-cropper canvas {
-      background-color: transparent !important;
+    /* Target any remaining white backgrounds */
+    image-cropper * {
+      background-color: inherit !important;
     }
 
-    /* Legacy ng2 class names fallback */
-    :host ::ng-deep image-cropper .ng2-imgcrop {
+    image-cropper div:first-child {
       background-color: #1a1a1a !important;
-    }
-
-    :host ::ng-deep image-cropper .ng2-imgcrop .overlay {
-      background-color: rgba(26, 26, 26, 0.8) !important;
-    }
-
-    :host ::ng-deep image-cropper .ng2-imgcrop .crop-marquee {
-      background-color: transparent !important;
-    }
-
-    :host ::ng-deep image-cropper .source-image {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-      background-color: transparent !important;
     }
 
     .loading-container {
