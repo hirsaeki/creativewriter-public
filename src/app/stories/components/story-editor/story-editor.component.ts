@@ -495,14 +495,10 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   }
 
   private updateHeaderActions(): void {
-    // Update the save status and word count in the right actions
+    // Update the word count in the right actions
+    // Note: First button is now Buy Me a Coffee (don't modify)
     if (this.rightActions.length >= 2) {
-      // Update save status chip
-      this.rightActions[0].icon = this.hasUnsavedChanges ? 'save-outline' : 'checkmark-circle-outline';
-      this.rightActions[0].chipContent = this.hasUnsavedChanges ? 'Not saved' : 'Saved';
-      this.rightActions[0].chipColor = this.hasUnsavedChanges ? 'warning' : 'success';
-      
-      // Update word count chip
+      // Update word count chip (second button)
       this.rightActions[1].chipContent = `${this.wordCount}w`;
       this.rightActions[1].action = () => this.showStoryStatsModal();
     }
