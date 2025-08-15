@@ -452,15 +452,22 @@ This action CANNOT be undone! Make sure you have exported your current database 
       this.showToast('Database imported successfully! Check console for any attachment warnings.', 'success');
       this.selectedFile = null;
       
-      // Refresh database info after import
-      await this.loadDatabaseInfo();
+      // Refresh database info after import (with error handling)
+      try {
+        await this.loadDatabaseInfo();
+      } catch (infoError) {
+        console.warn('Failed to refresh database info after import:', infoError);
+        // Don't fail the entire import for this
+      }
       
     } catch (error: unknown) {
       console.error('Import failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to import database. Please check the file and try again.';
       this.showToast(errorMessage, 'danger');
     } finally {
+      // Ensure the loading state is always reset
       this.isImporting = false;
+      console.log('Import process completed, isImporting set to false');
     }
   }
 

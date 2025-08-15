@@ -113,56 +113,66 @@ export class DatabaseBackupService {
     }
     
     // Process each batch
-    for (const batch of batches) {
-      // Clean documents for import (remove _rev to avoid conflicts and handle attachments)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cleanDocs = batch.map((doc: any) => {
-        const cleanDoc = { ...doc };
-        delete cleanDoc['_rev']; // Remove revision for fresh import
-        
-        // Handle attachment stubs - if attachments exist but don't have data, remove them
-        if (cleanDoc['_attachments']) {
-          const attachments = cleanDoc['_attachments'];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const hasValidAttachments = Object.values(attachments).some((att: any) => 
-            att.data || att.content_type && att.length
-          );
-          
-          if (!hasValidAttachments) {
-            console.warn(`Removing invalid attachment stubs from document ${cleanDoc['_id']}`);
-            delete cleanDoc['_attachments'];
-          }
-        }
-        
-        return cleanDoc;
-      });
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      console.log(`Processing batch ${i + 1}/${batches.length} with ${batch.length} documents`);
       
       try {
-        await db.bulkDocs(cleanDocs);
-      } catch (error) {
-        console.warn('Bulk import failed, trying individual documents:', error);
-        // If bulk import fails, try importing each document individually
-        for (const doc of cleanDocs) {
-          try {
-            await db.put(doc);
-          } catch (docError) {
-            console.warn(`Failed to import document ${doc['_id']}:`, docError);
-            
-            // If it's an attachment error, try without attachments
+        // Clean documents for import (remove _rev to avoid conflicts and handle attachments)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const cleanDocs = batch.map((doc: any) => {
+          const cleanDoc = { ...doc };
+          delete cleanDoc['_rev']; // Remove revision for fresh import
+          
+          // Handle attachment stubs - if attachments exist but don't have data, remove them
+          if (cleanDoc['_attachments']) {
+            const attachments = cleanDoc['_attachments'];
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const error = docError as any;
-            if (error.name === 'missing_stub' || error.message?.includes('stub') || error.message?.includes('attachment')) {
-              try {
-                const docWithoutAttachments = { ...doc };
-                delete docWithoutAttachments['_attachments'];
-                await db.put(docWithoutAttachments);
-                console.warn(`Successfully imported document ${doc['_id']} without attachments`);
-              } catch (finalError) {
-                console.error(`Failed to import document ${doc['_id']} even without attachments:`, finalError);
+            const hasValidAttachments = Object.values(attachments).some((att: any) => 
+              att.data || att.content_type && att.length
+            );
+            
+            if (!hasValidAttachments) {
+              console.warn(`Removing invalid attachment stubs from document ${cleanDoc['_id']}`);
+              delete cleanDoc['_attachments'];
+            }
+          }
+          
+          return cleanDoc;
+        });
+        
+        try {
+          await db.bulkDocs(cleanDocs);
+          console.log(`Batch ${i + 1} imported successfully`);
+        } catch (error) {
+          console.warn(`Batch ${i + 1} bulk import failed, trying individual documents:`, error);
+          // If bulk import fails, try importing each document individually
+          for (let j = 0; j < cleanDocs.length; j++) {
+            const doc = cleanDocs[j];
+            try {
+              await db.put(doc);
+            } catch (docError) {
+              console.warn(`Failed to import document ${doc['_id']} (${j + 1}/${cleanDocs.length}):`, docError);
+              
+              // If it's an attachment error, try without attachments
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const error = docError as any;
+              if (error.name === 'missing_stub' || error.message?.includes('stub') || error.message?.includes('attachment')) {
+                try {
+                  const docWithoutAttachments = { ...doc };
+                  delete docWithoutAttachments['_attachments'];
+                  await db.put(docWithoutAttachments);
+                  console.warn(`Successfully imported document ${doc['_id']} without attachments`);
+                } catch (finalError) {
+                  console.error(`Failed to import document ${doc['_id']} even without attachments:`, finalError);
+                }
               }
             }
           }
         }
+      } catch (batchError) {
+        console.error(`Critical error processing batch ${i + 1}:`, batchError);
+        // Continue with next batch even if this one fails completely
       }
     }
     
