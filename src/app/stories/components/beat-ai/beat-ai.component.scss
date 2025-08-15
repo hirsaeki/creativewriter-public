@@ -355,21 +355,6 @@
       color: #51cf66 !important;
     }
     
-    /* Generate and cancel buttons should use their default colors */
-    .generate-btn.primary {
-      background: #0d6efd !important;
-      color: white !important;
-    }
-    
-    .cancel-btn {
-      background: #6c757d !important;
-      color: white !important;
-    }
-    
-    .stop-btn {
-      background: #dc3545 !important;
-      color: white !important;
-    }
     
     /* Ensure badges don't inherit text color */
     .beat-type-badge,
