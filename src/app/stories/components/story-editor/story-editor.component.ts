@@ -1351,12 +1351,25 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
 
   async exportToPDF(): Promise<void> {
     try {
+      console.log('PDF export button clicked');
+      
       // Save any unsaved changes first
       if (this.hasUnsavedChanges) {
+        console.log('Saving unsaved changes before PDF export');
         await this.saveStory();
       }
 
-      // Show loading indicator (you can enhance this with a proper loading dialog)
+      // Validate story data
+      if (!this.story || !this.story.title) {
+        throw new Error('Story data is incomplete');
+      }
+
+      if (!this.story.chapters || this.story.chapters.length === 0) {
+        throw new Error('Story has no chapters to export');
+      }
+
+      console.log('Exporting story to PDF:', this.story.title);
+      console.log('Story chapters:', this.story.chapters.length);
 
       // Export the story to PDF with background
       await this.pdfExportService.exportStoryToPDF(this.story, {
@@ -1365,9 +1378,13 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         orientation: 'portrait'
       });
 
+      console.log('PDF export completed successfully');
+
     } catch (error) {
       console.error('PDF export failed:', error);
-      // You can add proper error handling/notification here
+      
+      // Show user-friendly error message
+      alert(`PDF export failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
     }
   }
 

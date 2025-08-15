@@ -42,6 +42,8 @@ export class PDFExportService {
     const config = { ...defaultOptions, ...options };
 
     try {
+      console.log('Starting PDF export for story:', story.title);
+      
       // Create PDF
       const pdf = new jsPDF({
         orientation: config.orientation,
@@ -49,24 +51,41 @@ export class PDFExportService {
         format: config.format
       });
 
+      console.log('jsPDF instance created successfully');
+
       // Get page dimensions
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
 
+      console.log('Page dimensions:', { pageWidth, pageHeight });
+
       // Add background if enabled
       if (config.includeBackground) {
+        console.log('Adding background to PDF');
         await this.addBackgroundToPDF(pdf, pageWidth, pageHeight);
       }
 
       // Add text content directly to PDF
+      console.log('Adding text content to PDF');
       await this.addTextContentToPDF(pdf, story, config);
 
       // Save the PDF
+      console.log('Saving PDF with filename:', config.filename);
       pdf.save(config.filename);
+      console.log('PDF export completed successfully');
       
     } catch (error) {
       console.error('Error exporting story to PDF:', error);
-      throw new Error('Failed to export story to PDF');
+      console.error('Error details:', error);
+      
+      // Try a simplified fallback approach
+      try {
+        console.log('Attempting fallback PDF export');
+        await this.fallbackPDFExport(story, config);
+      } catch (fallbackError) {
+        console.error('Fallback PDF export also failed:', fallbackError);
+        throw new Error(`Failed to export story to PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
@@ -398,20 +417,23 @@ export class PDFExportService {
 
 
   private async addBackgroundToPDF(pdf: jsPDF, pdfWidth: number, pdfHeight: number): Promise<void> {
-    const currentBackground = this.backgroundService.getCurrentBackground();
-    
-    if (currentBackground === 'none' || !currentBackground) {
-      // Add dark background color if no image
-      pdf.setFillColor('#1a1a1a');
-      pdf.rect(0, 0, pdfWidth, pdfHeight, 'F');
-      return;
-    }
-
     try {
+      const currentBackground = this.backgroundService.getCurrentBackground();
+      
+      if (currentBackground === 'none' || !currentBackground) {
+        // Add dark background color if no image
+        console.log('No background specified, using dark background');
+        pdf.setFillColor('#1a1a1a');
+        pdf.rect(0, 0, pdfWidth, pdfHeight, 'F');
+        return;
+      }
+
+      console.log('Current background:', currentBackground);
       let backgroundImageData: string | null = null;
 
       // Handle custom backgrounds
       if (currentBackground.startsWith('custom:')) {
+        console.log('Processing custom background');
         const customId = currentBackground.replace('custom:', '');
         const customBg = this.customBackgroundService.backgrounds().find(bg => bg.id === customId);
         
@@ -420,17 +442,21 @@ export class PDFExportService {
         }
       } else {
         // Handle standard backgrounds - load from assets
+        console.log('Processing standard background from assets');
         backgroundImageData = await this.loadImageAsBase64(`assets/backgrounds/${currentBackground}`);
       }
 
       if (backgroundImageData) {
+        console.log('Background image data loaded, creating canvas');
         // Create a canvas to composite the background image with overlay
         const backgroundCanvas = await this.createBackgroundCanvas(backgroundImageData, pdfWidth, pdfHeight);
         const backgroundDataUrl = backgroundCanvas.toDataURL('image/jpeg', 0.9);
         
         // Add the composited background to PDF
+        console.log('Adding background image to PDF');
         pdf.addImage(backgroundDataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       } else {
+        console.log('No background image data, using fallback dark background');
         // Fallback to dark background
         pdf.setFillColor('#1a1a1a');
         pdf.rect(0, 0, pdfWidth, pdfHeight, 'F');
@@ -503,5 +529,99 @@ export class PDFExportService {
       
       img.src = backgroundImageData;
     });
+  }
+
+  private async fallbackPDFExport(story: Story, config: Required<PDFExportOptions>): Promise<void> {
+    console.log('Using fallback PDF export method');
+    
+    // Create a simple PDF without backgrounds or complex formatting
+    const pdf = new jsPDF({
+      orientation: config.orientation,
+      unit: 'mm',
+      format: config.format
+    });
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const leftMargin = config.margins.left;
+    const rightMargin = config.margins.right;
+    const maxWidth = pageWidth - leftMargin - rightMargin;
+    let currentY = config.margins.top;
+
+    // Set basic font
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(12);
+    pdf.setTextColor(0, 0, 0); // Black text
+
+    // Add title
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(20);
+    const titleLines = pdf.splitTextToSize(story.title || 'Untitled Story', maxWidth);
+    for (const line of titleLines) {
+      pdf.text(line, leftMargin, currentY);
+      currentY += 8;
+    }
+    currentY += 10;
+
+    // Add content
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(12);
+
+    for (const chapter of story.chapters || []) {
+      // Add chapter title
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(16);
+      const chapterLines = pdf.splitTextToSize(chapter.title || 'Untitled Chapter', maxWidth);
+      for (const line of chapterLines) {
+        if (currentY > pdf.internal.pageSize.getHeight() - config.margins.bottom) {
+          pdf.addPage();
+          currentY = config.margins.top;
+        }
+        pdf.text(line, leftMargin, currentY);
+        currentY += 7;
+      }
+      currentY += 5;
+
+      // Add scenes
+      for (const scene of chapter.scenes || []) {
+        if (scene.title) {
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(14);
+          const sceneLines = pdf.splitTextToSize(scene.title, maxWidth);
+          for (const line of sceneLines) {
+            if (currentY > pdf.internal.pageSize.getHeight() - config.margins.bottom) {
+              pdf.addPage();
+              currentY = config.margins.top;
+            }
+            pdf.text(line, leftMargin, currentY);
+            currentY += 6;
+          }
+          currentY += 3;
+        }
+
+        if (scene.content) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(12);
+          
+          // Extract plain text from HTML content
+          const plainText = this.extractPlainText(scene.content);
+          const contentLines = pdf.splitTextToSize(plainText, maxWidth);
+          
+          for (const line of contentLines) {
+            if (currentY > pdf.internal.pageSize.getHeight() - config.margins.bottom) {
+              pdf.addPage();
+              currentY = config.margins.top;
+            }
+            pdf.text(line, leftMargin, currentY);
+            currentY += 5;
+          }
+          currentY += 5;
+        }
+      }
+      currentY += 10;
+    }
+
+    // Save the PDF
+    pdf.save(config.filename);
+    console.log('Fallback PDF export completed successfully');
   }
 }
