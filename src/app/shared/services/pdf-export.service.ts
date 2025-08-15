@@ -27,7 +27,7 @@ export class PDFExportService {
 
   async exportStoryToPDF(story: Story, options: PDFExportOptions = {}): Promise<void> {
     const defaultOptions: Required<PDFExportOptions> = {
-      filename: `${story.title || 'Story'}.pdf`,
+      filename: `${story.title?.trim() || 'Untitled Story'}.pdf`,
       includeBackground: true,
       format: 'a4',
       orientation: 'portrait',
@@ -109,7 +109,7 @@ export class PDFExportService {
     }
     
     // Add title
-    const titleLines = pdf.splitTextToSize(story.title, maxWidth);
+    const titleLines = pdf.splitTextToSize(story.title?.trim() || 'Untitled Story', maxWidth);
     for (const line of titleLines) {
       if (currentY > bottomMargin) {
         pdf.addPage();
@@ -555,7 +555,7 @@ export class PDFExportService {
     // Add title
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(20);
-    const titleLines = pdf.splitTextToSize(story.title || 'Untitled Story', maxWidth);
+    const titleLines = pdf.splitTextToSize(story.title?.trim() || 'Untitled Story', maxWidth);
     for (const line of titleLines) {
       pdf.text(line, leftMargin, currentY);
       currentY += 8;

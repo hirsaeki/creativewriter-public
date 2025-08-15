@@ -1360,12 +1360,24 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       }
 
       // Validate story data
-      if (!this.story || !this.story.title) {
-        throw new Error('Story data is incomplete');
+      if (!this.story) {
+        throw new Error('No story loaded');
       }
 
+      console.log('Story validation - title:', this.story.title, 'chapters:', this.story.chapters?.length);
+      
       if (!this.story.chapters || this.story.chapters.length === 0) {
         throw new Error('Story has no chapters to export');
+      }
+
+      // Check if story has any content
+      const hasContent = this.story.chapters.some(chapter => 
+        chapter.scenes && chapter.scenes.length > 0 && 
+        chapter.scenes.some(scene => scene.content && scene.content.trim().length > 0)
+      );
+
+      if (!hasContent) {
+        throw new Error('Story has no content to export');
       }
 
       console.log('Exporting story to PDF:', this.story.title);
