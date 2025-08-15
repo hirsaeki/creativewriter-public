@@ -748,13 +748,14 @@
     .generate-btn.primary:hover:not(:disabled) {
       background: linear-gradient(
         135deg,
-        rgba(255, 255, 255, 0.12) 0%,
-        rgba(255, 255, 255, 0.06) 100%
+        rgba(64, 192, 87, 0.12) 0%,
+        rgba(81, 207, 102, 0.06) 100%
       );
-      border-color: rgba(255, 255, 255, 0.2);
+      border-color: rgba(81, 207, 102, 0.3);
+      color: rgba(255, 255, 255, 0.95);
       box-shadow: 
-        0 4px 20px rgba(255, 255, 255, 0.15),
-        0 0 30px rgba(255, 255, 255, 0.1),
+        0 4px 20px rgba(64, 192, 87, 0.4),
+        0 0 30px rgba(81, 207, 102, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
     
@@ -766,13 +767,14 @@
     .generate-btn.secondary:hover:not(:disabled) {
       background: linear-gradient(
         135deg,
-        rgba(255, 255, 255, 0.08) 0%,
-        rgba(255, 255, 255, 0.04) 100%
+        rgba(255, 193, 7, 0.08) 0%,
+        rgba(255, 235, 59, 0.04) 100%
       );
-      border-color: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 193, 7, 0.25);
+      color: rgba(255, 255, 255, 0.95);
       box-shadow: 
-        0 3px 16px rgba(255, 255, 255, 0.12),
-        0 0 25px rgba(255, 255, 255, 0.08),
+        0 3px 16px rgba(255, 193, 7, 0.3),
+        0 0 25px rgba(255, 235, 59, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
     
@@ -801,13 +803,14 @@
     .cancel-btn:hover {
       background: linear-gradient(
         135deg,
-        rgba(255, 255, 255, 0.08) 0%,
-        rgba(255, 255, 255, 0.04) 100%
+        rgba(220, 53, 69, 0.08) 0%,
+        rgba(255, 107, 107, 0.04) 100%
       );
-      border-color: rgba(255, 255, 255, 0.15);
+      border-color: rgba(220, 53, 69, 0.25);
+      color: rgba(255, 255, 255, 0.95);
       box-shadow: 
-        0 3px 16px rgba(255, 255, 255, 0.12),
-        0 0 25px rgba(255, 255, 255, 0.08),
+        0 3px 16px rgba(220, 53, 69, 0.3),
+        0 0 25px rgba(255, 107, 107, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
     
