@@ -141,14 +141,38 @@ export class DatabaseService {
       });
 
       // Test connection
-      await this.remoteDb.info();
+      try {
+        await this.remoteDb.info();
+      } catch (testError) {
+        // If info() fails, likely the CouchDB server is not available or returns HTML error page
+        // Clean up the remoteDb reference and throw a more user-friendly error
+        this.remoteDb = null;
+        throw new Error(`CouchDB connection failed: ${testError instanceof Error ? testError.message : String(testError)}`);
+      }
 
       // Start bidirectional sync
       this.startSync();
       
     } catch (error) {
       console.warn('Could not setup sync:', error);
-      this.updateSyncStatus({ error: `Sync setup failed: ${error}` });
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Sync setup failed';
+      if (error instanceof Error) {
+        if (error.message.includes('CouchDB connection failed')) {
+          errorMessage = 'Database server unreachable';
+        } else if (error.message.includes('unauthorized') || error.message.includes('auth')) {
+          errorMessage = 'Database authentication failed';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Database connection timeout';
+        } else if (error.message.includes('SyntaxError') && error.message.includes('JSON')) {
+          errorMessage = 'Database server returned invalid response';
+        } else {
+          errorMessage = `Sync setup failed: ${error.message}`;
+        }
+      }
+      
+      this.updateSyncStatus({ error: errorMessage });
     }
   }
 
