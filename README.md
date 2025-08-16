@@ -243,24 +243,57 @@ The application uses PouchDB for local storage with optional CouchDB sync:
 
 ## 🐳 Docker Deployment
 
+> **⚠️ IMPORTANT - Data Persistence:** The database requires a persistent volume mount to preserve your stories across container restarts. **Without proper volume mounting, you WILL lose all your data when the container stops!** The default docker-compose.yml already includes this configuration, but make sure the `./data` directory exists and has proper permissions.
+
 ### Prerequisites
 - Docker and Docker Compose installed
 - Git (for cloning the repository)
 - ~500MB-1GB RAM per instance
 - Port 3080 available (or configure a different port)
+- **Persistent storage location for database** (default: `./data` directory)
 
 ### Single Instance
 Build and run locally:
 ```bash
 git clone https://github.com/MarcoDroll/creativewriter2.git
 cd creativewriter2
+
+# IMPORTANT: Create data directory for persistent storage
+mkdir -p data
+chmod 755 data
+
+# Build all required images
 docker build -t ghcr.io/marcodroll/creativewriter2:latest .
 docker build -t ghcr.io/marcodroll/creativewriter2-nginx:latest -f Dockerfile.nginx .
 docker build -t ghcr.io/marcodroll/creativewriter2-proxy:latest -f Dockerfile.proxy .
 docker build -t ghcr.io/marcodroll/creativewriter2-gemini-proxy:latest -f Dockerfile.gemini-proxy .
+
+# Start the application with persistent storage
 docker compose up -d
 ```
 Then configure your AI API keys in Settings after accessing the app at http://localhost:3080.
+
+### 📁 Data Persistence & Backup
+
+**Critical: Your stories are stored in CouchDB within the Docker container.** The docker-compose.yml file maps the following volumes:
+
+```yaml
+volumes:
+  - ./data/couchdb-data:/opt/couchdb/data     # Database files
+  - ./data/log/couchdb_log:/opt/couchdb/var/log  # Log files
+```
+
+#### To ensure data safety:
+
+1. **Never run without volumes:** Always use the provided docker-compose.yml
+2. **Backup regularly:** Copy the `./data` directory to a safe location
+3. **Custom data location:** Set a different path via environment variable:
+   ```bash
+   echo "DATA_PATH=/path/to/your/storage" >> .env
+   docker compose up -d
+   ```
+4. **Verify persistence:** Check that `./data/couchdb-data` contains files after first run
+5. **Use the built-in backup feature:** Go to Settings → Backup & Restore to create downloadable backups
 
 ### Multiple Instances
 Run multiple isolated instances on the same host:
