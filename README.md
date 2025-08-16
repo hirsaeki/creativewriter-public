@@ -194,6 +194,29 @@ ls -la ./data/couchdb-data/  # Should contain database files after first run
 
 Then configure your AI providers in Settings with your API keys.
 
+### Environment Variables
+
+The Docker Compose setup supports several environment variables that can be configured via a `.env` file in the project root:
+
+- `PORT`: The port on which the application will be accessible (default: `3080`)
+- `TZ`: Timezone setting for the containers (default: `Europe/Berlin`)
+- `DATA_PATH`: Custom path for persistent data storage (default: `./data`)
+- `COUCHDB_USER`: CouchDB admin username (default: `admin`)
+- `COUCHDB_PASSWORD`: CouchDB admin password (default: `password` - **change in production!**)
+- `COUCHDB_SECRET`: CouchDB secret key (default: `mysecret` - **change in production!**)
+
+Create a `.env` file to customize these values:
+```bash
+PORT=3080
+TZ=America/New_York
+DATA_PATH=/custom/path/to/data
+COUCHDB_USER=admin
+COUCHDB_PASSWORD=your_secure_password
+COUCHDB_SECRET=your_secure_secret
+```
+
+**Security Note:** Always change the default CouchDB credentials in production environments!
+
 ### Development Setup
 
 For development or customization, clone the repository:
