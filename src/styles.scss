@@ -13,6 +13,35 @@
 /* Token Info Popover */
 @import 'app/shared/styles/token-info-popover.scss';
 
+/* PDF Export Progress Loading */
+.pdf-export-loading {
+  --color: var(--ion-text-color);
+  --background: var(--ion-background-color);
+  --backdrop-opacity: 0.7;
+  
+  .loading-wrapper {
+    --color: var(--ion-text-color);
+    --background: var(--ion-background-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    min-width: 250px;
+    text-align: center;
+    padding: 20px;
+  }
+  
+  .loading-content {
+    color: var(--ion-text-color);
+    font-size: 14px;
+    line-height: 1.4;
+    margin-top: 16px;
+  }
+  
+  .loading-spinner {
+    --color: var(--ion-color-primary);
+    margin: 0 auto 16px auto;
+  }
+}
+
 /* Force Ionic Dark Mode Variables */
 :root {
   --ion-background-color: #1a1a1a;

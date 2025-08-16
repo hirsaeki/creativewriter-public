@@ -9,7 +9,7 @@ import {
   IonChip, IonItem, IonLabel, IonSelect, IonSelectOption, IonRange, IonTextarea
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, statsChart, warning, checkmarkCircle, globeOutline, logoGoogle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, hardwareChip } from 'ionicons/icons';
+import { arrowBack, statsChart, warning, checkmarkCircle, globeOutline, logoGoogle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, hardwareChip, archiveOutline } from 'ionicons/icons';
 import { SettingsService } from '../core/services/settings.service';
 import { ModelService } from '../core/services/model.service';
 import { OllamaApiService } from '../core/services/ollama-api.service';
@@ -23,6 +23,7 @@ import { BackgroundSelectorComponent } from '../shared/components/background-sel
 import { BackgroundUploadComponent } from '../shared/components/background-upload.component';
 import { BackgroundService } from '../shared/services/background.service';
 import { CustomBackground } from '../shared/services/synced-custom-background.service';
+import { DatabaseBackupComponent } from '../shared/components/database-backup.component';
 
 @Component({
   selector: 'app-settings',
@@ -32,7 +33,7 @@ import { CustomBackground } from '../shared/services/synced-custom-background.se
     IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonInput, IonToggle,
     IonChip, IonItem, IonLabel, IonSelect, IonSelectOption, IonRange, IonTextarea,
-    ColorPickerComponent, SettingsTabsComponent, SettingsContentComponent, BackgroundSelectorComponent, BackgroundUploadComponent
+    ColorPickerComponent, SettingsTabsComponent, SettingsContentComponent, BackgroundSelectorComponent, BackgroundUploadComponent, DatabaseBackupComponent
   ],
   template: `
     <div class="ion-page">
@@ -827,6 +828,11 @@ import { CustomBackground } from '../shared/services/synced-custom-background.se
           </ion-card-content>
         </ion-card>
           </div>
+
+          <!-- Backup & Restore Tab -->
+          <div *ngSwitchCase="'backup'">
+            <app-database-backup></app-database-backup>
+          </div>
         </div>
 
         <!-- Actions -->
@@ -1567,13 +1573,14 @@ export class SettingsComponent implements OnInit, OnDestroy {
     { value: 'models', icon: 'cloud-outline', label: 'AI Models' },
     { value: 'appearance', icon: 'color-palette-outline', label: 'Appearance' },
     { value: 'scene-title', icon: 'document-text-outline', label: 'Scene Titles' },
-    { value: 'scene-summary', icon: 'list-outline', label: 'Scene Summary' }
+    { value: 'scene-summary', icon: 'list-outline', label: 'Scene Summary' },
+    { value: 'backup', icon: 'archive-outline', label: 'Backup & Restore' }
   ];
 
   constructor() {
     this.settings = this.settingsService.getSettings();
     // Register Ionic icons
-    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, globeOutline, logoGoogle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, hardwareChip });
+    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, globeOutline, logoGoogle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, hardwareChip, archiveOutline });
   }
 
   ngOnInit(): void {

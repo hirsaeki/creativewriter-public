@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { 
   IonButton, IonIcon, 
-  IonContent, IonChip, IonLabel, IonMenu, IonSplitPane, MenuController
+  IonContent, IonChip, IonLabel, IonMenu, IonSplitPane, MenuController, LoadingController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
@@ -35,7 +35,7 @@ import { HeaderNavigationService } from '../../../shared/services/header-navigat
 import { SettingsService } from '../../../core/services/settings.service';
 import { StoryStatsService } from '../../services/story-stats.service';
 import { VersionService } from '../../../core/services/version.service';
-import { PDFExportService } from '../../../shared/services/pdf-export.service';
+import { PDFExportService, PDFExportProgress } from '../../../shared/services/pdf-export.service';
 
 @Component({
   selector: 'app-story-editor',
@@ -66,6 +66,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   private pdfExportService = inject(PDFExportService);
   private imageVideoService = inject(ImageVideoService);
   private videoService = inject(VideoService);
+  private loadingController = inject(LoadingController);
 
   @ViewChild('headerTitle', { static: true }) headerTitle!: TemplateRef<unknown>;
   @ViewChild('burgerMenuFooter', { static: true }) burgerMenuFooter!: TemplateRef<unknown>;
@@ -1350,24 +1351,91 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   }
 
   async exportToPDF(): Promise<void> {
+    let loading: HTMLIonLoadingElement | null = null;
+    
     try {
+      console.log('PDF export button clicked');
+      
       // Save any unsaved changes first
       if (this.hasUnsavedChanges) {
+        console.log('Saving unsaved changes before PDF export');
         await this.saveStory();
       }
 
-      // Show loading indicator (you can enhance this with a proper loading dialog)
+      // Validate story data
+      if (!this.story) {
+        throw new Error('No story loaded');
+      }
 
-      // Export the story to PDF with background
-      await this.pdfExportService.exportStoryToPDF(this.story, {
-        includeBackground: true,
-        format: 'a4',
-        orientation: 'portrait'
+      console.log('Story validation - title:', this.story.title, 'chapters:', this.story.chapters?.length);
+      
+      if (!this.story.chapters || this.story.chapters.length === 0) {
+        throw new Error('Story has no chapters to export');
+      }
+
+      // Check if story has any content
+      const hasContent = this.story.chapters.some(chapter => 
+        chapter.scenes && chapter.scenes.length > 0 && 
+        chapter.scenes.some(scene => scene.content && scene.content.trim().length > 0)
+      );
+
+      if (!hasContent) {
+        throw new Error('Story has no content to export');
+      }
+
+      console.log('Exporting story to PDF:', this.story.title);
+      console.log('Story chapters:', this.story.chapters.length);
+
+      // Show progress modal
+      loading = await this.loadingController.create({
+        message: 'Initializing PDF export...',
+        duration: 0, // Don't auto-dismiss
+        cssClass: 'pdf-export-loading',
+        spinner: 'lines',
+        showBackdrop: true,
+        backdropDismiss: false
       });
+
+      await loading.present();
+
+      // Subscribe to progress updates
+      const progressSubscription = this.pdfExportService.progress$.subscribe(
+        (progress: PDFExportProgress) => {
+          if (loading) {
+            const percentage = Math.round(progress.progress);
+            loading.message = `${progress.message} (${percentage}%)`;
+          }
+        }
+      );
+
+      try {
+        // Export the story to PDF with background
+        await this.pdfExportService.exportStoryToPDF(this.story, {
+          includeBackground: true,
+          format: 'a4',
+          orientation: 'portrait'
+        });
+
+        console.log('PDF export completed successfully');
+
+        // Small delay to show completion message
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+      } finally {
+        // Clean up progress subscription
+        progressSubscription.unsubscribe();
+      }
 
     } catch (error) {
       console.error('PDF export failed:', error);
-      // You can add proper error handling/notification here
+      
+      // Show user-friendly error message
+      alert(`PDF export failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
+    } finally {
+      // Always dismiss loading modal
+      if (loading) {
+        await loading.dismiss();
+      }
     }
   }
 

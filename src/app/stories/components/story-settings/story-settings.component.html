@@ -463,22 +463,11 @@
                 Datenbank komprimieren
               </ion-button>
 
-              <ion-button
-                fill="outline"
-                expand="block"
-                color="secondary"
-                (click)="exportDatabase()"
-                [disabled]="isScanning"
-                class="operation-button">
-                <ion-icon name="download-outline" slot="start"></ion-icon>
-                Create Complete Export
-              </ion-button>
             </div>
 
             <ion-text color="medium">
               <p>
-                <strong>Compress:</strong> Removes deleted data and reduces database size.<br>
-                <strong>Export:</strong> Creates a JSON file with all stories and images.
+                <strong>Compress:</strong> Removes deleted data and reduces database size.
               </p>
             </ion-text>
           </ion-card-content>

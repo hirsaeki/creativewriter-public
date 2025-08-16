@@ -14,7 +14,7 @@ import {
   arrowBack, saveOutline, refreshOutline, checkmarkCircleOutline,
   warningOutline, informationCircleOutline, codeSlashOutline,
   settingsOutline, chatboxOutline, documentTextOutline, serverOutline,
-  scanOutline, trashOutline, downloadOutline, statsChartOutline,
+  scanOutline, trashOutline, statsChartOutline,
   copyOutline, searchOutline, closeCircleOutline, checkboxOutline,
   squareOutline, imageOutline
 } from 'ionicons/icons';
@@ -86,7 +86,7 @@ export class StorySettingsComponent implements OnInit {
       arrowBack, saveOutline, refreshOutline, checkmarkCircleOutline,
       warningOutline, informationCircleOutline, codeSlashOutline,
       settingsOutline, chatboxOutline, documentTextOutline, serverOutline,
-      scanOutline, trashOutline, downloadOutline, statsChartOutline,
+      scanOutline, trashOutline, statsChartOutline,
       copyOutline, searchOutline, closeCircleOutline, checkboxOutline,
       squareOutline, imageOutline
     });
@@ -242,24 +242,6 @@ export class StorySettingsComponent implements OnInit {
     }
   }
 
-  async exportDatabase(): Promise<void> {
-    try {
-      const exportData = await this.dbMaintenanceService.exportDatabase();
-      const blob = new Blob([exportData], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `creative-writer-backup-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error exporting database:', error);
-      alert('Error exporting database.');
-    }
-  }
 
   toggleOrphanedImageSelection(imageId: string): void {
     if (this.selectedOrphanedImages.has(imageId)) {
