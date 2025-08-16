@@ -36,15 +36,19 @@ Your support helps keep this project free and open-source for the self-hosting c
 
 ## 🚀 Quick Start for Self-Hosters
 
+> **⚠️ CRITICAL - Data Persistence:** The database MUST have a persistent volume mount to preserve your stories. **Without proper volume mounting, you WILL lose all your data when the container restarts!** Always ensure the `./data` directory exists and is properly mounted.
+
 ### Zero-Configuration Deployment
 
-1. **Create a directory and download compose file**
+1. **Create directories for the app and persistent data storage**
    ```bash
    mkdir creativewriter && cd creativewriter
+   mkdir -p data  # IMPORTANT: This directory will store your database
+   chmod 755 data
    curl -O https://raw.githubusercontent.com/MarcoDroll/creativewriter-public/main/docker-compose.yml
    ```
 
-2. **Start the application**
+2. **Start the application with persistent storage**
    ```bash
    docker compose up -d
    ```
@@ -126,10 +130,33 @@ Configure your AI provider API keys directly in the application:
 - No environment variables needed for API keys
 - Each instance maintains separate settings
 
+## 📁 Data Persistence & Backup
+
+**Your stories are stored in CouchDB.** The docker-compose.yml maps these critical volumes:
+
+```yaml
+volumes:
+  - ./data/couchdb-data:/opt/couchdb/data     # Database files
+  - ./data/log/couchdb_log:/opt/couchdb/var/log  # Log files
+```
+
+### Best Practices for Data Safety:
+
+1. **Always use volume mounts** - Never run without the `./data` directory
+2. **Regular backups** - Copy the entire `./data` directory to a backup location
+3. **Verify persistence** - After first run, confirm `./data/couchdb-data` contains database files
+4. **Use built-in backup** - Access Settings → Backup & Restore for downloadable backups
+5. **Custom storage location**:
+   ```bash
+   echo "DATA_PATH=/your/backup/location" >> .env
+   docker compose up -d
+   ```
+
 ## 📋 Requirements
 
 - **Docker & Docker Compose**
 - **500MB-1GB RAM** per instance
+- **Persistent storage** for database (minimum 100MB, grows with usage)
 - **Available port** (default: 3080)
 - **API Keys** for AI providers (optional but recommended)
 
