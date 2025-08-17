@@ -171,13 +171,13 @@
             <button 
               class="generate-btn primary"
               (click)="generateContent(); $event.stopPropagation()"
-              [disabled]="!currentPrompt.trim() || beatData.isGenerating || !selectedModel">
+              [disabled]="!currentPrompt.trim() || beatData.isGenerating || !selectedModel || isSync || isSaving">
               Generate
             </button>
             <button 
               class="generate-btn primary"
               (click)="showPromptPreview(); $event.stopPropagation()"
-              [disabled]="!currentPrompt.trim()"
+              [disabled]="!currentPrompt.trim() || isSync || isSaving"
               title="Show prompt preview">
               Preview
             </button>

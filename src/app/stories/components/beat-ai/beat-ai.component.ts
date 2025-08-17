@@ -21,6 +21,7 @@ import { ProseMirrorEditorService, SimpleEditorConfig } from '../../../shared/se
 import { EditorView } from 'prosemirror-view';
 import { StoryService } from '../../services/story.service';
 import { Story, Scene, Chapter } from '../../models/story.interface';
+import { DatabaseService, SyncStatus } from '../../../core/services/database.service';
 
 interface SceneContext {
   chapterId: string;
@@ -52,11 +53,13 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   private popoverController = inject(PopoverController);
   private tokenCounter = inject(TokenCounterService);
   private modalService = inject(BeatAIModalService);
+  private databaseService = inject(DatabaseService);
 
   @Input() beatData!: BeatAI;
   @Input() storyId?: string;
   @Input() chapterId?: string;
   @Input() sceneId?: string;
+  @Input() isSaving = false;
   @Output() promptSubmit = new EventEmitter<BeatAIPromptEvent>();
   currentTextColor = '#e0e0e0';
   @Output() contentUpdate = new EventEmitter<BeatAI>();
@@ -96,6 +99,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     { value: 'custom', label: 'Custom amount...' }
   ];
   copyButtonText = 'Copy';
+  isSync = false;
   
   // Context selection properties
   story: Story | null = null;
@@ -180,6 +184,13 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
           // Note: Streaming text is handled directly in the editor via ProseMirror service
           // The component just tracks the generation state
         }
+      })
+    );
+    
+    // Subscribe to sync status
+    this.subscription.add(
+      this.databaseService.syncStatus$.subscribe((status: SyncStatus) => {
+        this.isSync = status.isSync;
       })
     );
   }
