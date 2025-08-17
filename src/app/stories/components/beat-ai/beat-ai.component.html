@@ -192,8 +192,9 @@
             <button 
               *ngIf="beatData.prompt && beatData.isEditing"
               class="cancel-btn"
-              (click)="cancelEditing(); $event.stopPropagation()">
-              Cancel
+              (click)="cancelEditing(); $event.stopPropagation()"
+              title="Cancel editing">
+              <ion-icon name="close-outline" style="color: #dc3545;"></ion-icon>
             </button>
           </div>
         </div>
