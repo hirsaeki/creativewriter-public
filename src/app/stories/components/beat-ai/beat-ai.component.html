@@ -171,14 +171,14 @@
             <button 
               class="generate-btn primary"
               (click)="generateContent(); $event.stopPropagation()"
-              [disabled]="!currentPrompt.trim() || beatData.isGenerating || !selectedModel || isSync || isSaving"
+              [disabled]="!currentPrompt.trim() || beatData.isGenerating || !selectedModel || isSaving"
               title="Generate content">
               <ion-icon name="color-wand-outline" style="color: #28a745;"></ion-icon>
             </button>
             <button 
               class="generate-btn primary"
               (click)="showPromptPreview(); $event.stopPropagation()"
-              [disabled]="!currentPrompt.trim() || isSync || isSaving"
+              [disabled]="!currentPrompt.trim() || isSaving"
               title="Show prompt preview">
               <ion-icon name="eye-outline" style="color: #ffc107;"></ion-icon>
             </button>
