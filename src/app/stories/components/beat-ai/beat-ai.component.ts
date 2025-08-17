@@ -588,33 +588,29 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       customContext: customContext
     }).toPromise();
 
-    // Map the selected model to SupportedModel type
-    // Handle formats like "gemini:gemini-1.5-pro" or "openrouter:anthropic/claude-3-haiku"
-    let modelToMap = this.selectedModel;
-    if (modelToMap.includes(':')) {
-      const parts = modelToMap.split(':');
-      modelToMap = parts[1] || modelToMap;
+    // Find the selected model in our available models to get its metadata
+    const selectedModelOption = this.availableModels.find(model => model.id === this.selectedModel);
+    
+    // Map the model based on its label/name instead of trying to parse the ID
+    let mappedModel: SupportedModel = 'custom';
+    
+    if (selectedModelOption) {
+      const modelLabel = selectedModelOption.label.toLowerCase();
+      
+      // Map based on the human-readable model name
+      if (modelLabel.includes('claude 3.7') || modelLabel.includes('claude-3.7') || 
+          modelLabel.includes('claude 3.5 sonnet v2') || modelLabel.includes('sonnet v2')) {
+        mappedModel = 'claude-3.7-sonnet';
+      } else if (modelLabel.includes('claude 3.5') || modelLabel.includes('claude-3.5')) {
+        mappedModel = 'claude-3.5-sonnet';
+      } else if (modelLabel.includes('gemini 1.5') || modelLabel.includes('gemini-1.5')) {
+        mappedModel = 'gemini-1.5-pro';
+      } else if (modelLabel.includes('gemini 2.5') || modelLabel.includes('gemini-2.5')) {
+        mappedModel = 'gemini-2.5-pro';
+      } else if (modelLabel.includes('grok')) {
+        mappedModel = 'grok-3';
+      }
     }
-    if (modelToMap.includes('/')) {
-      modelToMap = modelToMap.split('/').pop() || modelToMap;
-    }
-
-    const modelMapping: Record<string, SupportedModel> = {
-      'claude-3-5-sonnet-20241022': 'claude-3.5-sonnet',
-      'claude-3-5-sonnet': 'claude-3.5-sonnet',
-      'claude-3.5-sonnet': 'claude-3.5-sonnet',
-      'claude-3-5-sonnet-v2': 'claude-3.7-sonnet',
-      'claude-3.7-sonnet': 'claude-3.7-sonnet',
-      'claude-3-haiku': 'claude-3.5-sonnet', // Map haiku to closest available
-      'gemini-1.5-pro': 'gemini-1.5-pro',
-      'gemini-1.5-pro-latest': 'gemini-1.5-pro',
-      'gemini-2.0-flash-thinking-exp': 'gemini-2.5-pro',
-      'gemini-2.5-pro': 'gemini-2.5-pro',
-      'grok-beta': 'grok-3',
-      'grok-3': 'grok-3'
-    };
-
-    const mappedModel = modelMapping[modelToMap] || 'custom';
 
     const popover = await this.popoverController.create({
       component: TokenInfoPopoverComponent,
