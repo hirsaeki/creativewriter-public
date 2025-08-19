@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/MarcoDroll/creativewriter2/main/src/assets/logo.png" alt="CreativeWriter Logo" width="300">
+  <img src="src/assets/logo.png" alt="CreativeWriter Logo" width="300">
   
-  # CreativeWriter 2
+  # CreativeWriter
 </div>
 
 > **⚠️ Early Development Version:** This is a very early version in active development. Expect bugs, missing features, and frequent changes. Use at your own risk and consider it experimental software.
