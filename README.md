@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src/assets/logo.png" alt="CreativeWriter Logo" width="300">
+  <img src="https://raw.githubusercontent.com/MarcoDroll/creativewriter2/main/src/assets/logo.png" alt="CreativeWriter Logo" width="300">
   
   # CreativeWriter 2
 </div>
