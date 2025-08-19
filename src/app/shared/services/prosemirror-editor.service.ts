@@ -357,7 +357,7 @@ export class ProseMirrorEditorService {
     contextMenu.appendChild(aiRewriteItem);
     document.body.appendChild(contextMenu);
     
-    (contextMenu as HTMLElement & { _isContextMenu: boolean })._isContextMenu = true;
+    (contextMenu as unknown as HTMLElement & { _isContextMenu: boolean })._isContextMenu = true;
   }
 
   private hideContextMenu(): void {
