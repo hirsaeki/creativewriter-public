@@ -61,22 +61,6 @@ ion-toolbar {
   position: relative;
 }
 
-.logo-container {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1rem;
-}
-
-.app-logo {
-  max-width: 120px;
-  height: auto;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
-  transition: transform 0.3s ease;
-}
-
-.app-logo:hover {
-  transform: scale(1.05);
-}
 
 .app-title {
   margin: 0;

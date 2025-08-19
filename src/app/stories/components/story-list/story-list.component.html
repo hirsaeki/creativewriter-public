@@ -1,5 +1,6 @@
 <app-header
   title="My Stories"
+  logoSrc="assets/logo-v2.png"
   [showBurgerMenu]="true"
   [burgerMenuItems]="burgerMenuItems"
   [burgerMenuFooterContent]="burgerMenuFooter"
@@ -35,17 +36,6 @@
 <ion-content [scrollEvents]="true">
   <div class="story-list-container">
   
-  <!-- App Branding Header -->
-  <div class="app-branding">
-    <div class="logo-container">
-      <img src="assets/logo-v2.png" alt="CreativeWriter Logo" class="app-logo">
-    </div>
-    <h1 class="app-title">
-      <span class="app-name">Creative Writer</span>
-      <span class="app-tagline">Your Stories, Your World</span>
-    </h1>
-    <div class="brand-decoration"></div>
-  </div>
   
   <div class="action-buttons">
     <ion-button expand="block" size="default" color="primary" (click)="createNewStory()">
