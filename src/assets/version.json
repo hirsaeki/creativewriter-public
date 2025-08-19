@@ -1,8 +1,8 @@
 {
-  "version": "1.0.0",
+  "version": "1.2.0",
   "buildNumber": "dev",
-  "commitHash": "7c9de1d19f83d0f469636282ff228bfd02ddbd23",
-  "commitMessage": "refactor: simplify ion-textarea height approach without \\!important\n\n- Use flex: 1 1 auto instead of complex height constraints\n- Set min-height: 200px for consistent baseline size\n- Remove \\!important declarations for cleaner CSS\n- Add ionic custom properties --min-height and --max-height\n- Keep native textarea overflow: unset for scrolling functionality\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
-  "buildDate": "2025-08-06T11:05:10.553Z",
+  "commitHash": "a6be191",
+  "commitMessage": "refactor: consolidate ProseMirror services into single editor service",
+  "buildDate": "2025-08-19T00:00:00.000Z",
   "branch": "main"
 }
