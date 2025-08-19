@@ -200,6 +200,10 @@ export interface BurgerMenuItem {
     /* Title Styling */
     ion-title {
       overflow: visible !important;
+      padding: 0 !important;
+      position: relative;
+      flex: 1;
+      text-align: center;
     }
     
     .title-content {
@@ -208,6 +212,8 @@ export interface BurgerMenuItem {
       gap: 12px;
       justify-content: center;
       overflow: visible;
+      min-width: max-content;
+      padding: 0 16px;
     }
     
     .header-logo {
