@@ -25,8 +25,8 @@ import { ModelService } from '../../core/services/model.service';
       <ion-card-header (click)="isModelSelectionCollapsed = !isModelSelectionCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
           <ion-card-title>AI Model Selection</ion-card-title>
-          <ion-button fill="clear" size="small">
-            <ion-icon [name]="isModelSelectionCollapsed ? 'chevron-down' : 'chevron-up'"></ion-icon>
+          <ion-button fill="clear" size="small" style="--color: #ffffff;">
+            <ion-icon [name]="isModelSelectionCollapsed ? 'chevron-down' : 'chevron-up'" style="color: #ffffff !important; font-size: 1.5rem !important;"></ion-icon>
           </ion-button>
         </div>
       </ion-card-header>
@@ -96,8 +96,8 @@ import { ModelService } from '../../core/services/model.service';
       <ion-card-header (click)="isOpenRouterCollapsed = !isOpenRouterCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
           <ion-card-title>OpenRouter API</ion-card-title>
-          <ion-button fill="clear" size="small">
-            <ion-icon [name]="isOpenRouterCollapsed ? 'chevron-down' : 'chevron-up'"></ion-icon>
+          <ion-button fill="clear" size="small" style="--color: #ffffff;">
+            <ion-icon [name]="isOpenRouterCollapsed ? 'chevron-down' : 'chevron-up'" style="color: #ffffff !important; font-size: 1.5rem !important;"></ion-icon>
           </ion-button>
         </div>
       </ion-card-header>
@@ -164,8 +164,8 @@ import { ModelService } from '../../core/services/model.service';
       <ion-card-header (click)="isReplicateCollapsed = !isReplicateCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
           <ion-card-title>Replicate API</ion-card-title>
-          <ion-button fill="clear" size="small">
-            <ion-icon [name]="isReplicateCollapsed ? 'chevron-down' : 'chevron-up'"></ion-icon>
+          <ion-button fill="clear" size="small" style="--color: #ffffff;">
+            <ion-icon [name]="isReplicateCollapsed ? 'chevron-down' : 'chevron-up'" style="color: #ffffff !important; font-size: 1.5rem !important;"></ion-icon>
           </ion-button>
         </div>
       </ion-card-header>
@@ -252,8 +252,8 @@ import { ModelService } from '../../core/services/model.service';
       <ion-card-header (click)="isOllamaCollapsed = !isOllamaCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
           <ion-card-title>Ollama (Local AI)</ion-card-title>
-          <ion-button fill="clear" size="small">
-            <ion-icon [name]="isOllamaCollapsed ? 'chevron-down' : 'chevron-up'"></ion-icon>
+          <ion-button fill="clear" size="small" style="--color: #ffffff;">
+            <ion-icon [name]="isOllamaCollapsed ? 'chevron-down' : 'chevron-up'" style="color: #ffffff !important; font-size: 1.5rem !important;"></ion-icon>
           </ion-button>
         </div>
       </ion-card-header>
@@ -349,8 +349,8 @@ import { ModelService } from '../../core/services/model.service';
       <ion-card-header (click)="isGeminiCollapsed = !isGeminiCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
           <ion-card-title>Google Gemini API</ion-card-title>
-          <ion-button fill="clear" size="small">
-            <ion-icon [name]="isGeminiCollapsed ? 'chevron-down' : 'chevron-up'"></ion-icon>
+          <ion-button fill="clear" size="small" style="--color: #ffffff;">
+            <ion-icon [name]="isGeminiCollapsed ? 'chevron-down' : 'chevron-up'" style="color: #ffffff !important; font-size: 1.5rem !important;"></ion-icon>
           </ion-button>
         </div>
       </ion-card-header>
