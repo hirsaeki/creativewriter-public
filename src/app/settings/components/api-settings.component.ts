@@ -9,6 +9,7 @@ import { NgSelectModule } from '@ng-select/ng-select';
 import { Settings } from '../../core/models/settings.interface';
 import { ModelOption } from '../../core/models/model.interface';
 import { OllamaApiService } from '../../core/services/ollama-api.service';
+import { ClaudeApiService } from '../../core/services/claude-api.service';
 import { ModelService } from '../../core/services/model.service';
 
 @Component({
@@ -39,7 +40,7 @@ import { ModelService } from '../../core/services/model.service';
                 size="small"
                 fill="outline"
                 (click)="loadCombinedModels()" 
-                [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl) || loadingModels"
+                [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl) && (!settings.claude.enabled || !settings.claude.apiKey) || loadingModels"
                 title="Load Models">
                 {{ loadingModels ? 'Loading...' : 'Load Models' }}
               </ion-button>
@@ -50,7 +51,7 @@ import { ModelService } from '../../core/services/model.service';
                        bindValue="id"
                        [searchable]="true"
                        [clearable]="true"
-                       [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl)"
+                       [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl) && (!settings.claude.enabled || !settings.claude.apiKey)"
                        placeholder="Select or search model..."
                        (ngModelChange)="onGlobalModelChange()"
                        [loading]="loadingModels"
@@ -61,11 +62,12 @@ import { ModelService } from '../../core/services/model.service';
                 <div class="model-option">
                   <div class="model-option-header">
                     <ion-icon 
-                      [name]="item.provider === 'gemini' ? 'logo-google' : item.provider === 'ollama' ? 'hardware-chip' : 'globe-outline'" 
+                      [name]="item.provider === 'gemini' ? 'logo-google' : item.provider === 'ollama' ? 'hardware-chip' : item.provider === 'claude' ? 'library-outline' : 'globe-outline'" 
                       class="provider-icon" 
                       [class.gemini]="item.provider === 'gemini'" 
                       [class.openrouter]="item.provider === 'openrouter'"
                       [class.ollama]="item.provider === 'ollama'"
+                      [class.claude]="item.provider === 'claude'"
                       [class.replicate]="item.provider === 'replicate'"></ion-icon>
                     <span class="model-label">{{ item.label }}</span>
                   </div>
@@ -82,7 +84,7 @@ import { ModelService } from '../../core/services/model.service';
               <p *ngIf="!modelLoadError && combinedModels.length > 0" class="info-text">
                 {{ combinedModels.length }} models available. Prices in EUR per 1M tokens.
               </p>
-              <p *ngIf="!modelLoadError && combinedModels.length === 0 && (settings.openRouter.enabled || settings.googleGemini.enabled || settings.replicate.enabled || settings.ollama.enabled)" class="info-text">
+              <p *ngIf="!modelLoadError && combinedModels.length === 0 && (settings.openRouter.enabled || settings.googleGemini.enabled || settings.replicate.enabled || settings.ollama.enabled || settings.claude.enabled)" class="info-text">
                 Click 'Load Models' to display available models.
               </p>
             </div>
@@ -492,6 +494,102 @@ import { ModelService } from '../../core/services/model.service';
         </div>
       </ion-card-content>
     </ion-card>
+
+    <!-- Claude API Settings -->
+    <ion-card>
+      <ion-card-header (click)="isClaudeCollapsed = !isClaudeCollapsed" style="cursor: pointer;">
+        <div class="card-header-content">
+          <ion-card-title>Claude API (Anthropic)</ion-card-title>
+          <span style="color: #8bb4f8; font-size: 1.5rem; margin-left: auto; padding: 0.5rem;">
+            {{ isClaudeCollapsed ? '▼' : '▲' }}
+          </span>
+        </div>
+      </ion-card-header>
+      <ion-card-content [class.collapsed]="isClaudeCollapsed">
+        <ion-item>
+          <ion-label>Enable Claude</ion-label>
+          <ion-toggle 
+            [(ngModel)]="settings.claude.enabled"
+            (ngModelChange)="onProviderToggle('claude')"
+            slot="end">
+          </ion-toggle>
+        </ion-item>
+
+        <ion-item [class.disabled]="!settings.claude.enabled">
+          <ion-input
+            type="password"
+            [(ngModel)]="settings.claude.apiKey"
+            (ngModelChange)="onApiKeyChange('claude')"
+            placeholder="sk-ant-api03-..."
+            [disabled]="!settings.claude.enabled"
+            label="API Key"
+            labelPlacement="stacked"
+            helperText="Find your Claude API key at console.anthropic.com">
+          </ion-input>
+        </ion-item>
+
+        <div class="connection-test" [class.disabled]="!settings.claude.enabled">
+          <ion-button 
+            size="small"
+            fill="outline"
+            (click)="testClaudeConnection()" 
+            [disabled]="!settings.claude.enabled || !settings.claude.apiKey || testingClaudeConnection"
+            title="Test Connection">
+            <ion-icon name="checkmark-circle" slot="start" *ngIf="claudeConnectionStatus === 'success'"></ion-icon>
+            <ion-icon name="warning" slot="start" *ngIf="claudeConnectionStatus === 'error'"></ion-icon>
+            {{ testingClaudeConnection ? 'Testing...' : 'Test Connection' }}
+          </ion-button>
+          <span *ngIf="claudeConnectionStatus === 'success'" class="connection-status success">✓ Connected</span>
+          <span *ngIf="claudeConnectionStatus === 'error'" class="connection-status error">✗ Connection Failed</span>
+        </div>
+
+        <div class="model-info" [class.disabled]="!settings.claude.enabled">
+          <p class="info-text">Use the global model selection above.</p>
+        </div>
+
+        <div class="settings-row" [class.disabled]="!settings.claude.enabled">
+          <ion-item>
+            <ion-input
+              type="number"
+              [(ngModel)]="settings.claude.temperature"
+              (ngModelChange)="settingsChange.emit()"
+              min="0"
+              max="1"
+              step="0.1"
+              [disabled]="!settings.claude.enabled"
+              label="Temperature"
+              labelPlacement="stacked">
+            </ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input
+              type="number"
+              [(ngModel)]="settings.claude.topP"
+              (ngModelChange)="settingsChange.emit()"
+              min="0"
+              max="1"
+              step="0.1"
+              [disabled]="!settings.claude.enabled"
+              label="Top P"
+              labelPlacement="stacked">
+            </ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input
+              type="number"
+              [(ngModel)]="settings.claude.topK"
+              (ngModelChange)="settingsChange.emit()"
+              min="0"
+              max="200"
+              step="1"
+              [disabled]="!settings.claude.enabled"
+              label="Top K"
+              labelPlacement="stacked">
+            </ion-input>
+          </ion-item>
+        </div>
+      </ion-card-content>
+    </ion-card>
   `,
   styles: [`
     :host {
@@ -592,6 +690,10 @@ import { ModelService } from '../../core/services/model.service';
 
     .provider-icon.replicate {
       color: #9c27b0;
+    }
+
+    .provider-icon.claude {
+      color: #ff6b35;
     }
 
     .model-label {
@@ -737,6 +839,7 @@ import { ModelService } from '../../core/services/model.service';
 })
 export class ApiSettingsComponent {
   private ollamaApiService = inject(OllamaApiService);
+  private claudeApiService = inject(ClaudeApiService);
   private modelService = inject(ModelService);
 
   @Input() settings!: Settings;
@@ -750,6 +853,8 @@ export class ApiSettingsComponent {
   
   testingOllamaConnection = false;
   ollamaConnectionStatus: 'success' | 'error' | null = null;
+  testingClaudeConnection = false;
+  claudeConnectionStatus: 'success' | 'error' | null = null;
 
   // Collapsible card states
   isModelSelectionCollapsed = false;
@@ -757,6 +862,7 @@ export class ApiSettingsComponent {
   isReplicateCollapsed = true;
   isOllamaCollapsed = true;
   isGeminiCollapsed = true;
+  isClaudeCollapsed = true;
 
   formatContextLength(length: number): string {
     if (length >= 1000000) {
@@ -792,13 +898,15 @@ export class ApiSettingsComponent {
         this.settings.openRouter.model = modelId;
       } else if (provider === 'gemini') {
         this.settings.googleGemini.model = modelId;
+      } else if (provider === 'claude') {
+        this.settings.claude.model = modelId;
       }
     }
     
     this.settingsChange.emit();
   }
 
-  onApiKeyChange(provider: 'openRouter' | 'replicate' | 'googleGemini'): void {
+  onApiKeyChange(provider: 'openRouter' | 'replicate' | 'googleGemini' | 'claude'): void {
     this.settingsChange.emit();
     
     // Auto-load models when API key is entered and provider is enabled
@@ -808,6 +916,8 @@ export class ApiSettingsComponent {
       this.modelService.loadReplicateModels().subscribe();
     } else if (provider === 'googleGemini' && this.settings.googleGemini.enabled && this.settings.googleGemini.apiKey) {
       this.modelService.loadGeminiModels().subscribe();
+    } else if (provider === 'claude' && this.settings.claude.enabled && this.settings.claude.apiKey) {
+      this.modelService.loadClaudeModels().subscribe();
     }
   }
   
@@ -821,7 +931,7 @@ export class ApiSettingsComponent {
     }
   }
   
-  onProviderToggle(provider: 'openRouter' | 'replicate' | 'googleGemini' | 'ollama'): void {
+  onProviderToggle(provider: 'openRouter' | 'replicate' | 'googleGemini' | 'ollama' | 'claude'): void {
     this.settingsChange.emit();
     
     // Load models when provider is enabled and has credentials
@@ -834,6 +944,9 @@ export class ApiSettingsComponent {
     } else if (provider === 'ollama' && this.settings.ollama.enabled && this.settings.ollama.baseUrl) {
       this.modelService.loadOllamaModels().subscribe();
       this.ollamaConnectionStatus = null; // Reset connection status
+    } else if (provider === 'claude' && this.settings.claude.enabled && this.settings.claude.apiKey) {
+      this.modelService.loadClaudeModels().subscribe();
+      this.claudeConnectionStatus = null; // Reset connection status
     }
   }
   
@@ -856,6 +969,29 @@ export class ApiSettingsComponent {
         this.testingOllamaConnection = false;
         this.ollamaConnectionStatus = 'error';
         console.error('Ollama connection test failed:', error);
+      }
+    });
+  }
+
+  testClaudeConnection(): void {
+    if (!this.settings.claude.apiKey) return;
+    
+    this.testingClaudeConnection = true;
+    this.claudeConnectionStatus = null;
+    
+    this.claudeApiService.testConnection().subscribe({
+      next: (success) => {
+        this.testingClaudeConnection = false;
+        this.claudeConnectionStatus = success ? 'success' : 'error';
+        // Auto-load models on successful connection
+        if (success && this.settings.claude.enabled) {
+          this.modelService.loadClaudeModels().subscribe();
+        }
+      },
+      error: (error) => {
+        this.testingClaudeConnection = false;
+        this.claudeConnectionStatus = 'error';
+        console.error('Claude connection test failed:', error);
       }
     });
   }

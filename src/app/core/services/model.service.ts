@@ -28,12 +28,14 @@ export class ModelService {
   private replicateModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private geminiModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private ollamaModelsSubject = new BehaviorSubject<ModelOption[]>([]);
+  private claudeModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private loadingSubject = new BehaviorSubject<boolean>(false);
 
   public openRouterModels$ = this.openRouterModelsSubject.asObservable();
   public replicateModels$ = this.replicateModelsSubject.asObservable();
   public geminiModels$ = this.geminiModelsSubject.asObservable();
   public ollamaModels$ = this.ollamaModelsSubject.asObservable();
+  public claudeModels$ = this.claudeModelsSubject.asObservable();
   public loading$ = this.loadingSubject.asObservable();
 
   loadOpenRouterModels(): Observable<ModelOption[]> {
@@ -175,12 +177,77 @@ export class ModelService {
       );
   }
 
-  loadAllModels(): Observable<{ openRouter: ModelOption[], replicate: ModelOption[], gemini: ModelOption[], ollama: ModelOption[] }> {
+  loadClaudeModels(): Observable<ModelOption[]> {
+    const settings = this.settingsService.getSettings();
+    
+    if (!settings.claude.enabled || !settings.claude.apiKey) {
+      return of([]);
+    }
+
+    this.loadingSubject.next(true);
+
+    // Claude models are predefined since the API doesn't provide a models list endpoint
+    const predefinedModels: ModelOption[] = [
+      {
+        id: 'claude-3-5-sonnet-20241022',
+        label: 'Claude 3.5 Sonnet (Latest)',
+        description: 'Most intelligent model with advanced reasoning, coding, and analysis capabilities',
+        costInputEur: '2.76 €',
+        costOutputEur: '13.80 €',
+        contextLength: 200000,
+        provider: 'claude'
+      },
+      {
+        id: 'claude-3-5-haiku-20241022',
+        label: 'Claude 3.5 Haiku',
+        description: 'Fast and affordable model for routine tasks with excellent speed',
+        costInputEur: '0.92 €',
+        costOutputEur: '4.60 €',
+        contextLength: 200000,
+        provider: 'claude'
+      },
+      {
+        id: 'claude-3-opus-20240229',
+        label: 'Claude 3 Opus',
+        description: 'Powerful model for complex analysis and creative tasks',
+        costInputEur: '13.80 €',
+        costOutputEur: '69.00 €',
+        contextLength: 200000,
+        provider: 'claude'
+      },
+      {
+        id: 'claude-3-sonnet-20240229',
+        label: 'Claude 3 Sonnet',
+        description: 'Balanced model with strong performance across all capabilities',
+        costInputEur: '2.76 €',
+        costOutputEur: '13.80 €',
+        contextLength: 200000,
+        provider: 'claude'
+      },
+      {
+        id: 'claude-3-haiku-20240307',
+        label: 'Claude 3 Haiku',
+        description: 'Fast, affordable model for basic tasks with low latency',
+        costInputEur: '0.23 €',
+        costOutputEur: '1.15 €',
+        contextLength: 200000,
+        provider: 'claude'
+      }
+    ];
+
+    this.claudeModelsSubject.next(predefinedModels);
+    this.loadingSubject.next(false);
+    
+    return of(predefinedModels);
+  }
+
+  loadAllModels(): Observable<{ openRouter: ModelOption[], replicate: ModelOption[], gemini: ModelOption[], ollama: ModelOption[], claude: ModelOption[] }> {
     return forkJoin({
       openRouter: this.loadOpenRouterModels(),
       replicate: this.loadReplicateModels(),
       gemini: this.loadGeminiModels(),
-      ollama: this.loadOllamaModels()
+      ollama: this.loadOllamaModels(),
+      claude: this.loadClaudeModels()
     });
   }
 
@@ -419,6 +486,10 @@ export class ModelService {
     
     if (settings.ollama.enabled && settings.ollama.baseUrl) {
       modelsToLoad.push(this.loadOllamaModels());
+    }
+    
+    if (settings.claude.enabled && settings.claude.apiKey) {
+      modelsToLoad.push(this.loadClaudeModels());
     }
     
     if (modelsToLoad.length === 0) {
