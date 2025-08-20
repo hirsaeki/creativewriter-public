@@ -11,6 +11,7 @@ import {
 } from '../models/model.interface';
 import { SettingsService } from './settings.service';
 import { OllamaApiService, OllamaModelsResponse } from './ollama-api.service';
+import { ClaudeApiService, ClaudeModel } from './claude-api.service';
 
 @Injectable({
   providedIn: 'root'
@@ -19,6 +20,7 @@ export class ModelService {
   private http = inject(HttpClient);
   private settingsService = inject(SettingsService);
   private ollamaApiService = inject(OllamaApiService);
+  private claudeApiService = inject(ClaudeApiService);
 
   private readonly OPENROUTER_API_URL = 'https://openrouter.ai/api/v1';
   private readonly REPLICATE_API_URL = 'https://api.replicate.com/v1';
@@ -186,59 +188,18 @@ export class ModelService {
 
     this.loadingSubject.next(true);
 
-    // Claude models are predefined since the API doesn't provide a models list endpoint
-    const predefinedModels: ModelOption[] = [
-      {
-        id: 'claude-3-5-sonnet-20241022',
-        label: 'Claude 3.5 Sonnet (Latest)',
-        description: 'Most intelligent model with advanced reasoning, coding, and analysis capabilities',
-        costInputEur: '2.76 €',
-        costOutputEur: '13.80 €',
-        contextLength: 200000,
-        provider: 'claude'
-      },
-      {
-        id: 'claude-3-5-haiku-20241022',
-        label: 'Claude 3.5 Haiku',
-        description: 'Fast and affordable model for routine tasks with excellent speed',
-        costInputEur: '0.92 €',
-        costOutputEur: '4.60 €',
-        contextLength: 200000,
-        provider: 'claude'
-      },
-      {
-        id: 'claude-3-opus-20240229',
-        label: 'Claude 3 Opus',
-        description: 'Powerful model for complex analysis and creative tasks',
-        costInputEur: '13.80 €',
-        costOutputEur: '69.00 €',
-        contextLength: 200000,
-        provider: 'claude'
-      },
-      {
-        id: 'claude-3-sonnet-20240229',
-        label: 'Claude 3 Sonnet',
-        description: 'Balanced model with strong performance across all capabilities',
-        costInputEur: '2.76 €',
-        costOutputEur: '13.80 €',
-        contextLength: 200000,
-        provider: 'claude'
-      },
-      {
-        id: 'claude-3-haiku-20240307',
-        label: 'Claude 3 Haiku',
-        description: 'Fast, affordable model for basic tasks with low latency',
-        costInputEur: '0.23 €',
-        costOutputEur: '1.15 €',
-        contextLength: 200000,
-        provider: 'claude'
-      }
-    ];
-
-    this.claudeModelsSubject.next(predefinedModels);
-    this.loadingSubject.next(false);
-    
-    return of(predefinedModels);
+    return this.claudeApiService.listModels().pipe(
+      map(response => this.transformClaudeModels(response.data)),
+      tap(models => {
+        this.claudeModelsSubject.next(models);
+        this.loadingSubject.next(false);
+      }),
+      catchError(error => {
+        console.error('Failed to load Claude models:', error);
+        this.loadingSubject.next(false);
+        return of([]);
+      })
+    );
   }
 
   loadAllModels(): Observable<{ openRouter: ModelOption[], replicate: ModelOption[], gemini: ModelOption[], ollama: ModelOption[], claude: ModelOption[] }> {
@@ -346,6 +307,126 @@ export class ModelService {
         
         return a.label.localeCompare(b.label);
       });
+  }
+
+  private transformClaudeModels(models: ClaudeModel[]): ModelOption[] {
+    return models
+      .map(model => ({
+        id: model.id,
+        label: model.display_name,
+        description: this.generateClaudeModelDescription(model.id),
+        costInputEur: this.estimateClaudeCostInput(model.id),
+        costOutputEur: this.estimateClaudeCostOutput(model.id),
+        contextLength: this.estimateClaudeContextLength(model.id),
+        provider: 'claude' as const
+      }))
+      .sort((a, b) => {
+        // Sort by model generation and tier (newer first, then by tier)
+        const getModelPriority = (id: string) => {
+          const lowerName = id.toLowerCase();
+          if (lowerName.includes('claude-4') || lowerName.includes('sonnet-4') || lowerName.includes('opus-4')) {
+            if (lowerName.includes('opus')) return 1; // Opus 4 first
+            if (lowerName.includes('sonnet')) return 2; // Sonnet 4 second
+            return 3; // Other Claude 4 models
+          } else if (lowerName.includes('claude-3')) {
+            if (lowerName.includes('opus')) return 4; // Claude 3 Opus
+            if (lowerName.includes('sonnet')) return 5; // Claude 3 Sonnet
+            if (lowerName.includes('haiku')) return 6; // Claude 3 Haiku
+            return 7; // Other Claude 3 models
+          }
+          return 10; // Older models
+        };
+        
+        const priorityA = getModelPriority(a.id);
+        const priorityB = getModelPriority(b.id);
+        
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+        
+        return a.label.localeCompare(b.label);
+      });
+  }
+
+  private generateClaudeModelDescription(modelId: string): string {
+    const lowerName = modelId.toLowerCase();
+    
+    if (lowerName.includes('claude-4') || lowerName.includes('sonnet-4') || lowerName.includes('opus-4')) {
+      if (lowerName.includes('opus')) {
+        return 'Most capable Claude model with superior reasoning and complex task handling';
+      } else if (lowerName.includes('sonnet')) {
+        return 'High-performance model with excellent reasoning and efficiency';
+      }
+      return 'Advanced Claude 4 model with enhanced capabilities';
+    } else if (lowerName.includes('claude-3')) {
+      if (lowerName.includes('opus')) {
+        return 'Powerful model for complex analysis and creative tasks';
+      } else if (lowerName.includes('sonnet')) {
+        return 'Balanced model with strong performance across all capabilities';
+      } else if (lowerName.includes('haiku')) {
+        return 'Fast and affordable model for routine tasks';
+      }
+      return 'Claude 3 series model with strong capabilities';
+    }
+    
+    return 'Claude AI model for text generation and analysis';
+  }
+
+  private estimateClaudeCostInput(modelId: string): string {
+    const lowerName = modelId.toLowerCase();
+    
+    // Current Claude pricing (approximated in EUR)
+    if (lowerName.includes('claude-4') || lowerName.includes('opus-4')) {
+      return '13.80 €'; // Opus pricing tier
+    } else if (lowerName.includes('sonnet-4') || (lowerName.includes('claude-4') && lowerName.includes('sonnet'))) {
+      return '2.76 €'; // Sonnet 4 pricing
+    } else if (lowerName.includes('haiku') && lowerName.includes('3.5')) {
+      return '0.92 €'; // Claude 3.5 Haiku
+    } else if (lowerName.includes('sonnet') && lowerName.includes('3.5')) {
+      return '2.76 €'; // Claude 3.5 Sonnet
+    } else if (lowerName.includes('opus') && lowerName.includes('3')) {
+      return '13.80 €'; // Claude 3 Opus
+    } else if (lowerName.includes('sonnet') && lowerName.includes('3')) {
+      return '2.76 €'; // Claude 3 Sonnet
+    } else if (lowerName.includes('haiku') && lowerName.includes('3')) {
+      return '0.23 €'; // Claude 3 Haiku
+    }
+    
+    return '2.76 €'; // Default to Sonnet pricing
+  }
+
+  private estimateClaudeCostOutput(modelId: string): string {
+    const lowerName = modelId.toLowerCase();
+    
+    // Current Claude pricing (approximated in EUR)
+    if (lowerName.includes('claude-4') || lowerName.includes('opus-4')) {
+      return '69.00 €'; // Opus pricing tier
+    } else if (lowerName.includes('sonnet-4') || (lowerName.includes('claude-4') && lowerName.includes('sonnet'))) {
+      return '13.80 €'; // Sonnet 4 pricing
+    } else if (lowerName.includes('haiku') && lowerName.includes('3.5')) {
+      return '4.60 €'; // Claude 3.5 Haiku
+    } else if (lowerName.includes('sonnet') && lowerName.includes('3.5')) {
+      return '13.80 €'; // Claude 3.5 Sonnet
+    } else if (lowerName.includes('opus') && lowerName.includes('3')) {
+      return '69.00 €'; // Claude 3 Opus
+    } else if (lowerName.includes('sonnet') && lowerName.includes('3')) {
+      return '13.80 €'; // Claude 3 Sonnet
+    } else if (lowerName.includes('haiku') && lowerName.includes('3')) {
+      return '1.15 €'; // Claude 3 Haiku
+    }
+    
+    return '13.80 €'; // Default to Sonnet pricing
+  }
+
+  private estimateClaudeContextLength(modelId: string): number {
+    // Most Claude models support 200K tokens, with some supporting up to 1M
+    const lowerName = modelId.toLowerCase();
+    
+    if (lowerName.includes('claude-4') && lowerName.includes('sonnet')) {
+      return 1000000; // Claude 4 Sonnet can support 1M tokens with beta header
+    }
+    
+    return 200000; // Default context length for Claude models
   }
 
   private generateOllamaModelDescription(model: { details?: { parameter_size?: string; quantization_level?: string }; size: number }): string {

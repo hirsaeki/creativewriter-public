@@ -34,6 +34,20 @@ export interface ClaudeResponse {
   };
 }
 
+export interface ClaudeModel {
+  created_at: string;
+  display_name: string;
+  id: string;
+  type: string;
+}
+
+export interface ClaudeModelsResponse {
+  data: ClaudeModel[];
+  first_id?: string;
+  has_more: boolean;
+  last_id?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -43,6 +57,7 @@ export class ClaudeApiService {
   private aiLogger = inject(AIRequestLoggerService);
 
   private readonly API_URL = 'https://api.anthropic.com/v1/messages';
+  private readonly MODELS_URL = 'https://api.anthropic.com/v1/models';
   private readonly API_VERSION = '2023-06-01';
   private abortSubjects = new Map<string, Subject<void>>();
   private requestMetadata = new Map<string, { logId: string; startTime: number }>();
@@ -314,6 +329,26 @@ export class ClaudeApiService {
 
   private generateRequestId(): string {
     return 'claude_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+  }
+
+  listModels(): Observable<ClaudeModelsResponse> {
+    const settings = this.settingsService.getSettings();
+    
+    if (!settings.claude.enabled || !settings.claude.apiKey) {
+      throw new Error('Claude API is not enabled or API key is missing');
+    }
+
+    const headers = new HttpHeaders({
+      'X-API-Key': settings.claude.apiKey,
+      'anthropic-version': this.API_VERSION
+    });
+
+    return this.http.get<ClaudeModelsResponse>(this.MODELS_URL, { headers }).pipe(
+      catchError(error => {
+        console.error('Failed to load Claude models:', error);
+        throw error;
+      })
+    );
   }
 
   testConnection(): Observable<boolean> {
