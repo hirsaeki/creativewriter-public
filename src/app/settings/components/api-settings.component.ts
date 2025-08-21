@@ -98,7 +98,10 @@ import { ModelService } from '../../core/services/model.service';
     <ion-card>
       <ion-card-header (click)="isOpenRouterCollapsed = !isOpenRouterCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
-          <ion-card-title>OpenRouter API</ion-card-title>
+          <ion-card-title>
+            <ion-icon name="swap-horizontal-outline" class="provider-icon openrouter" style="margin-right: 8px;"></ion-icon>
+            OpenRouter API
+          </ion-card-title>
           <span style="color: #8bb4f8; font-size: 1.5rem; margin-left: auto; padding: 0.5rem;">
             {{ isOpenRouterCollapsed ? '▼' : '▲' }}
           </span>
@@ -166,7 +169,10 @@ import { ModelService } from '../../core/services/model.service';
     <ion-card>
       <ion-card-header (click)="isReplicateCollapsed = !isReplicateCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
-          <ion-card-title>Replicate API</ion-card-title>
+          <ion-card-title>
+            <ion-icon name="cloud-upload-outline" class="provider-icon replicate" style="margin-right: 8px;"></ion-icon>
+            Replicate API
+          </ion-card-title>
           <span style="color: #8bb4f8; font-size: 1.5rem; margin-left: auto; padding: 0.5rem;">
             {{ isReplicateCollapsed ? '▼' : '▲' }}
           </span>
@@ -254,7 +260,10 @@ import { ModelService } from '../../core/services/model.service';
     <ion-card>
       <ion-card-header (click)="isOllamaCollapsed = !isOllamaCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
-          <ion-card-title>Ollama (Local AI)</ion-card-title>
+          <ion-card-title>
+            <ion-icon name="hardware-chip" class="provider-icon ollama" style="margin-right: 8px;"></ion-icon>
+            Ollama (Local AI)
+          </ion-card-title>
           <span style="color: #8bb4f8; font-size: 1.5rem; margin-left: auto; padding: 0.5rem;">
             {{ isOllamaCollapsed ? '▼' : '▲' }}
           </span>
@@ -351,7 +360,10 @@ import { ModelService } from '../../core/services/model.service';
     <ion-card>
       <ion-card-header (click)="isGeminiCollapsed = !isGeminiCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
-          <ion-card-title>Google Gemini API</ion-card-title>
+          <ion-card-title>
+            <ion-icon name="logo-google" class="provider-icon gemini" style="margin-right: 8px;"></ion-icon>
+            Google Gemini API
+          </ion-card-title>
           <span style="color: #8bb4f8; font-size: 1.5rem; margin-left: auto; padding: 0.5rem;">
             {{ isGeminiCollapsed ? '▼' : '▲' }}
           </span>
@@ -500,7 +512,10 @@ import { ModelService } from '../../core/services/model.service';
     <ion-card>
       <ion-card-header (click)="isClaudeCollapsed = !isClaudeCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
-          <ion-card-title>Claude API (Anthropic)</ion-card-title>
+          <ion-card-title>
+            <ion-icon name="chatbubble-outline" class="provider-icon claude" style="margin-right: 8px;"></ion-icon>
+            Claude API (Anthropic)
+          </ion-card-title>
           <span style="color: #8bb4f8; font-size: 1.5rem; margin-left: auto; padding: 0.5rem;">
             {{ isClaudeCollapsed ? '▼' : '▲' }}
           </span>

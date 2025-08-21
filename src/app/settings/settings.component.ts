@@ -591,6 +591,14 @@ import { PromptsSettingsComponent } from './components/prompts-settings.componen
       color: #f59e0b; /* Amber for cloud ML */
     }
 
+    /* Card title icons styling */
+    ion-card-title .provider-icon {
+      font-size: 1.3rem;
+      width: 1.3rem;
+      height: 1.3rem;
+      vertical-align: middle;
+    }
+
     .model-label {
       font-weight: 500;
       color: #e0e0e0;
