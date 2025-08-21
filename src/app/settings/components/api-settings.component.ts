@@ -99,7 +99,7 @@ import { ModelService } from '../../core/services/model.service';
       <ion-card-header (click)="isOpenRouterCollapsed = !isOpenRouterCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
           <ion-card-title>
-            <ion-icon name="swap-horizontal-outline" class="provider-icon openrouter" style="margin-right: 8px;"></ion-icon>
+            <ion-icon name="git-network-outline" class="provider-icon openrouter" style="margin-right: 8px;"></ion-icon>
             OpenRouter API
           </ion-card-title>
           <span style="color: #8bb4f8; font-size: 1.5rem; margin-left: auto; padding: 0.5rem;">
@@ -697,7 +697,7 @@ import { ModelService } from '../../core/services/model.service';
     }
 
     .provider-icon.openrouter {
-      color: #00a67e;
+      color: #6467f2;
     }
 
     .provider-icon.ollama {
@@ -1017,7 +1017,7 @@ export class ApiSettingsComponent {
       case 'gemini':
         return 'logo-google';
       case 'openrouter':
-        return 'swap-horizontal-outline'; // Better icon for routing
+        return 'git-network-outline'; // Network/routing icon representing API gateway
       case 'claude':
         return 'chatbubble-outline'; // Better icon for conversational AI
       case 'ollama':
@@ -1034,7 +1034,7 @@ export class ApiSettingsComponent {
       case 'gemini':
         return 'Google Gemini - Advanced multimodal AI from Google';
       case 'openrouter':
-        return 'OpenRouter - Access to multiple AI models through unified API';
+        return 'OpenRouter - Unified API gateway for multiple AI models';
       case 'claude':
         return 'Claude - Anthropic\'s helpful, harmless, and honest AI assistant';
       case 'ollama':

@@ -342,7 +342,7 @@ import { ModelOption } from '../../core/models/model.interface';
     }
 
     .provider-icon.openrouter {
-      color: #00a67e;
+      color: #6467f2;
     }
 
     .provider-icon.ollama {
@@ -431,7 +431,7 @@ export class PromptsSettingsComponent {
       case 'gemini':
         return 'logo-google';
       case 'openrouter':
-        return 'swap-horizontal-outline';
+        return 'git-network-outline';
       case 'claude':
         return 'chatbubble-outline';
       case 'ollama':

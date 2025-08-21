@@ -14,7 +14,7 @@ import {
   arrowBack, sendOutline, peopleOutline, documentTextOutline, 
   addOutline, checkmarkOutline, closeOutline, sparklesOutline,
   personOutline, locationOutline, cubeOutline, readerOutline,
-  copyOutline, logoGoogle, globeOutline, chatbubbleOutline, swapHorizontalOutline, cloudUploadOutline, hardwareChip
+  copyOutline, logoGoogle, globeOutline, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, hardwareChip
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -114,7 +114,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
       arrowBack, sendOutline, peopleOutline, documentTextOutline, 
       addOutline, checkmarkOutline, closeOutline, sparklesOutline,
       personOutline, locationOutline, cubeOutline, readerOutline,
-      copyOutline, logoGoogle, globeOutline, chatbubbleOutline, swapHorizontalOutline, cloudUploadOutline, hardwareChip
+      copyOutline, logoGoogle, globeOutline, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, hardwareChip
     });
     
     this.initializePresetPrompts();
@@ -958,7 +958,20 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
   }
   
   getProviderIcon(provider: string): string {
-    return provider === 'gemini' ? 'logo-google' : 'globe-outline';
+    switch (provider) {
+      case 'gemini':
+        return 'logo-google';
+      case 'openrouter':
+        return 'git-network-outline';
+      case 'claude':
+        return 'chatbubble-outline';
+      case 'ollama':
+        return 'hardware-chip';
+      case 'replicate':
+        return 'cloud-upload-outline';
+      default:
+        return 'globe-outline';
+    }
   }
   
   private buildChatHistory(): string {

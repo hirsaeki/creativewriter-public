@@ -8,7 +8,7 @@ import {
   IonChip, IonLabel
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, swapHorizontalOutline, cloudUploadOutline } from 'ionicons/icons';
+import { arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline } from 'ionicons/icons';
 import { SettingsService } from '../core/services/settings.service';
 import { ModelService } from '../core/services/model.service';
 import { Settings } from '../core/models/settings.interface';
@@ -576,7 +576,7 @@ import { PromptsSettingsComponent } from './components/prompts-settings.componen
     }
 
     .provider-icon.openrouter {
-      color: #00a67e; /* OpenRouter Green */
+      color: #6467f2; /* OpenRouter Cornflower Blue */
     }
 
     .provider-icon.claude {
@@ -872,7 +872,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   constructor() {
     this.settings = this.settingsService.getSettings();
     // Register Ionic icons
-    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, swapHorizontalOutline, cloudUploadOutline });
+    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline });
   }
 
   ngOnInit(): void {
