@@ -176,8 +176,8 @@ ls -la ./data/couchdb-data/  # Should contain database files after first run
 #### Option 2: Development Setup (Local Build)
 For development or customization:
 ```bash
-git clone https://github.com/MarcoDroll/creativewriter2.git
-cd creativewriter2
+git clone https://github.com/MarcoDroll/creativewriter-public.git
+cd creativewriter-public
 
 # CRITICAL: Create data directory for database persistence
 mkdir -p data
@@ -227,8 +227,8 @@ For development or customization, clone the repository:
 
 1. **Clone and setup**
    ```bash
-   git clone https://github.com/MarcoDroll/creativewriter2.git
-   cd creativewriter2
+   git clone https://github.com/MarcoDroll/creativewriter-public.git
+   cd creativewriter-public
    ```
 
 2. **Prerequisites**
@@ -309,8 +309,8 @@ The application uses PouchDB for local storage with optional CouchDB sync:
 ### Single Instance
 Build and run locally:
 ```bash
-git clone https://github.com/MarcoDroll/creativewriter2.git
-cd creativewriter2
+git clone https://github.com/MarcoDroll/creativewriter-public.git
+cd creativewriter-public
 
 # IMPORTANT: Create data directory for persistent storage
 mkdir -p data
@@ -354,7 +354,7 @@ Run multiple isolated instances on the same host:
 
 ```bash
 # Clone once
-git clone https://github.com/MarcoDroll/creativewriter2.git creativewriter-base
+git clone https://github.com/MarcoDroll/creativewriter-public.git creativewriter-base
 cd creativewriter-base
 
 # Build images once
@@ -444,6 +444,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🔗 Links
 
-- [GitHub Repository](https://github.com/MarcoDroll/creativewriter2)
-- [Issue Tracker](https://github.com/MarcoDroll/creativewriter2/issues)
-- [Docker Images](https://github.com/MarcoDroll/creativewriter2/pkgs/container/creativewriter2)
+- [GitHub Repository](https://github.com/MarcoDroll/creativewriter-public)
+- [Issue Tracker](https://github.com/MarcoDroll/creativewriter-public/issues)
+- [Docker Images](https://github.com/MarcoDroll/creativewriter-public/pkgs/container/creativewriter-public)
