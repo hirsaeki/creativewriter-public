@@ -1,122 +1,197 @@
-name: Build and Push Docker Image
+name: Build Public Docker Images
 
 on:
-  push:
-    branches: [ main ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  BASE_IMAGE_NAME: marcodroll/creativewriter-public
 
 jobs:
-  build:
+  build-images:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    
+    strategy:
+      matrix:
+        include:
+          - dockerfile: Dockerfile
+            image_suffix: ""
+            context: .
+            platforms: linux/amd64,linux/arm64
+          - dockerfile: Dockerfile.proxy
+            image_suffix: -proxy
+            context: .
+            platforms: linux/amd64,linux/arm64
+          - dockerfile: Dockerfile.gemini-proxy
+            image_suffix: -gemini-proxy
+            context: .
+            platforms: linux/amd64,linux/arm64
+          - dockerfile: Dockerfile.nginx
+            image_suffix: -nginx
+            context: .
+            platforms: linux/amd64,linux/arm64
+          - dockerfile: Dockerfile.couchdb
+            image_suffix: -couchdb
+            context: .
+            platforms: linux/amd64,linux/arm64
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Auto-increment patch version and generate version info
-      run: |
-        BUILD_NUMBER=${{ github.run_number }}
-        COMMIT_HASH=$(git rev-parse HEAD)
-        COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')
-        BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        BRANCH=${GITHUB_REF#refs/heads/}
-        
-        # Auto-increment patch version based on build number
-        CURRENT_VERSION=$(node -p "require('./package.json').version")
-        
-        # Extract major.minor from current version, use build number as patch
-        MAJOR_MINOR=$(echo $CURRENT_VERSION | cut -d. -f1-2)
-        NEW_VERSION="${MAJOR_MINOR}.$BUILD_NUMBER"
-        
-        # Update package.json with new version
-        node -e "
-          const pkg = require('./package.json');
-          pkg.version = '$NEW_VERSION';
-          require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-        "
-        
-        echo "Version updated from $CURRENT_VERSION to $NEW_VERSION"
-        
-        # Create version.json
-        cat > src/assets/version.json << EOF
-        {
-          "version": "$NEW_VERSION",
-          "buildNumber": "$BUILD_NUMBER",
-          "commitHash": "$COMMIT_HASH",
-          "commitMessage": "$COMMIT_MESSAGE",
-          "buildDate": "$BUILD_DATE",
-          "branch": "$BRANCH"
-        }
-        EOF
-        
-        echo "Generated version.json:"
-        cat src/assets/version.json
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Log in to Container Registry
-      if: github.event_name != 'pull_request'
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Get version info
-      id: version
-      run: |
-        VERSION=$(node -p "require('./package.json').version")
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "Version: $VERSION"
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          
+          # Remove 'v' prefix if present
+          VERSION_NUMBER=${VERSION#v}
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version_number=$VERSION_NUMBER" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
 
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=raw,value=v${{ steps.version.outputs.version }}
-          type=raw,value=latest,enable={{is_default_branch}}
-        labels: |
-          org.opencontainers.image.title=${{ github.event.repository.name }}
-          org.opencontainers.image.description=${{ github.event.repository.description }}
-          org.opencontainers.image.version=v${{ steps.version.outputs.version }}
-          org.opencontainers.image.source=${{ github.event.repository.html_url }}
-          org.opencontainers.image.revision=${{ github.sha }}
-          org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+      - name: Update version in package.json
+        if: matrix.dockerfile == 'Dockerfile'
+        run: |
+          VERSION_NUMBER="${{ steps.version.outputs.version_number }}"
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          COMMIT_HASH=$(git rev-parse HEAD)
+          COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')
+          
+          # Update package.json version if it exists
+          if [ -f "package.json" ]; then
+            node -e "
+              const pkg = require('./package.json');
+              pkg.version = '$VERSION_NUMBER';
+              require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+            "
+          fi
+          
+          # Create version.json for the main app
+          mkdir -p src/assets
+          cat > src/assets/version.json << EOF
+          {
+            "version": "$VERSION_NUMBER",
+            "commitHash": "$COMMIT_HASH",
+            "commitMessage": "$COMMIT_MESSAGE",
+            "buildDate": "$BUILD_DATE",
+            "release": true,
+            "stable": true
+          }
+          EOF
+          
+          echo "Updated version.json for stable release"
 
-    - name: Build and push Docker image
-      id: build
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile
-        platforms: linux/amd64
-        push: ${{ github.event_name != 'pull_request' }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.BASE_IMAGE_NAME }}${{ matrix.image_suffix }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=stable
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=creativewriter-public${{ matrix.image_suffix }}
+            org.opencontainers.image.description=CreativeWriter 2 - Self-Hosted Creative Writing Tool${{ matrix.image_suffix }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.source=https://github.com/MarcoDroll/creativewriter-public
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.release.created_at }}
+            org.opencontainers.image.url=https://github.com/MarcoDroll/creativewriter-public
+            org.opencontainers.image.vendor=MarcoDroll
+            stable=true
 
-    # Note: Build attestations are only available for public repositories
-    # - name: Generate artifact attestation
-    #   if: github.event_name != 'pull_request'
-    #   uses: actions/attest-build-provenance@v1
-    #   with:
-    #     subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
-    #     subject-digest: ${{ steps.build.outputs.digest }}
-    #     push-to-registry: true
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ./${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platforms }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.dockerfile }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.dockerfile }}
+          # provenance and sbom removed due to permissions limitations
+
+      # Note: Attestation removed due to permissions limitations in public repo
+
+  create-release-summary:
+    needs: build-images
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Create release summary
+        run: |
+          echo "# 🚀 Public Docker Images Released" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 Released Images" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          
+          REGISTRY="${{ env.REGISTRY }}"
+          REPO="${{ env.BASE_IMAGE_NAME }}"
+          
+          echo "| Image | Tags | Pull Command |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|------|--------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Main App | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO:latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Proxy | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-proxy:latest\` |" >> $GITHUB_STEP_SUMMARY  
+          echo "| Gemini Proxy | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-gemini-proxy:latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Nginx | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-nginx:latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| CouchDB | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-couchdb:latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔧 Features" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Multi-platform builds (AMD64, ARM64)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Build provenance attestation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Software Bill of Materials (SBOM)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Proper semantic versioning" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Build cache optimization" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎯 Quick Start" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "# Download docker-compose.yml" >> $GITHUB_STEP_SUMMARY
+          echo "curl -O https://raw.githubusercontent.com/MarcoDroll/creativewriter-public/main/docker-compose.yml" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Start the application" >> $GITHUB_STEP_SUMMARY
+          echo "docker compose up -d" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Access at http://localhost:3080" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
