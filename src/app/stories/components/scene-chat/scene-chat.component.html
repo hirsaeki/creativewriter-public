@@ -39,8 +39,14 @@
               color="#9c27b0" 
               class="provider-icon-inline replicate">
             </app-replicate-icon>
+            <app-ollama-icon 
+              *ngIf="item.provider === 'ollama'"
+              size="16" 
+              color="#ff9800" 
+              class="provider-icon-inline ollama">
+            </app-ollama-icon>
             <ion-icon 
-              *ngIf="item.provider !== 'openrouter' && item.provider !== 'claude' && item.provider !== 'replicate'"
+              *ngIf="item.provider !== 'openrouter' && item.provider !== 'claude' && item.provider !== 'replicate' && item.provider !== 'ollama'"
               [name]="getProviderIcon(item.provider)" 
               class="provider-icon-inline" 
               [class.gemini]="item.provider === 'gemini'">

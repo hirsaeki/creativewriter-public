@@ -14,6 +14,7 @@ import { ModelService } from '../../core/services/model.service';
 import { OpenRouterIconComponent } from '../../shared/components/openrouter-icon.component';
 import { ClaudeIconComponent } from '../../shared/components/claude-icon.component';
 import { ReplicateIconComponent } from '../../shared/components/replicate-icon.component';
+import { OllamaIconComponent } from '../../shared/components/ollama-icon.component';
 
 @Component({
   selector: 'app-api-settings',
@@ -24,7 +25,8 @@ import { ReplicateIconComponent } from '../../shared/components/replicate-icon.c
     IonItem, IonLabel, IonSelect, IonSelectOption, IonButton, IonIcon,
     OpenRouterIconComponent,
     ClaudeIconComponent,
-    ReplicateIconComponent
+    ReplicateIconComponent,
+    OllamaIconComponent
   ],
   template: `
     <!-- Global Model Selection -->
@@ -88,12 +90,18 @@ import { ReplicateIconComponent } from '../../shared/components/replicate-icon.c
                       class="provider-icon replicate"
                       [title]="getProviderTooltip(item.provider)">
                     </app-replicate-icon>
+                    <app-ollama-icon 
+                      *ngIf="item.provider === 'ollama'"
+                      size="18" 
+                      color="#ff9800" 
+                      class="provider-icon ollama"
+                      [title]="getProviderTooltip(item.provider)">
+                    </app-ollama-icon>
                     <ion-icon 
-                      *ngIf="item.provider !== 'openrouter' && item.provider !== 'claude' && item.provider !== 'replicate'"
+                      *ngIf="item.provider !== 'openrouter' && item.provider !== 'claude' && item.provider !== 'replicate' && item.provider !== 'ollama'"
                       [name]="getProviderIcon(item.provider)" 
                       class="provider-icon" 
-                      [class.gemini]="item.provider === 'gemini'" 
-                      [class.ollama]="item.provider === 'ollama'"
+                      [class.gemini]="item.provider === 'gemini'"
                       [title]="getProviderTooltip(item.provider)"></ion-icon>
                     <span class="model-label">{{ item.label }}</span>
                   </div>
@@ -286,7 +294,7 @@ import { ReplicateIconComponent } from '../../shared/components/replicate-icon.c
       <ion-card-header (click)="isOllamaCollapsed = !isOllamaCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
           <ion-card-title>
-            <ion-icon name="hardware-chip" class="provider-icon ollama" style="margin-right: 8px;"></ion-icon>
+            <app-ollama-icon size="20" color="#ff9800" style="margin-right: 8px;"></app-ollama-icon>
             Ollama (Local AI)
           </ion-card-title>
           <span style="color: #8bb4f8; font-size: 1.5rem; margin-left: auto; padding: 0.5rem;">
@@ -1046,7 +1054,7 @@ export class ApiSettingsComponent {
       case 'claude':
         return 'claude-custom'; // Official Claude logo
       case 'ollama':
-        return 'hardware-chip'; // Perfect for local inference
+        return 'ollama-custom'; // Official Ollama logo
       case 'replicate':
         return 'replicate-custom'; // Official Replicate logo
       default:

@@ -435,7 +435,7 @@ export class PromptsSettingsComponent {
       case 'claude':
         return 'claude-custom';
       case 'ollama':
-        return 'hardware-chip';
+        return 'ollama-custom';
       case 'replicate':
         return 'replicate-custom';
       default:

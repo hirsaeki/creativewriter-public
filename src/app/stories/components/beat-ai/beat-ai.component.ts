@@ -25,6 +25,7 @@ import { DatabaseService, SyncStatus } from '../../../core/services/database.ser
 import { OpenRouterIconComponent } from '../../../shared/components/openrouter-icon.component';
 import { ClaudeIconComponent } from '../../../shared/components/claude-icon.component';
 import { ReplicateIconComponent } from '../../../shared/components/replicate-icon.component';
+import { OllamaIconComponent } from '../../../shared/components/ollama-icon.component';
 
 interface SceneContext {
   chapterId: string;
@@ -42,7 +43,7 @@ interface SceneContext {
     CommonModule, FormsModule, NgSelectModule, IonIcon, IonModal, IonChip, IonLabel, 
     IonSearchbar, IonCheckbox, IonItemDivider, IonButton, IonButtons, IonToolbar, 
     IonTitle, IonHeader, IonContent, IonList, IonItem, OpenRouterIconComponent,
-    ClaudeIconComponent, ReplicateIconComponent
+    ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent
   ],
   templateUrl: './beat-ai.component.html',
   styleUrls: ['./beat-ai.component.scss'],
@@ -657,7 +658,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       case 'claude':
         return 'claude-custom';
       case 'ollama':
-        return 'hardware-chip';
+        return 'ollama-custom';
       case 'replicate':
         return 'replicate-custom';
       default:

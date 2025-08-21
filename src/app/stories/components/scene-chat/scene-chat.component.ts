@@ -26,6 +26,7 @@ import { ModelService } from '../../../core/services/model.service';
 import { OpenRouterIconComponent } from '../../../shared/components/openrouter-icon.component';
 import { ClaudeIconComponent } from '../../../shared/components/claude-icon.component';
 import { ReplicateIconComponent } from '../../../shared/components/replicate-icon.component';
+import { OllamaIconComponent } from '../../../shared/components/ollama-icon.component';
 import { Story, Scene, Chapter } from '../../models/story.interface';
 import { ModelOption } from '../../../core/models/model.interface';
 import { StoryRole } from '../../models/codex.interface';
@@ -67,7 +68,7 @@ interface PresetPrompt {
     IonContent, IonFooter, IonItem, IonLabel, IonTextarea, IonList,
     IonChip, IonAvatar, IonSearchbar, IonModal, IonCheckbox, IonItemDivider,
     IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader,
-    OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent
+    OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent
   ],
   templateUrl: './scene-chat.component.html',
   styleUrls: ['./scene-chat.component.scss']
@@ -970,7 +971,7 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
       case 'claude':
         return 'claude-custom';
       case 'ollama':
-        return 'hardware-chip';
+        return 'ollama-custom';
       case 'replicate':
         return 'replicate-custom';
       default:
