@@ -56,11 +56,23 @@ export class ClaudeApiService {
   private settingsService = inject(SettingsService);
   private aiLogger = inject(AIRequestLoggerService);
 
-  private readonly API_URL = 'https://api.anthropic.com/v1/messages';
-  private readonly MODELS_URL = 'https://api.anthropic.com/v1/models';
+  private readonly API_URL: string;
+  private readonly MODELS_URL: string;
   private readonly API_VERSION = '2023-06-01';
+  private readonly isDevelopment = !window.location.hostname.includes('.de') && !window.location.hostname.includes('.com');
   private abortSubjects = new Map<string, Subject<void>>();
   private requestMetadata = new Map<string, { logId: string; startTime: number }>();
+
+  constructor() {
+    // Use proxy in development, direct API in production
+    if (this.isDevelopment) {
+      this.API_URL = '/api/anthropic/v1/messages';
+      this.MODELS_URL = '/api/anthropic/v1/models';
+    } else {
+      this.API_URL = 'https://api.anthropic.com/v1/messages';
+      this.MODELS_URL = 'https://api.anthropic.com/v1/models';
+    }
+  }
 
   generateText(prompt: string, options: {
     model?: string;
@@ -96,11 +108,18 @@ export class ClaudeApiService {
       prompt: prompt
     });
 
-    const headers = new HttpHeaders({
+    const headerOptions: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-API-Key': settings.claude.apiKey,
       'anthropic-version': this.API_VERSION
-    });
+    };
+
+    // Add CORS header for production
+    if (!this.isDevelopment) {
+      headerOptions['anthropic-dangerous-direct-browser-access'] = 'true';
+    }
+
+    const headers = new HttpHeaders(headerOptions);
 
     // Convert messages format to Claude format
     const messages = this.convertMessagesToClaudeFormat(options.messages, prompt);
@@ -216,13 +235,20 @@ export class ClaudeApiService {
       const startTime = Date.now();
       let accumulatedText = '';
 
+      const fetchHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-API-Key': settings.claude.apiKey,
+        'anthropic-version': this.API_VERSION
+      };
+
+      // Add CORS header for production
+      if (!this.isDevelopment) {
+        fetchHeaders['anthropic-dangerous-direct-browser-access'] = 'true';
+      }
+
       fetch(this.API_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': settings.claude.apiKey,
-          'anthropic-version': this.API_VERSION
-        },
+        headers: fetchHeaders,
         body: JSON.stringify(request)
       }).then(async response => {
         if (!response.ok) {
@@ -338,10 +364,17 @@ export class ClaudeApiService {
       throw new Error('Claude API is not enabled or API key is missing');
     }
 
-    const headers = new HttpHeaders({
+    const headerOptions: Record<string, string> = {
       'X-API-Key': settings.claude.apiKey,
       'anthropic-version': this.API_VERSION
-    });
+    };
+
+    // Add CORS header for production
+    if (!this.isDevelopment) {
+      headerOptions['anthropic-dangerous-direct-browser-access'] = 'true';
+    }
+
+    const headers = new HttpHeaders(headerOptions);
 
     return this.http.get<ClaudeModelsResponse>(this.MODELS_URL, { headers }).pipe(
       catchError(error => {
@@ -358,11 +391,18 @@ export class ClaudeApiService {
       return from(Promise.resolve(false));
     }
 
-    const headers = new HttpHeaders({
+    const headerOptions: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-API-Key': settings.claude.apiKey,
       'anthropic-version': this.API_VERSION
-    });
+    };
+
+    // Add CORS header for production
+    if (!this.isDevelopment) {
+      headerOptions['anthropic-dangerous-direct-browser-access'] = 'true';
+    }
+
+    const headers = new HttpHeaders(headerOptions);
 
     // Test with a minimal request
     const testRequest: ClaudeRequest = {
