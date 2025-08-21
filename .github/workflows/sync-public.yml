@@ -150,6 +150,7 @@ jobs:
           - **Proxy Service**: \`ghcr.io/marcodroll/creativewriter-public-proxy:v${VERSION}\`
           - **Gemini Proxy**: \`ghcr.io/marcodroll/creativewriter-public-gemini-proxy:v${VERSION}\`
           - **Nginx Reverse Proxy**: \`ghcr.io/marcodroll/creativewriter-public-nginx:v${VERSION}\`
+          - **CouchDB Database**: \`ghcr.io/marcodroll/creativewriter-public-couchdb:v${VERSION}\`
           
           ### 🎯 Quick Start
           \`\`\`bash
@@ -158,6 +159,7 @@ jobs:
           docker pull ghcr.io/marcodroll/creativewriter-public-proxy:stable
           docker pull ghcr.io/marcodroll/creativewriter-public-gemini-proxy:stable
           docker pull ghcr.io/marcodroll/creativewriter-public-nginx:stable
+          docker pull ghcr.io/marcodroll/creativewriter-public-couchdb:stable
           \`\`\`
           
           ### 🔧 Features in this Release
