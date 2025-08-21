@@ -617,11 +617,23 @@
     }
     
     .provider-icon-inline.gemini {
-      color: #4285f4;
+      color: #4285f4; /* Google Blue */
     }
     
     .provider-icon-inline.openrouter {
-      color: #00a67e;
+      color: #6467f2; /* OpenRouter Cornflower Blue */
+    }
+    
+    .provider-icon-inline.claude {
+      color: #C15F3C; /* Claude Crail */
+    }
+    
+    .provider-icon-inline.ollama {
+      color: #9333ea; /* Purple for local inference */
+    }
+    
+    .provider-icon-inline.replicate {
+      color: #f59e0b; /* Amber for cloud ML */
     }
 
     .beat-type-option {

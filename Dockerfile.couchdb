@@ -1,0 +1,10 @@
+FROM couchdb:3.3
+
+# Copy custom CouchDB configuration with increased limits
+COPY couchdb/local.ini /opt/couchdb/etc/local.d/local.ini
+
+# Expose standard CouchDB port
+EXPOSE 5984
+
+# Use the default CouchDB entrypoint
+# The configuration will be automatically loaded from local.d/

@@ -7,7 +7,7 @@ import {
   IonButton, IonButtons, IonToolbar, IonTitle, IonHeader, IonContent, IonList, IonItem
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { logoGoogle, globeOutline, createOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline } from 'ionicons/icons';
+import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, createOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline } from 'ionicons/icons';
 import { BeatAIModalService } from '../../../shared/services/beat-ai-modal.service';
 import { TokenInfoPopoverComponent } from '../../../shared/components/token-info-popover.component';
 import { TokenCounterService, SupportedModel } from '../../../shared/services/token-counter.service';
@@ -22,6 +22,10 @@ import { EditorView } from 'prosemirror-view';
 import { StoryService } from '../../services/story.service';
 import { Story, Scene, Chapter } from '../../models/story.interface';
 import { DatabaseService, SyncStatus } from '../../../core/services/database.service';
+import { OpenRouterIconComponent } from '../../../shared/components/openrouter-icon.component';
+import { ClaudeIconComponent } from '../../../shared/components/claude-icon.component';
+import { ReplicateIconComponent } from '../../../shared/components/replicate-icon.component';
+import { OllamaIconComponent } from '../../../shared/components/ollama-icon.component';
 
 interface SceneContext {
   chapterId: string;
@@ -38,7 +42,8 @@ interface SceneContext {
   imports: [
     CommonModule, FormsModule, NgSelectModule, IonIcon, IonModal, IonChip, IonLabel, 
     IonSearchbar, IonCheckbox, IonItemDivider, IonButton, IonButtons, IonToolbar, 
-    IonTitle, IonHeader, IonContent, IonList, IonItem
+    IonTitle, IonHeader, IonContent, IonList, IonItem, OpenRouterIconComponent,
+    ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent
   ],
   templateUrl: './beat-ai.component.html',
   styleUrls: ['./beat-ai.component.scss'],
@@ -114,7 +119,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   constructor() {
     // Register icons
-    addIcons({ logoGoogle, globeOutline, createOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline });
+    addIcons({ logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, createOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline });
   }
   
   ngOnInit(): void {
@@ -649,11 +654,32 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       case 'gemini':
         return 'logo-google';
       case 'openrouter':
-        return 'globe-outline';
-      case 'anthropic':
-        return 'globe-outline'; // Oder ein spezifisches Icon wenn verfügbar
+        return 'openrouter-custom';
+      case 'claude':
+        return 'claude-custom';
+      case 'ollama':
+        return 'ollama-custom';
+      case 'replicate':
+        return 'replicate-custom';
       default:
         return 'globe-outline';
+    }
+  }
+
+  getProviderTooltip(provider: string): string {
+    switch (provider) {
+      case 'gemini':
+        return 'Google Gemini - Advanced multimodal AI from Google';
+      case 'openrouter':
+        return 'OpenRouter - Access to multiple AI models through unified API';
+      case 'claude':
+        return 'Claude - Anthropic\'s helpful, harmless, and honest AI assistant';
+      case 'ollama':
+        return 'Ollama - Run large language models locally on your machine';
+      case 'replicate':
+        return 'Replicate - Cloud platform for running machine learning models';
+      default:
+        return 'AI Provider';
     }
   }
 

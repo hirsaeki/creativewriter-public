@@ -13,7 +13,7 @@ import {
   settingsOutline, cloudOutline, bugOutline, speedometerOutline,
   playCircleOutline, radioOutline, globeOutline, cogOutline,
   checkmarkCircleOutline, refreshOutline, copyOutline, shieldCheckmarkOutline,
-  shieldOutline, stopCircleOutline, codeOutline
+  shieldOutline, stopCircleOutline, codeOutline, logoGoogle, libraryOutline, hardwareChip
 } from 'ionicons/icons';
 import { AIRequestLoggerService, AIRequestLog } from '../../../core/services/ai-request-logger.service';
 import { Subscription } from 'rxjs';
@@ -45,7 +45,7 @@ export class AILogTabComponent implements OnInit, OnDestroy {
       settingsOutline, cloudOutline, bugOutline, speedometerOutline,
       playCircleOutline, radioOutline, globeOutline, cogOutline,
       checkmarkCircleOutline, refreshOutline, copyOutline, shieldCheckmarkOutline,
-      shieldOutline, stopCircleOutline, codeOutline
+      shieldOutline, stopCircleOutline, codeOutline, logoGoogle, libraryOutline, hardwareChip
     });
   }
 

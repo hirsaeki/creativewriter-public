@@ -5,6 +5,31 @@ All notable changes to CreativeWriter 2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-08-21
+
+### Added
+- **Claude API Integration**: Full integration of Claude as an AI provider with dynamic model loading
+- **Provider Branding**: Official logos for all AI providers (Claude, OpenRouter, Replicate, Ollama)
+- **UI Improvements**: 
+  - Collapsible AI provider settings cards
+  - Enhanced provider icon clarity and recognition
+  - Larger header logo for better visibility
+- **Infrastructure**: Custom CouchDB Docker image with embedded configuration
+
+### Fixed
+- **Claude API**: Resolved CORS issues with proxy configuration
+- **UI Elements**: 
+  - Fixed chevron icon visibility in settings cards
+  - Resolved missing Ionicons console warnings
+  - Fixed logo truncation and display issues
+- **Sync Issues**: Increased nginx and CouchDB limits for large document sync
+- **Database**: Added CouchDB system database initialization
+
+### Changed
+- **Code Structure**: 
+  - Modularized large prosemirror-editor service
+  - Split settings component into smaller modules
+
 ## [1.2.0] - 2025-08-18
 
 ### Added
