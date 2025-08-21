@@ -5,6 +5,7 @@ import { Story } from '../../stories/models/story.interface';
 import { OpenRouterApiService } from '../../core/services/openrouter-api.service';
 import { GoogleGeminiApiService } from '../../core/services/google-gemini-api.service';
 import { OllamaApiService } from '../../core/services/ollama-api.service';
+import { ClaudeApiService } from '../../core/services/claude-api.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { StoryService } from '../../stories/services/story.service';
 import { CodexService } from '../../stories/services/codex.service';
@@ -19,6 +20,7 @@ export class BeatAIService {
   private readonly openRouterApi = inject(OpenRouterApiService);
   private readonly googleGeminiApi = inject(GoogleGeminiApiService);
   private readonly ollamaApi = inject(OllamaApiService);
+  private readonly claudeApi = inject(ClaudeApiService);
   private readonly settingsService = inject(SettingsService);
   private readonly storyService = inject(StoryService);
   private readonly codexService = inject(CodexService);
@@ -61,8 +63,9 @@ export class BeatAIService {
     const useGoogleGemini = provider === 'gemini' && settings.googleGemini.enabled && settings.googleGemini.apiKey;
     const useOpenRouter = provider === 'openrouter' && settings.openRouter.enabled && settings.openRouter.apiKey;
     const useOllama = provider === 'ollama' && settings.ollama.enabled && settings.ollama.baseUrl;
+    const useClaude = provider === 'claude' && settings.claude.enabled && settings.claude.apiKey;
     
-    if (!useGoogleGemini && !useOpenRouter && !useOllama) {
+    if (!useGoogleGemini && !useOpenRouter && !useOllama && !useClaude) {
       console.warn('No AI API configured, using fallback content');
       return this.generateFallbackContent(prompt, beatId);
     }
@@ -94,10 +97,12 @@ export class BeatAIService {
         // Update options with the actual model ID
         const updatedOptions = { ...options, model: actualModelId || undefined };
         
-        // Choose API based on configuration (prioritize local Ollama, then Gemini, then OpenRouter)
+        // Choose API based on configuration (prioritize local Ollama, then Claude, then Gemini, then OpenRouter)
         let apiCall: Observable<string>;
         if (useOllama) {
           apiCall = this.callOllamaAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
+        } else if (useClaude) {
+          apiCall = this.callClaudeStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
         } else if (useGoogleGemini) {
           apiCall = this.callGoogleGeminiStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
         } else {
@@ -322,6 +327,110 @@ export class BeatAIService {
         }
       }),
       map(() => accumulatedContent) // Return full content at the end
+    );
+  }
+
+  private callClaudeStreamingAPI(prompt: string, options: { model?: string; temperature?: number; topP?: number }, maxTokens: number, wordCount: number, requestId: string, beatId: string): Observable<string> {
+    // Parse the structured prompt to extract messages
+    const messages = this.parseStructuredPrompt(prompt);
+    
+    let accumulatedContent = '';
+    
+    return this.claudeApi.generateTextStream(prompt, {
+      model: options.model,
+      maxTokens: maxTokens,
+      temperature: options.temperature,
+      topP: options.topP,
+      wordCount: wordCount,
+      requestId: requestId,
+      messages: messages
+    }).pipe(
+      tap((chunk: string) => {
+        // Emit each chunk as it arrives
+        accumulatedContent += chunk;
+        this.generationSubject.next({
+          beatId,
+          chunk: chunk,
+          isComplete: false
+        });
+      }),
+      scan((acc, chunk) => acc + chunk, ''), // Accumulate chunks
+      tap({
+        complete: () => {
+          // Post-process to remove duplicate character analyses
+          accumulatedContent = this.removeDuplicateCharacterAnalyses(accumulatedContent);
+          
+          // Emit completion
+          this.generationSubject.next({
+            beatId,
+            chunk: '',
+            isComplete: true
+          });
+          
+          // Clean up active generation
+          this.activeGenerations.delete(beatId);
+          
+          // Signal streaming stopped if no more active generations
+          if (this.activeGenerations.size === 0) {
+            this.isStreamingSubject.next(false);
+          }
+        },
+        error: () => {
+          // Clean up on error
+          this.activeGenerations.delete(beatId);
+          
+          // Signal streaming stopped if no more active generations
+          if (this.activeGenerations.size === 0) {
+            this.isStreamingSubject.next(false);
+          }
+        }
+      }),
+      map(() => accumulatedContent), // Return full content at the end
+      catchError(() => {
+        // Try non-streaming API as fallback
+        return this.claudeApi.generateText(prompt, {
+          model: options.model,
+          maxTokens: maxTokens,
+          temperature: options.temperature,
+          topP: options.topP,
+          wordCount: wordCount,
+          requestId: requestId,
+          messages: messages
+        }).pipe(
+          map(response => {
+            const content = response.content?.[0]?.text || '';
+            accumulatedContent = content;
+            
+            // Simulate streaming by emitting in chunks
+            const chunkSize = 50;
+            for (let i = 0; i < content.length; i += chunkSize) {
+              const chunk = content.substring(i, i + chunkSize);
+              this.generationSubject.next({
+                beatId,
+                chunk: chunk,
+                isComplete: false
+              });
+            }
+            
+            // Emit completion
+            this.generationSubject.next({
+              beatId,
+              chunk: '',
+              isComplete: true
+            });
+            
+            // Clean up
+            this.activeGenerations.delete(beatId);
+            
+            // Signal streaming stopped if no more active generations
+            if (this.activeGenerations.size === 0) {
+              this.isStreamingSubject.next(false);
+            }
+            
+            return content;
+          })
+        );
+      })
     );
   }
 
@@ -656,9 +765,11 @@ export class BeatAIService {
   stopGeneration(beatId: string): void {
     const requestId = this.activeGenerations.get(beatId);
     if (requestId) {
-      // Try to abort on both APIs (one will succeed based on request ID format)
+      // Try to abort on all APIs (one will succeed based on request ID format)
       if (requestId.startsWith('gemini_')) {
         this.googleGeminiApi.abortRequest(requestId);
+      } else if (requestId.startsWith('claude_')) {
+        this.claudeApi.abortRequest(requestId);
       } else {
         this.openRouterApi.abortRequest(requestId);
       }

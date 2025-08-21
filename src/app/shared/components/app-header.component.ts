@@ -57,7 +57,10 @@ export interface BurgerMenuItem {
             <ng-container *ngTemplateOutlet="titleTemplate"></ng-container>
           </ng-container>
           <ng-template #staticTitle>
-            <span class="app-title">{{ title }}</span>
+            <div class="title-content">
+              <img *ngIf="logoSrc" [src]="logoSrc" alt="Logo" class="header-logo">
+              <span class="app-title">{{ title }}</span>
+            </div>
           </ng-template>
         </ion-title>
 
@@ -195,6 +198,32 @@ export interface BurgerMenuItem {
     }
 
     /* Title Styling */
+    ion-title {
+      overflow: visible !important;
+      padding: 0 !important;
+      position: relative;
+      flex: 1;
+      text-align: center;
+    }
+    
+    .title-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: center;
+      overflow: visible;
+      min-width: max-content;
+      padding: 0 16px;
+    }
+    
+    .header-logo {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+      flex-shrink: 0;
+    }
+    
     .app-title {
       background: linear-gradient(135deg, #f8f9fa 0%, #8bb4f8 50%, #4776e6 100%);
       -webkit-background-clip: text;
@@ -431,6 +460,7 @@ export class AppHeaderComponent implements OnInit {
   
   @Input() title = '';
   @Input() titleTemplate?: TemplateRef<unknown>;
+  @Input() logoSrc?: string;
   @Input() showBackButton = false;
   @Input() backAction?: () => void;
   @Input() leftActions: HeaderAction[] = [];

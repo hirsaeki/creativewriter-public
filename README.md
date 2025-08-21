@@ -1,4 +1,8 @@
-# CreativeWriter 2
+<div align="center">
+  <img src="src/assets/logo.png" alt="CreativeWriter Logo" width="300">
+  
+  # CreativeWriter
+</div>
 
 > **⚠️ Early Development Version:** This is a very early version in active development. Expect bugs, missing features, and frequent changes. Use at your own risk and consider it experimental software.
 

@@ -3,6 +3,7 @@ export interface Settings {
   replicate: ReplicateSettings;
   googleGemini: GoogleGeminiSettings;
   ollama: OllamaSettings;
+  claude: ClaudeSettings;
   sceneTitleGeneration: SceneTitleGenerationSettings;
   sceneSummaryGeneration: SceneSummaryGenerationSettings;
   selectedModel: string; // Global selected model (format: "provider:model_id")
@@ -52,6 +53,15 @@ export interface OllamaSettings {
   temperature: number;
   topP: number;
   maxTokens: number;
+  enabled: boolean;
+}
+
+export interface ClaudeSettings {
+  apiKey: string;
+  model: string;
+  temperature: number;
+  topP: number;
+  topK: number;
   enabled: boolean;
 }
 
@@ -109,6 +119,14 @@ export const DEFAULT_SETTINGS: Settings = {
     temperature: 0.7,
     topP: 1.0,
     maxTokens: 2000,
+    enabled: false
+  },
+  claude: {
+    apiKey: '',
+    model: 'claude-3-5-sonnet-20241022',
+    temperature: 0.7,
+    topP: 1.0,
+    topK: 0,
     enabled: false
   },
   sceneTitleGeneration: {

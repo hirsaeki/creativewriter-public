@@ -14,7 +14,7 @@ import {
   arrowBack, sendOutline, peopleOutline, documentTextOutline, 
   addOutline, checkmarkOutline, closeOutline, sparklesOutline,
   personOutline, locationOutline, cubeOutline, readerOutline,
-  copyOutline, logoGoogle, globeOutline
+  copyOutline, logoGoogle, globeOutline, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, hardwareChip
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -23,6 +23,10 @@ import { PromptManagerService } from '../../../shared/services/prompt-manager.se
 import { CodexService } from '../../services/codex.service';
 import { AIRequestLoggerService } from '../../../core/services/ai-request-logger.service';
 import { ModelService } from '../../../core/services/model.service';
+import { OpenRouterIconComponent } from '../../../shared/components/openrouter-icon.component';
+import { ClaudeIconComponent } from '../../../shared/components/claude-icon.component';
+import { ReplicateIconComponent } from '../../../shared/components/replicate-icon.component';
+import { OllamaIconComponent } from '../../../shared/components/ollama-icon.component';
 import { Story, Scene, Chapter } from '../../models/story.interface';
 import { ModelOption } from '../../../core/models/model.interface';
 import { StoryRole } from '../../models/codex.interface';
@@ -63,7 +67,8 @@ interface PresetPrompt {
     CommonModule, FormsModule, NgSelectModule, AppHeaderComponent,
     IonContent, IonFooter, IonItem, IonLabel, IonTextarea, IonList,
     IonChip, IonAvatar, IonSearchbar, IonModal, IonCheckbox, IonItemDivider,
-    IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader
+    IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader,
+    OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent
   ],
   templateUrl: './scene-chat.component.html',
   styleUrls: ['./scene-chat.component.scss']
@@ -114,7 +119,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
       arrowBack, sendOutline, peopleOutline, documentTextOutline, 
       addOutline, checkmarkOutline, closeOutline, sparklesOutline,
       personOutline, locationOutline, cubeOutline, readerOutline,
-      copyOutline, logoGoogle, globeOutline
+      copyOutline, logoGoogle, globeOutline, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, hardwareChip
     });
     
     this.initializePresetPrompts();
@@ -958,7 +963,20 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
   }
   
   getProviderIcon(provider: string): string {
-    return provider === 'gemini' ? 'logo-google' : 'globe-outline';
+    switch (provider) {
+      case 'gemini':
+        return 'logo-google';
+      case 'openrouter':
+        return 'git-network-outline';
+      case 'claude':
+        return 'claude-custom';
+      case 'ollama':
+        return 'ollama-custom';
+      case 'replicate':
+        return 'replicate-custom';
+      default:
+        return 'globe-outline';
+    }
   }
   
   private buildChatHistory(): string {

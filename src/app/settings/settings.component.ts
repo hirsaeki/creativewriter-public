@@ -5,35 +5,31 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { 
   IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
-  IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonInput, IonToggle,
-  IonChip, IonItem, IonLabel, IonSelect, IonSelectOption, IonRange, IonTextarea
+  IonChip, IonLabel
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, statsChart, warning, checkmarkCircle, globeOutline, logoGoogle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, hardwareChip, archiveOutline } from 'ionicons/icons';
+import { arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline } from 'ionicons/icons';
 import { SettingsService } from '../core/services/settings.service';
 import { ModelService } from '../core/services/model.service';
-import { OllamaApiService } from '../core/services/ollama-api.service';
 import { Settings } from '../core/models/settings.interface';
 import { ModelOption } from '../core/models/model.interface';
-import { NgSelectModule } from '@ng-select/ng-select';
-import { ColorPickerComponent } from '../shared/components/color-picker.component';
 import { SettingsTabsComponent, TabItem } from '../shared/components/settings-tabs.component';
 import { SettingsContentComponent } from '../shared/components/settings-content.component';
-import { BackgroundSelectorComponent } from '../shared/components/background-selector.component';
-import { BackgroundUploadComponent } from '../shared/components/background-upload.component';
 import { BackgroundService } from '../shared/services/background.service';
-import { CustomBackground } from '../shared/services/synced-custom-background.service';
 import { DatabaseBackupComponent } from '../shared/components/database-backup.component';
+import { ApiSettingsComponent } from './components/api-settings.component';
+import { UiSettingsComponent } from './components/ui-settings.component';
+import { PromptsSettingsComponent } from './components/prompts-settings.component';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, NgSelectModule,
+    CommonModule, FormsModule,
     IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
-    IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonInput, IonToggle,
-    IonChip, IonItem, IonLabel, IonSelect, IonSelectOption, IonRange, IonTextarea,
-    ColorPickerComponent, SettingsTabsComponent, SettingsContentComponent, BackgroundSelectorComponent, BackgroundUploadComponent, DatabaseBackupComponent
+    IonChip, IonLabel,
+    SettingsTabsComponent, SettingsContentComponent, DatabaseBackupComponent,
+    ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent
   ],
   template: `
     <div class="ion-page">
@@ -71,762 +67,46 @@ import { DatabaseBackupComponent } from '../shared/components/database-backup.co
           
           <!-- Models Tab -->
           <div *ngSwitchCase="'models'">
-            <!-- Global Model Selection -->
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>AI Model Selection</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="model-selection-wrapper">
-              <div class="model-selection-container">
-                <div class="model-header">
-                  <ion-label>Global Model</ion-label>
-                  <ion-button 
-                    size="small"
-                    fill="outline"
-                    (click)="loadCombinedModels()" 
-                    [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl) || loadingModels"
-                    title="Load Models">
-                    {{ loadingModels ? 'Loading...' : 'Load Models' }}
-                  </ion-button>
-                </div>
-                <ng-select [(ngModel)]="settings.selectedModel"
-                           [items]="combinedModels"
-                           bindLabel="label"
-                           bindValue="id"
-                           [searchable]="true"
-                           [clearable]="true"
-                           [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl)"
-                           placeholder="Select or search model..."
-                           (ngModelChange)="onGlobalModelChange()"
-                           [loading]="loadingModels"
-                           [virtualScroll]="true"
-                           class="ng-select-custom"
-                           appendTo="body">
-                  <ng-template ng-option-tmp let-item="item">
-                    <div class="model-option">
-                      <div class="model-option-header">
-                        <ion-icon 
-                          [name]="item.provider === 'gemini' ? 'logo-google' : item.provider === 'ollama' ? 'hardware-chip' : 'globe-outline'" 
-                          class="provider-icon" 
-                          [class.gemini]="item.provider === 'gemini'" 
-                          [class.openrouter]="item.provider === 'openrouter'"
-                          [class.ollama]="item.provider === 'ollama'"
-                          [class.replicate]="item.provider === 'replicate'"></ion-icon>
-                        <span class="model-label">{{ item.label }}</span>
-                      </div>
-                      <div class="model-option-details">
-                        <span class="model-cost">Input: {{ item.costInputEur }} | Output: {{ item.costOutputEur }}</span>
-                        <span class="model-context">Context: {{ formatContextLength(item.contextLength) }}</span>
-                      </div>
-                      <div class="model-description" *ngIf="item.description">{{ item.description }}</div>
-                    </div>
-                  </ng-template>
-                </ng-select>
-                <div class="model-info">
-                  <p *ngIf="modelLoadError" class="error-text">{{ modelLoadError }}</p>
-                  <p *ngIf="!modelLoadError && combinedModels.length > 0" class="info-text">
-                    {{ combinedModels.length }} models available. Prices in EUR per 1M tokens.
-                  </p>
-                  <p *ngIf="!modelLoadError && combinedModels.length === 0 && (settings.openRouter.enabled || settings.googleGemini.enabled || settings.replicate.enabled || settings.ollama.enabled)" class="info-text">
-                    Click 'Load Models' to display available models.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </ion-card-content>
-        </ion-card>
-
-        <!-- OpenRouter Settings -->
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>OpenRouter API</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-item>
-              <ion-label>Enable OpenRouter</ion-label>
-              <ion-toggle 
-                [(ngModel)]="settings.openRouter.enabled"
-                (ngModelChange)="onProviderToggle('openRouter')"
-                slot="end">
-              </ion-toggle>
-            </ion-item>
-
-            <ion-item [class.disabled]="!settings.openRouter.enabled">
-              <ion-input
-                type="password"
-                [(ngModel)]="settings.openRouter.apiKey"
-                (ngModelChange)="onApiKeyChange('openRouter')"
-                placeholder="sk-or-v1-..."
-                [disabled]="!settings.openRouter.enabled"
-                label="API Key"
-                labelPlacement="stacked"
-                helperText="Find your OpenRouter API key at openrouter.ai/keys">
-              </ion-input>
-            </ion-item>
-
-            <div class="model-info" [class.disabled]="!settings.openRouter.enabled">
-              <p class="info-text">Use the global model selection above.</p>
-            </div>
-
-            <div class="settings-row" [class.disabled]="!settings.openRouter.enabled">
-              <ion-item>
-                <ion-input
-                  type="number"
-                  [(ngModel)]="settings.openRouter.temperature"
-                  (ngModelChange)="onSettingsChange()"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  [disabled]="!settings.openRouter.enabled"
-                  label="Temperature"
-                  labelPlacement="stacked">
-                </ion-input>
-              </ion-item>
-              <ion-item>
-                <ion-input
-                  type="number"
-                  [(ngModel)]="settings.openRouter.topP"
-                  (ngModelChange)="onSettingsChange()"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  [disabled]="!settings.openRouter.enabled"
-                  label="Top P"
-                  labelPlacement="stacked">
-                </ion-input>
-              </ion-item>
-            </div>
-          </ion-card-content>
-        </ion-card>
-
-        <!-- Replicate Settings -->
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>Replicate API</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-item>
-              <ion-label>Enable Replicate</ion-label>
-              <ion-toggle 
-                [(ngModel)]="settings.replicate.enabled"
-                (ngModelChange)="onProviderToggle('replicate')"
-                slot="end">
-              </ion-toggle>
-            </ion-item>
-
-            <ion-item [class.disabled]="!settings.replicate.enabled">
-              <ion-input
-                type="password"
-                [(ngModel)]="settings.replicate.apiKey"
-                (ngModelChange)="onApiKeyChange('replicate')"
-                placeholder="r8_..."
-                [disabled]="!settings.replicate.enabled"
-                label="API Key"
-                labelPlacement="stacked"
-                helperText="Find your Replicate API key at replicate.com/account/api-tokens">
-              </ion-input>
-            </ion-item>
-
-            <div class="model-selection-wrapper" [class.disabled]="!settings.replicate.enabled">
-              <div class="model-selection-container">
-                <div class="model-header">
-                  <ion-label>Model</ion-label>
-                  <ion-button 
-                    size="small"
-                    fill="outline"
-                    (click)="loadModels()" 
-                    [disabled]="!settings.replicate.enabled || !settings.replicate.apiKey || loadingModels"
-                    title="Load models from Replicate">
-                    {{ loadingModels ? 'Loading...' : 'Load Models' }}
-                  </ion-button>
-                </div>
-                <ng-select [(ngModel)]="settings.replicate.model"
-                           [items]="replicateModels"
-                           bindLabel="label"
-                           bindValue="id"
-                           [searchable]="true"
-                           [clearable]="true"
-                           [disabled]="!settings.replicate.enabled"
-                           placeholder="Select or search model..."
-                           (ngModelChange)="onSettingsChange()"
-                           [loading]="loadingModels"
-                           [virtualScroll]="true"
-                           class="ng-select-custom">
-                </ng-select>
-                <div class="model-info">
-                  <p *ngIf="modelLoadError" class="error-text">{{ modelLoadError }}</p>
-                  <p *ngIf="!modelLoadError && replicateModels.length > 0" class="info-text">
-                    {{ replicateModels.length }} models available. Estimated prices in EUR per 1M tokens.
-                  </p>
-                  <p *ngIf="!modelLoadError && replicateModels.length === 0 && settings.replicate.enabled" class="info-text">
-                    Click 'Load Models' to display available models.
-                  </p>
-                  <p *ngIf="!settings.replicate.enabled" class="info-text">
-                    Format: owner/model-name (e.g. meta/llama-2-70b-chat)
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <ion-item [class.disabled]="!settings.replicate.enabled">
-              <ion-input
-                type="text"
-                [(ngModel)]="settings.replicate.version"
-                (ngModelChange)="onSettingsChange()"
-                placeholder="Leave empty for latest version"
-                [disabled]="!settings.replicate.enabled"
-                label="Version (optional)"
-                labelPlacement="stacked">
-              </ion-input>
-            </ion-item>
-          </ion-card-content>
-        </ion-card>
-
-        <!-- Ollama Settings -->
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>Ollama (Local AI)</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-item>
-              <ion-label>Enable Ollama</ion-label>
-              <ion-toggle 
-                [(ngModel)]="settings.ollama.enabled"
-                (ngModelChange)="onProviderToggle('ollama')"
-                slot="end">
-              </ion-toggle>
-            </ion-item>
-
-            <ion-item [class.disabled]="!settings.ollama.enabled">
-              <ion-input
-                type="url"
-                [(ngModel)]="settings.ollama.baseUrl"
-                (ngModelChange)="onOllamaUrlChange()"
-                placeholder="http://localhost:11434"
-                [disabled]="!settings.ollama.enabled"
-                label="Base URL"
-                labelPlacement="stacked"
-                helperText="URL where your Ollama server is running">
-              </ion-input>
-            </ion-item>
-
-            <div class="connection-test" [class.disabled]="!settings.ollama.enabled">
-              <ion-button 
-                size="small"
-                fill="outline"
-                (click)="testOllamaConnection()" 
-                [disabled]="!settings.ollama.enabled || !settings.ollama.baseUrl || testingOllamaConnection"
-                title="Test Connection">
-                <ion-icon name="checkmark-circle" slot="start" *ngIf="ollamaConnectionStatus === 'success'"></ion-icon>
-                <ion-icon name="warning" slot="start" *ngIf="ollamaConnectionStatus === 'error'"></ion-icon>
-                {{ testingOllamaConnection ? 'Testing...' : 'Test Connection' }}
-              </ion-button>
-              <span *ngIf="ollamaConnectionStatus === 'success'" class="connection-status success">✓ Connected</span>
-              <span *ngIf="ollamaConnectionStatus === 'error'" class="connection-status error">✗ Connection Failed</span>
-            </div>
-
-            <div class="model-info" [class.disabled]="!settings.ollama.enabled">
-              <p class="info-text">Use the global model selection above to choose from your local models. <br>
-                Install models with: <code>ollama pull llama3.2</code></p>
-            </div>
-
-            <div class="settings-row" [class.disabled]="!settings.ollama.enabled">
-              <ion-item>
-                <ion-input
-                  type="number"
-                  [(ngModel)]="settings.ollama.temperature"
-                  (ngModelChange)="onSettingsChange()"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  [disabled]="!settings.ollama.enabled"
-                  label="Temperature"
-                  labelPlacement="stacked">
-                </ion-input>
-              </ion-item>
-              <ion-item>
-                <ion-input
-                  type="number"
-                  [(ngModel)]="settings.ollama.topP"
-                  (ngModelChange)="onSettingsChange()"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  [disabled]="!settings.ollama.enabled"
-                  label="Top P"
-                  labelPlacement="stacked">
-                </ion-input>
-              </ion-item>
-              <ion-item>
-                <ion-input
-                  type="number"
-                  [(ngModel)]="settings.ollama.maxTokens"
-                  (ngModelChange)="onSettingsChange()"
-                  min="100"
-                  max="10000"
-                  step="100"
-                  [disabled]="!settings.ollama.enabled"
-                  label="Max Tokens"
-                  labelPlacement="stacked">
-                </ion-input>
-              </ion-item>
-            </div>
-          </ion-card-content>
-        </ion-card>
-
-        <!-- Google Gemini Settings -->
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>Google Gemini API</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-item>
-              <ion-label>Enable Google Gemini</ion-label>
-              <ion-toggle 
-                [(ngModel)]="settings.googleGemini.enabled"
-                (ngModelChange)="onProviderToggle('googleGemini')"
-                slot="end">
-              </ion-toggle>
-            </ion-item>
-
-            <ion-item [class.disabled]="!settings.googleGemini.enabled">
-              <ion-input
-                type="password"
-                [(ngModel)]="settings.googleGemini.apiKey"
-                (ngModelChange)="onApiKeyChange('googleGemini')"
-                placeholder="AIza..."
-                [disabled]="!settings.googleGemini.enabled"
-                label="API Key"
-                labelPlacement="stacked"
-                helperText="Find your Google AI API key at aistudio.google.com/app/apikey">
-              </ion-input>
-            </ion-item>
-
-            <div class="model-info" [class.disabled]="!settings.googleGemini.enabled">
-              <p class="info-text">Use the global model selection above.</p>
-            </div>
-
-            <div class="settings-row" [class.disabled]="!settings.googleGemini.enabled">
-              <ion-item>
-                <ion-input
-                  type="number"
-                  [(ngModel)]="settings.googleGemini.temperature"
-                  (ngModelChange)="onSettingsChange()"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  [disabled]="!settings.googleGemini.enabled"
-                  label="Temperature"
-                  labelPlacement="stacked">
-                </ion-input>
-              </ion-item>
-              <ion-item>
-                <ion-input
-                  type="number"
-                  [(ngModel)]="settings.googleGemini.topP"
-                  (ngModelChange)="onSettingsChange()"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  [disabled]="!settings.googleGemini.enabled"
-                  label="Top P"
-                  labelPlacement="stacked">
-                </ion-input>
-              </ion-item>
-            </div>
-
-            <!-- Content Filter Settings -->
-            <div *ngIf="settings.googleGemini.enabled" class="content-filter-section">
-              <h4 class="section-title">Content Filter Settings</h4>
-              
-              <ion-item>
-                <ion-label>Harassment</ion-label>
-                <ion-select
-                  [(ngModel)]="settings.googleGemini.contentFilter.harassment"
-                  (ngModelChange)="onSettingsChange()"
-                  interface="popover"
-                  slot="end">
-                  <ion-select-option value="BLOCK_NONE">Don't Block</ion-select-option>
-                  <ion-select-option value="BLOCK_ONLY_HIGH">Only high risks</ion-select-option>
-                  <ion-select-option value="BLOCK_MEDIUM_AND_ABOVE">Medium and high risks</ion-select-option>
-                  <ion-select-option value="BLOCK_LOW_AND_ABOVE">Low and higher risks</ion-select-option>
-                </ion-select>
-              </ion-item>
-
-              <ion-item>
-                <ion-label>Hate Speech</ion-label>
-                <ion-select
-                  [(ngModel)]="settings.googleGemini.contentFilter.hateSpeech"
-                  (ngModelChange)="onSettingsChange()"
-                  interface="popover"
-                  slot="end">
-                  <ion-select-option value="BLOCK_NONE">Don't Block</ion-select-option>
-                  <ion-select-option value="BLOCK_ONLY_HIGH">Only high risks</ion-select-option>
-                  <ion-select-option value="BLOCK_MEDIUM_AND_ABOVE">Medium and high risks</ion-select-option>
-                  <ion-select-option value="BLOCK_LOW_AND_ABOVE">Low and higher risks</ion-select-option>
-                </ion-select>
-              </ion-item>
-
-              <ion-item>
-                <ion-label>Sexually Explicit</ion-label>
-                <ion-select
-                  [(ngModel)]="settings.googleGemini.contentFilter.sexuallyExplicit"
-                  (ngModelChange)="onSettingsChange()"
-                  interface="popover"
-                  slot="end">
-                  <ion-select-option value="BLOCK_NONE">Don't Block</ion-select-option>
-                  <ion-select-option value="BLOCK_ONLY_HIGH">Only high risks</ion-select-option>
-                  <ion-select-option value="BLOCK_MEDIUM_AND_ABOVE">Medium and high risks</ion-select-option>
-                  <ion-select-option value="BLOCK_LOW_AND_ABOVE">Low and higher risks</ion-select-option>
-                </ion-select>
-              </ion-item>
-
-              <ion-item>
-                <ion-label>Dangerous Content</ion-label>
-                <ion-select
-                  [(ngModel)]="settings.googleGemini.contentFilter.dangerousContent"
-                  (ngModelChange)="onSettingsChange()"
-                  interface="popover"
-                  slot="end">
-                  <ion-select-option value="BLOCK_NONE">Don't Block</ion-select-option>
-                  <ion-select-option value="BLOCK_ONLY_HIGH">Only high risks</ion-select-option>
-                  <ion-select-option value="BLOCK_MEDIUM_AND_ABOVE">Medium and high risks</ion-select-option>
-                  <ion-select-option value="BLOCK_LOW_AND_ABOVE">Low and higher risks</ion-select-option>
-                </ion-select>
-              </ion-item>
-
-              <ion-item>
-                <ion-label>Civic Integrity</ion-label>
-                <ion-select
-                  [(ngModel)]="settings.googleGemini.contentFilter.civicIntegrity"
-                  (ngModelChange)="onSettingsChange()"
-                  interface="popover"
-                  slot="end">
-                  <ion-select-option value="BLOCK_NONE">Don't Block</ion-select-option>
-                  <ion-select-option value="BLOCK_ONLY_HIGH">Only high risks</ion-select-option>
-                  <ion-select-option value="BLOCK_MEDIUM_AND_ABOVE">Medium and high risks</ion-select-option>
-                  <ion-select-option value="BLOCK_LOW_AND_ABOVE">Low and higher risks</ion-select-option>
-                </ion-select>
-              </ion-item>
-            </div>
-
-            <div class="model-info" *ngIf="settings.googleGemini.enabled">
-              <p class="info-text">
-                <strong>Content Filter:</strong> Configurable safety settings for different content categories.
-              </p>
-            </div>
-          </ion-card-content>
-        </ion-card>
+            <app-api-settings
+              [settings]="settings"
+              [combinedModels]="combinedModels"
+              [replicateModels]="replicateModels"
+              [loadingModels]="loadingModels"
+              [modelLoadError]="modelLoadError"
+              (settingsChange)="onSettingsChange()"
+              (modelsLoaded)="onModelsLoaded($event)">
+            </app-api-settings>
           </div>
           
           <!-- Appearance Tab -->
           <div *ngSwitchCase="'appearance'">
-            <ion-card>
-          <ion-card-header>
-            <ion-card-title>Appearance</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="appearance-section">
-              <h3>Text Color</h3>
-              <p class="appearance-description">
-                This color is used for text in the story editor and Beat AI input.
-              </p>
-              <app-color-picker 
-                [color]="settings.appearance.textColor"
-                (colorChange)="onTextColorChange($event)">
-              </app-color-picker>
-            </div>
-            
-            <div class="appearance-section">
-              <app-background-selector 
-                [selectedBackgroundImage]="settings.appearance.backgroundImage"
-                (backgroundImageChange)="onBackgroundImageChange($event)">
-              </app-background-selector>
-            </div>
-            
-            <div class="appearance-section">
-              <app-background-upload
-                (backgroundUploaded)="onBackgroundUploaded($event)">
-              </app-background-upload>
-            </div>
-          </ion-card-content>
-        </ion-card>
+            <app-ui-settings
+              [settings]="settings"
+              (settingsChange)="onSettingsChange()">
+            </app-ui-settings>
           </div>
           
           <!-- Scene Title Tab -->
           <div *ngSwitchCase="'scene-title'">
-            <ion-card>
-          <ion-card-header>
-            <ion-card-title>Scene Title Generation</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-item>
-              <ion-label>Maximum Word Count</ion-label>
-              <ion-range
-                [(ngModel)]="settings.sceneTitleGeneration.maxWords"
-                (ngModelChange)="onSettingsChange()"
-                min="1"
-                max="20"
-                step="1"
-                snaps="true"
-                ticks="true"
-                slot="end">
-                <ion-label slot="start">1</ion-label>
-                <ion-label slot="end">20</ion-label>
-              </ion-range>
-            </ion-item>
-
-            <ion-item>
-              <ion-label>Style</ion-label>
-              <ion-select
-                [(ngModel)]="settings.sceneTitleGeneration.style"
-                (ngModelChange)="onSettingsChange()"
-                interface="popover"
-                slot="end">
-                <ion-select-option value="concise">Concise</ion-select-option>
-                <ion-select-option value="descriptive">Descriptive</ion-select-option>
-                <ion-select-option value="action">Action-packed</ion-select-option>
-                <ion-select-option value="emotional">Emotional</ion-select-option>
-              </ion-select>
-            </ion-item>
-
-            <ion-item>
-              <ion-label>Language</ion-label>
-              <ion-select
-                [(ngModel)]="settings.sceneTitleGeneration.language"
-                (ngModelChange)="onSettingsChange()"
-                interface="popover"
-                slot="end">
-                <ion-select-option value="german">German</ion-select-option>
-                <ion-select-option value="english">English</ion-select-option>
-              </ion-select>
-            </ion-item>
-
-            <ion-item>
-              <ion-label>Consider Genre</ion-label>
-              <ion-toggle
-                [(ngModel)]="settings.sceneTitleGeneration.includeGenre"
-                (ngModelChange)="onSettingsChange()"
-                slot="end">
-              </ion-toggle>
-            </ion-item>
-
-            <ion-item>
-              <ion-label>Creativity (Temperature)</ion-label>
-              <ion-range
-                [(ngModel)]="settings.sceneTitleGeneration.temperature"
-                (ngModelChange)="onSettingsChange()"
-                min="0.1"
-                max="1.0"
-                step="0.1"
-                snaps="true"
-                slot="end">
-                <ion-label slot="start">0.1</ion-label>
-                <ion-label slot="end">1.0</ion-label>
-              </ion-range>
-            </ion-item>
-            
-            <ion-item>
-              <ion-label position="stacked">AI Model for Scene Titles</ion-label>
-              <div class="model-selection-container">
-                <ng-select [(ngModel)]="settings.sceneTitleGeneration.selectedModel"
-                           [items]="combinedModels"
-                           bindLabel="label"
-                           bindValue="id"
-                           [searchable]="true"
-                           [clearable]="true"
-                           [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey)"
-                           placeholder="Select model (empty = use global model)"
-                           (ngModelChange)="onSceneTitleModelChange()"
-                           [loading]="loadingModels"
-                           [virtualScroll]="true"
-                           class="ng-select-custom"
-                           appendTo="body">
-                  <ng-template ng-option-tmp let-item="item">
-                    <div class="model-option">
-                      <div class="model-option-header">
-                        <ion-icon 
-                          [name]="item.provider === 'gemini' ? 'logo-google' : item.provider === 'ollama' ? 'hardware-chip' : 'globe-outline'" 
-                          class="provider-icon" 
-                          [class.gemini]="item.provider === 'gemini'" 
-                          [class.openrouter]="item.provider === 'openrouter'"
-                          [class.ollama]="item.provider === 'ollama'"
-                          [class.replicate]="item.provider === 'replicate'"></ion-icon>
-                        <span class="model-label">{{ item.label }}</span>
-                      </div>
-                      <div class="model-option-details">
-                        <span class="model-cost">Input: {{ item.costInputEur }} | Output: {{ item.costOutputEur }}</span>
-                        <span class="model-context">Context: {{ formatContextLength(item.contextLength) }}</span>
-                      </div>
-                      <div class="model-description" *ngIf="item.description">{{ item.description }}</div>
-                    </div>
-                  </ng-template>
-                </ng-select>
-                <div class="model-info-small">
-                  <p *ngIf="!settings.sceneTitleGeneration.selectedModel" class="info-text">
-                    No model selected - the global model will be used
-                  </p>
-                  <p *ngIf="settings.sceneTitleGeneration.selectedModel" class="info-text">
-                    Specific model for scene titles: {{ getModelDisplayName(settings.sceneTitleGeneration.selectedModel) }}
-                  </p>
-                </div>
-              </div>
-            </ion-item>
-
-            <ion-item>
-              <ion-label position="stacked">Additional Instructions (optional)</ion-label>
-              <ion-textarea
-                [(ngModel)]="settings.sceneTitleGeneration.customInstruction"
-                (ngModelChange)="onSettingsChange()"
-                placeholder="e.g. 'Don't use articles' or 'Focus on emotions'"
-                rows="3"
-                auto-grow="true">
-              </ion-textarea>
-            </ion-item>
-            
-            <ion-item>
-              <ion-label>Use Custom Prompt</ion-label>
-              <ion-toggle
-                [(ngModel)]="settings.sceneTitleGeneration.useCustomPrompt"
-                (ngModelChange)="onSettingsChange()"
-                slot="end">
-              </ion-toggle>
-            </ion-item>
-            
-            <ion-item *ngIf="settings.sceneTitleGeneration.useCustomPrompt">
-              <ion-label position="stacked">
-                Custom Prompt
-                <p class="prompt-help">
-                  Available placeholders: {{ '{' }}maxWords{{ '}' }}, {{ '{' }}styleInstruction{{ '}' }}, {{ '{' }}genreInstruction{{ '}' }}, {{ '{' }}languageInstruction{{ '}' }}, {{ '{' }}customInstruction{{ '}' }}, {{ '{' }}sceneContent{{ '}' }}
-                </p>
-              </ion-label>
-              <ion-textarea
-                [(ngModel)]="settings.sceneTitleGeneration.customPrompt"
-                (ngModelChange)="onSettingsChange()"
-                placeholder="Create a short title for the following scene..."
-                rows="8"
-                auto-grow="true">
-              </ion-textarea>
-            </ion-item>
-            
-            <ion-item *ngIf="settings.sceneTitleGeneration.useCustomPrompt">
-              <ion-button fill="outline" size="small" (click)="resetToDefaultPrompt()">
-                Restore Default Prompt
-              </ion-button>
-            </ion-item>
-          </ion-card-content>
-        </ion-card>
+            <app-prompts-settings
+              [settings]="settings"
+              [combinedModels]="combinedModels"
+              [loadingModels]="loadingModels"
+              [modelsDisabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey)"
+              (settingsChange)="onSettingsChange()">
+            </app-prompts-settings>
           </div>
 
           <!-- Scene Summary Tab -->
           <div *ngSwitchCase="'scene-summary'">
-            <ion-card>
-          <ion-card-header>
-            <ion-card-title>Scene Summary</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-item>
-              <ion-label>Creativity (Temperature)</ion-label>
-              <ion-range
-                [(ngModel)]="settings.sceneSummaryGeneration.temperature"
-                (ngModelChange)="onSettingsChange()"
-                min="0.1"
-                max="1.0"
-                step="0.1"
-                snaps="true"
-                slot="end">
-                <ion-label slot="start">0.1</ion-label>
-                <ion-label slot="end">1.0</ion-label>
-              </ion-range>
-            </ion-item>
-
-            <ion-item>
-              <ion-label position="stacked">AI Model for Scene Summary</ion-label>
-              <div class="model-selection-container">
-                <ng-select [(ngModel)]="settings.sceneSummaryGeneration.selectedModel"
-                           [items]="combinedModels"
-                           bindLabel="label"
-                           bindValue="id"
-                           [searchable]="true"
-                           [clearable]="true"
-                           [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey)"
-                           placeholder="Select model (empty = use global model)"
-                           (ngModelChange)="onSceneSummaryModelChange()"
-                           [loading]="loadingModels"
-                           [virtualScroll]="true"
-                           class="ng-select-custom"
-                           appendTo="body">
-                  <ng-template ng-option-tmp let-item="item">
-                    <div class="model-option">
-                      <div class="model-option-header">
-                        <ion-icon 
-                          [name]="item.provider === 'gemini' ? 'logo-google' : item.provider === 'ollama' ? 'hardware-chip' : 'globe-outline'" 
-                          class="provider-icon" 
-                          [class.gemini]="item.provider === 'gemini'" 
-                          [class.openrouter]="item.provider === 'openrouter'"
-                          [class.ollama]="item.provider === 'ollama'"
-                          [class.replicate]="item.provider === 'replicate'"></ion-icon>
-                        <span class="model-label">{{ item.label }}</span>
-                      </div>
-                      <div class="model-description" *ngIf="item.description">{{ item.description }}</div>
-                    </div>
-                  </ng-template>
-                </ng-select>
-                <div class="model-info-small">
-                  <p *ngIf="!settings.sceneSummaryGeneration.selectedModel" class="info-text">
-                    No model selected - the global model will be used
-                  </p>
-                  <p *ngIf="settings.sceneSummaryGeneration.selectedModel" class="info-text">
-                    Specific model for scene summary: {{ getModelDisplayName(settings.sceneSummaryGeneration.selectedModel) }}
-                  </p>
-                </div>
-              </div>
-            </ion-item>
-
-            <ion-item>
-              <ion-label position="stacked">Additional Instructions (optional)</ion-label>
-              <ion-textarea
-                [(ngModel)]="settings.sceneSummaryGeneration.customInstruction"
-                (ngModelChange)="onSettingsChange()"
-                placeholder="e.g. 'Focus on emotional aspects' or 'Mention important objects'"
-                rows="3"
-                auto-grow="true">
-              </ion-textarea>
-            </ion-item>
-
-            <ion-item>
-              <ion-label>Use Custom Prompt</ion-label>
-              <ion-toggle
-                [(ngModel)]="settings.sceneSummaryGeneration.useCustomPrompt"
-                (ngModelChange)="onSettingsChange()"
-                slot="end">
-              </ion-toggle>
-            </ion-item>
-            
-            <ion-item *ngIf="settings.sceneSummaryGeneration.useCustomPrompt">
-              <ion-label position="stacked">
-                Custom Prompt
-                <p class="prompt-help">
-                  Available placeholders: {{ '{' }}sceneTitle{{ '}' }}, {{ '{' }}sceneContent{{ '}' }}, {{ '{' }}customInstruction{{ '}' }}
-                </p>
-              </ion-label>
-              <ion-textarea
-                [(ngModel)]="settings.sceneSummaryGeneration.customPrompt"
-                (ngModelChange)="onSettingsChange()"
-                placeholder="Create a summary of the following scene..."
-                rows="8"
-                auto-grow="true">
-              </ion-textarea>
-            </ion-item>
-            
-            <ion-item *ngIf="settings.sceneSummaryGeneration.useCustomPrompt">
-              <ion-button fill="outline" size="small" (click)="resetToDefaultSummaryPrompt()">
-                Restore Default Prompt
-              </ion-button>
-            </ion-item>
-          </ion-card-content>
-        </ion-card>
+            <!-- Using the same prompts component, it handles both scene title and summary -->
+            <app-prompts-settings
+              [settings]="settings"
+              [combinedModels]="combinedModels"
+              [loadingModels]="loadingModels"
+              [modelsDisabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey)"
+              (settingsChange)="onSettingsChange()">
+            </app-prompts-settings>
           </div>
 
           <!-- Backup & Restore Tab -->
@@ -1292,11 +572,31 @@ import { DatabaseBackupComponent } from '../shared/components/database-backup.co
     }
 
     .provider-icon.gemini {
-      color: #4285f4;
+      color: #4285f4; /* Google Blue */
     }
 
     .provider-icon.openrouter {
-      color: #00a67e;
+      color: #6467f2; /* OpenRouter Cornflower Blue */
+    }
+
+    .provider-icon.claude {
+      color: #C15F3C; /* Claude Crail */
+    }
+
+    .provider-icon.ollama {
+      color: #9333ea; /* Purple for local inference */
+    }
+
+    .provider-icon.replicate {
+      color: #f59e0b; /* Amber for cloud ML */
+    }
+
+    /* Card title icons styling */
+    ion-card-title .provider-icon {
+      font-size: 1.3rem;
+      width: 1.3rem;
+      height: 1.3rem;
+      vertical-align: middle;
     }
 
     .model-label {
@@ -1547,7 +847,6 @@ export class SettingsComponent implements OnInit, OnDestroy {
   private settingsService = inject(SettingsService);
   private modelService = inject(ModelService);
   private backgroundService = inject(BackgroundService);
-  private ollamaApiService = inject(OllamaApiService);
 
   settings: Settings;
   hasUnsavedChanges = false;
@@ -1555,17 +854,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
   private subscription: Subscription = new Subscription();
   
   // Model loading state
-  openRouterModels: ModelOption[] = [];
   replicateModels: ModelOption[] = [];
-  geminiModels: ModelOption[] = [];
-  ollamaModels: ModelOption[] = [];
   combinedModels: ModelOption[] = [];
   loadingModels = false;
   modelLoadError: string | null = null;
-  
-  // Ollama connection testing
-  testingOllamaConnection = false;
-  ollamaConnectionStatus: 'success' | 'error' | null = null;
   
   // Tab control
   selectedTab = 'models';
@@ -1580,7 +872,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   constructor() {
     this.settings = this.settingsService.getSettings();
     // Register Ionic icons
-    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, globeOutline, logoGoogle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, hardwareChip, archiveOutline });
+    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline });
   }
 
   ngOnInit(): void {
@@ -1599,9 +891,6 @@ export class SettingsComponent implements OnInit, OnDestroy {
             backgroundImage: 'none'
           };
         }
-        
-        // Auto-load models if a model is already selected but models aren't loaded yet
-        this.autoLoadModelsIfNeeded();
       })
     );
     
@@ -1614,25 +903,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
     
     // Subscribe to model updates
     this.subscription.add(
-      this.modelService.openRouterModels$.subscribe(models => {
-        this.openRouterModels = models;
-      })
-    );
-    
-    this.subscription.add(
       this.modelService.replicateModels$.subscribe(models => {
         this.replicateModels = models;
       })
     );
-    
-    this.subscription.add(
-      this.modelService.geminiModels$.subscribe(models => {
-        this.geminiModels = models;
-      })
-    );
-    
-    // Initial auto-load check
-    this.autoLoadModelsIfNeeded();
     
     // Load combined models if any API is enabled
     if ((this.settings.openRouter.enabled && this.settings.openRouter.apiKey) ||
@@ -1665,141 +939,8 @@ export class SettingsComponent implements OnInit, OnDestroy {
     }
   }
 
-  loadModels(): void {
-    this.modelLoadError = null;
-    this.modelService.loadAllModels().subscribe({
-      next: () => { /* Do nothing - models are loaded */ },
-      error: (error) => {
-        console.error('Failed to load models:', error);
-        this.modelLoadError = 'Error loading models. Check your API keys and internet connection.';
-      }
-    });
-  }
-  
-  onApiKeyChange(provider: 'openRouter' | 'replicate' | 'googleGemini'): void {
-    this.onSettingsChange();
-    
-    // Auto-load models when API key is entered and provider is enabled
-    // This ensures models are available for selection
-    if (provider === 'openRouter' && this.settings.openRouter.enabled && this.settings.openRouter.apiKey) {
-      this.modelService.loadOpenRouterModels().subscribe();
-    } else if (provider === 'replicate' && this.settings.replicate.enabled && this.settings.replicate.apiKey) {
-      this.modelService.loadReplicateModels().subscribe();
-    } else if (provider === 'googleGemini' && this.settings.googleGemini.enabled && this.settings.googleGemini.apiKey) {
-      this.modelService.loadGeminiModels().subscribe();
-    }
-  }
-  
-  onOllamaUrlChange(): void {
-    this.onSettingsChange();
-    this.ollamaConnectionStatus = null; // Reset connection status when URL changes
-    
-    // Auto-load models when URL is entered and provider is enabled
-    if (this.settings.ollama.enabled && this.settings.ollama.baseUrl) {
-      this.modelService.loadOllamaModels().subscribe();
-    }
-  }
-  
-  onProviderToggle(provider: 'openRouter' | 'replicate' | 'googleGemini' | 'ollama'): void {
-    // No more mutual exclusion - providers can be enabled at the same time
-    this.onSettingsChange();
-    
-    // Load models when provider is enabled and has credentials
-    if (provider === 'openRouter' && this.settings.openRouter.enabled && this.settings.openRouter.apiKey) {
-      this.modelService.loadOpenRouterModels().subscribe();
-    } else if (provider === 'replicate' && this.settings.replicate.enabled && this.settings.replicate.apiKey) {
-      this.modelService.loadReplicateModels().subscribe();
-    } else if (provider === 'googleGemini' && this.settings.googleGemini.enabled && this.settings.googleGemini.apiKey) {
-      this.modelService.loadGeminiModels().subscribe();
-    } else if (provider === 'ollama' && this.settings.ollama.enabled && this.settings.ollama.baseUrl) {
-      this.modelService.loadOllamaModels().subscribe();
-      this.ollamaConnectionStatus = null; // Reset connection status
-    }
-  }
-  
-  testOllamaConnection(): void {
-    if (!this.settings.ollama.baseUrl) return;
-    
-    this.testingOllamaConnection = true;
-    this.ollamaConnectionStatus = null;
-    
-    this.ollamaApiService.testConnection().subscribe({
-      next: () => {
-        this.testingOllamaConnection = false;
-        this.ollamaConnectionStatus = 'success';
-        // Auto-load models on successful connection
-        if (this.settings.ollama.enabled) {
-          this.modelService.loadOllamaModels().subscribe();
-        }
-      },
-      error: (error) => {
-        this.testingOllamaConnection = false;
-        this.ollamaConnectionStatus = 'error';
-        console.error('Ollama connection test failed:', error);
-      }
-    });
-  }
-  
-  shouldShowDeprecatedOpenRouterModel(): boolean {
-    return !!(this.settings.openRouter.model && 
-             this.openRouterModels.length > 0 && 
-             !this.openRouterModels.find(m => m.id === this.settings.openRouter.model));
-  }
-  
-  shouldShowDeprecatedReplicateModel(): boolean {
-    return !!(this.settings.replicate.model && 
-             this.replicateModels.length > 0 && 
-             !this.replicateModels.find(m => m.id === this.settings.replicate.model));
-  }
-  
-  formatContextLength(length: number): string {
-    if (length >= 1000000) {
-      return `${(length / 1000000).toFixed(1)}M`;
-    } else if (length >= 1000) {
-      return `${(length / 1000).toFixed(0)}K`;
-    }
-    return length.toString();
-  }
-  
-  private autoLoadModelsIfNeeded(): void {
-    // Auto-load OpenRouter models if:
-    // 1. OpenRouter is enabled
-    // 2. API key is present  
-    // 3. A model is already selected
-    // 4. Models haven't been loaded yet
-    if (this.settings.openRouter.enabled && 
-        this.settings.openRouter.apiKey && 
-        this.settings.openRouter.model && 
-        this.openRouterModels.length === 0 &&
-        !this.loadingModels) {
-      this.modelService.loadOpenRouterModels().subscribe();
-    }
-    
-    // Auto-load Replicate models if:
-    // 1. Replicate is enabled
-    // 2. API key is present
-    // 3. A model is already selected  
-    // 4. Models haven't been loaded yet
-    if (this.settings.replicate.enabled && 
-        this.settings.replicate.apiKey && 
-        this.settings.replicate.model && 
-        this.replicateModels.length === 0 &&
-        !this.loadingModels) {
-      this.modelService.loadReplicateModels().subscribe();
-    }
-    
-    // Auto-load Gemini models if:
-    // 1. Gemini is enabled
-    // 2. API key is present
-    // 3. A model is already selected
-    // 4. Models haven't been loaded yet
-    if (this.settings.googleGemini.enabled && 
-        this.settings.googleGemini.apiKey && 
-        this.settings.googleGemini.model && 
-        this.geminiModels.length === 0 &&
-        !this.loadingModels) {
-      this.modelService.loadGeminiModels().subscribe();
-    }
+  onModelsLoaded(models: ModelOption[]): void {
+    this.combinedModels = models;
   }
 
   goBack(): void {
@@ -1844,83 +985,4 @@ export class SettingsComponent implements OnInit, OnDestroy {
     });
   }
 
-  onGlobalModelChange(): void {
-    
-    // Update the individual API model settings based on the selected model
-    if (this.settings.selectedModel) {
-      const [provider, ...modelIdParts] = this.settings.selectedModel.split(':');
-      const modelId = modelIdParts.join(':'); // Rejoin in case model ID contains colons
-      
-      if (provider === 'openrouter') {
-        this.settings.openRouter.model = modelId;
-      } else if (provider === 'gemini') {
-        this.settings.googleGemini.model = modelId;
-      }
-    }
-    
-    this.onSettingsChange();
-  }
-
-  resetToDefaultPrompt(): void {
-    const defaultPrompt = 'Create a title for the following scene. The title should be up to {maxWords} words long and capture the essence of the scene.\n\n{styleInstruction}\n{genreInstruction}\n{languageInstruction}{customInstruction}\n\nScene content (only this one scene):\n{sceneContent}\n\nRespond only with the title, without further explanations or quotes.';
-    this.settings.sceneTitleGeneration.customPrompt = defaultPrompt;
-    this.onSettingsChange();
-  }
-
-  onSceneTitleModelChange(): void {
-    this.onSettingsChange();
-  }
-
-  resetToDefaultSummaryPrompt(): void {
-    const defaultPrompt = 'Create a summary of the following scene:\n\nTitle: {sceneTitle}\n\nContent:\n{sceneContent}\n\nThe summary should capture the most important plot points and character developments. Write a complete and comprehensive summary with at least 3-5 sentences.';
-    this.settings.sceneSummaryGeneration.customPrompt = defaultPrompt;
-    this.onSettingsChange();
-  }
-
-  onSceneSummaryModelChange(): void {
-    this.onSettingsChange();
-  }
-
-  onTextColorChange(color: string): void {
-    // Update local settings first to track changes
-    this.settings.appearance.textColor = color;
-    this.onSettingsChange();
-    
-  }
-
-  onBackgroundImageChange(backgroundImage: string): void {
-    // Update local settings first to track changes
-    this.settings.appearance.backgroundImage = backgroundImage;
-    this.onSettingsChange();
-    
-    // Set preview background for immediate visual feedback
-    this.backgroundService.setPreviewBackground(backgroundImage);
-    
-  }
-
-  onBackgroundUploaded(customBackground: CustomBackground): void {
-    // Automatically select the newly uploaded background
-    const customId = `custom:${customBackground._id}`;
-    this.onBackgroundImageChange(customId);
-    
-  }
-
-  getModelDisplayName(modelId: string): string {
-    if (!modelId) return 'Global Model';
-    
-    // Find the model in available models to get its display name
-    const model = this.combinedModels.find(m => m.id === modelId);
-    if (model) {
-      return model.label;
-    }
-    
-    // If not found in available models, try to extract a readable name from the ID
-    if (modelId.includes(':')) {
-      const parts = modelId.split(':');
-      const modelName = parts[1] || modelId;
-      return modelName.split('/').pop() || modelName;
-    }
-    
-    return modelId;
-  }
 }

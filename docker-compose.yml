@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   nginx:
-    image: ghcr.io/marcodroll/creativewriter2-nginx:latest
+    image: ghcr.io/marcodroll/creativewriter-public-nginx:latest
     restart: unless-stopped
     ports:
       - "${PORT:-3080}:80"  # Port can be overridden via .env, defaults to 3080
@@ -15,7 +15,7 @@ services:
       - creativewriter-network
 
   creativewriter:
-    image: ghcr.io/marcodroll/creativewriter2:latest
+    image: ghcr.io/marcodroll/creativewriter-public:latest
     restart: unless-stopped
     # No ports exposed directly - only through nginx
     environment:
@@ -28,7 +28,7 @@ services:
       - couchdb
 
   couchdb:
-    image: couchdb:3.3
+    image: ghcr.io/marcodroll/creativewriter2-couchdb:latest
     restart: unless-stopped
     # No ports exposed directly - only through nginx
     environment:
@@ -41,8 +41,23 @@ services:
     networks:
       - creativewriter-network
 
+  couchdb-init:
+    image: curlimages/curl:latest
+    restart: "no"
+    depends_on:
+      - couchdb
+    networks:
+      - creativewriter-network
+    command: >
+      sh -c "
+        sleep 10 &&
+        curl -X PUT http://${COUCHDB_USER:-admin}:${COUCHDB_PASSWORD:-password}@couchdb:5984/_users &&
+        curl -X PUT http://${COUCHDB_USER:-admin}:${COUCHDB_PASSWORD:-password}@couchdb:5984/_replicator &&
+        curl -X PUT http://${COUCHDB_USER:-admin}:${COUCHDB_PASSWORD:-password}@couchdb:5984/_global_changes
+      "
+
   replicate-proxy:
-    image: ghcr.io/marcodroll/creativewriter2-proxy:latest
+    image: ghcr.io/marcodroll/creativewriter-public-proxy:latest
     restart: unless-stopped
     environment:
       - PORT=3001
@@ -52,7 +67,7 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
 
   gemini-proxy:
-    image: ghcr.io/marcodroll/creativewriter2-gemini-proxy:latest
+    image: ghcr.io/marcodroll/creativewriter-public-gemini-proxy:latest
     restart: unless-stopped
     environment:
       - PORT=3002
