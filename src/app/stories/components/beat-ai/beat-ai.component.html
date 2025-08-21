@@ -123,7 +123,8 @@
                             [class.active]="selectedModel === model.id"
                             (click)="selectFavoriteModel(model)"
                             [title]="model.label">
-                      <ion-icon [name]="getProviderIcon(model.provider)" class="provider-icon-inline" [class.gemini]="model.provider === 'gemini'" [class.openrouter]="model.provider === 'openrouter'"></ion-icon>
+                      <app-openrouter-icon *ngIf="model.provider === 'openrouter'" size="16" color="#6467f2" class="provider-icon-inline openrouter"></app-openrouter-icon>
+                      <ion-icon *ngIf="model.provider !== 'openrouter'" [name]="getProviderIcon(model.provider)" class="provider-icon-inline" [class.gemini]="model.provider === 'gemini'"></ion-icon>
                       <span class="model-short-name">{{ getShortModelName(model.label) }}</span>
                     </button>
                   </div>
@@ -140,7 +141,8 @@
                            (change)="onModelChange()">
                   <ng-template ng-label-tmp let-item="item">
                     <div class="model-option-inline">
-                      <ion-icon [name]="getProviderIcon(item.provider)" class="provider-icon-inline" [class.gemini]="item.provider === 'gemini'" [class.openrouter]="item.provider === 'openrouter'"></ion-icon>
+                      <app-openrouter-icon *ngIf="item.provider === 'openrouter'" size="16" color="#6467f2" class="provider-icon-inline openrouter"></app-openrouter-icon>
+                      <ion-icon *ngIf="item.provider !== 'openrouter'" [name]="getProviderIcon(item.provider)" class="provider-icon-inline" [class.gemini]="item.provider === 'gemini'"></ion-icon>
                       <span class="model-label">{{ item.label }}</span>
                       <button class="favorite-toggle"
                               (click)="toggleFavorite($event, item)"
@@ -152,7 +154,8 @@
                   </ng-template>
                   <ng-template ng-option-tmp let-item="item">
                     <div class="model-option-inline">
-                      <ion-icon [name]="getProviderIcon(item.provider)" class="provider-icon-inline" [class.gemini]="item.provider === 'gemini'" [class.openrouter]="item.provider === 'openrouter'"></ion-icon>
+                      <app-openrouter-icon *ngIf="item.provider === 'openrouter'" size="16" color="#6467f2" class="provider-icon-inline openrouter"></app-openrouter-icon>
+                      <ion-icon *ngIf="item.provider !== 'openrouter'" [name]="getProviderIcon(item.provider)" class="provider-icon-inline" [class.gemini]="item.provider === 'gemini'"></ion-icon>
                       <span class="model-label">{{ item.label }}</span>
                       <button class="favorite-toggle"
                               (click)="toggleFavorite($event, item)"

@@ -431,7 +431,7 @@ export class PromptsSettingsComponent {
       case 'gemini':
         return 'logo-google';
       case 'openrouter':
-        return 'git-network-outline';
+        return 'openrouter-custom';
       case 'claude':
         return 'chatbubble-outline';
       case 'ollama':

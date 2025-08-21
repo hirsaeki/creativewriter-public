@@ -11,6 +11,7 @@ import { ModelOption } from '../../core/models/model.interface';
 import { OllamaApiService } from '../../core/services/ollama-api.service';
 import { ClaudeApiService } from '../../core/services/claude-api.service';
 import { ModelService } from '../../core/services/model.service';
+import { OpenRouterIconComponent } from '../../shared/components/openrouter-icon.component';
 
 @Component({
   selector: 'app-api-settings',
@@ -18,7 +19,8 @@ import { ModelService } from '../../core/services/model.service';
   imports: [
     CommonModule, FormsModule, NgSelectModule,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonInput, IonToggle,
-    IonItem, IonLabel, IonSelect, IonSelectOption, IonButton, IonIcon
+    IonItem, IonLabel, IonSelect, IonSelectOption, IonButton, IonIcon,
+    OpenRouterIconComponent
   ],
   template: `
     <!-- Global Model Selection -->
@@ -61,11 +63,18 @@ import { ModelService } from '../../core/services/model.service';
               <ng-template ng-option-tmp let-item="item">
                 <div class="model-option">
                   <div class="model-option-header">
+                    <app-openrouter-icon 
+                      *ngIf="item.provider === 'openrouter'"
+                      size="18" 
+                      color="#6467f2" 
+                      class="provider-icon openrouter"
+                      [title]="getProviderTooltip(item.provider)">
+                    </app-openrouter-icon>
                     <ion-icon 
+                      *ngIf="item.provider !== 'openrouter'"
                       [name]="getProviderIcon(item.provider)" 
                       class="provider-icon" 
                       [class.gemini]="item.provider === 'gemini'" 
-                      [class.openrouter]="item.provider === 'openrouter'"
                       [class.ollama]="item.provider === 'ollama'"
                       [class.claude]="item.provider === 'claude'"
                       [class.replicate]="item.provider === 'replicate'"
@@ -99,7 +108,7 @@ import { ModelService } from '../../core/services/model.service';
       <ion-card-header (click)="isOpenRouterCollapsed = !isOpenRouterCollapsed" style="cursor: pointer;">
         <div class="card-header-content">
           <ion-card-title>
-            <ion-icon name="git-network-outline" class="provider-icon openrouter" style="margin-right: 8px;"></ion-icon>
+            <app-openrouter-icon size="20" color="#6467f2" style="margin-right: 8px;"></app-openrouter-icon>
             OpenRouter API
           </ion-card-title>
           <span style="color: #8bb4f8; font-size: 1.5rem; margin-left: auto; padding: 0.5rem;">
@@ -1017,7 +1026,7 @@ export class ApiSettingsComponent {
       case 'gemini':
         return 'logo-google';
       case 'openrouter':
-        return 'git-network-outline'; // Network/routing icon representing API gateway
+        return 'openrouter-custom'; // Custom OpenRouter logo
       case 'claude':
         return 'chatbubble-outline'; // Better icon for conversational AI
       case 'ollama':

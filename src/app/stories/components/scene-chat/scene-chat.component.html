@@ -21,10 +21,17 @@
                  appendTo="body">
         <ng-template ng-option-tmp let-item="item">
           <div class="model-option-inline">
-            <ion-icon [name]="getProviderIcon(item.provider)" 
-                      class="provider-icon-inline" 
-                      [class.gemini]="item.provider === 'gemini'" 
-                      [class.openrouter]="item.provider === 'openrouter'">
+            <app-openrouter-icon 
+              *ngIf="item.provider === 'openrouter'"
+              size="16" 
+              color="#6467f2" 
+              class="provider-icon-inline openrouter">
+            </app-openrouter-icon>
+            <ion-icon 
+              *ngIf="item.provider !== 'openrouter'"
+              [name]="getProviderIcon(item.provider)" 
+              class="provider-icon-inline" 
+              [class.gemini]="item.provider === 'gemini'">
             </ion-icon>
             <span class="model-label">{{ item.label }}</span>
           </div>
