@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sudo snap install:*)",
+      "Bash(git clone:*)",
+      "Bash(gh repo clone:*)",
+      "Bash(gh auth:*)",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(sudo rm:*)",
+      "Bash(sudo apt:*)",
+      "Bash(sudo ufw:*)",
+      "Bash(mosh-server:*)",
+      "Bash(sudo usermod:*)",
+      "Bash(sudo passwd:*)",
+      "Bash(sudo:*)",
+      "Bash(cat:*)",
+      "Bash(tmux list-sessions:*)",
+      "Bash(pkill:*)",
+      "Bash(node:*)",
+      "Bash(npm --version)",
+      "Bash(who)",
+      "Bash(echo $DISPLAY)",
+      "Bash(timeout:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "additionalDirectories": [
+      "/home/nos/.ssh"
+    ]
+  }
+}
