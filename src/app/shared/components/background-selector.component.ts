@@ -6,6 +6,7 @@ import { checkmarkCircle, trashOutline } from 'ionicons/icons';
 import { addIcons } from 'ionicons';
 import { SettingsService } from '../../core/services/settings.service';
 import { SyncedCustomBackgroundService, CustomBackgroundOption } from '../services/synced-custom-background.service';
+import { LazyImageDirective } from '../directives/lazy-image.directive';
 
 interface BackgroundOption {
   filename: string;
@@ -26,7 +27,8 @@ interface BackgroundOption {
     IonCard,
     IonCardContent,
     IonButton,
-    IonAlert
+    IonAlert,
+    LazyImageDirective
   ],
   template: `
     <div class="background-selector">
@@ -77,10 +79,10 @@ interface BackgroundOption {
               <ion-card-content class="preview-card">
                 <div class="preview-container">
                   <img 
-                    [src]="background.previewPath" 
+                    [appLazyImage]="background.previewPath" 
                     [alt]="background.displayName"
-                    class="background-preview"
-                    loading="lazy"
+                    class="background-preview lazy-image"
+                    [lazyPlaceholder]="placeholderImage"
                   />
                 </div>
                 <div class="background-name">{{ background.displayName }}</div>
@@ -119,10 +121,10 @@ interface BackgroundOption {
               <ion-card-content class="preview-card custom-card">
                 <div class="preview-container">
                   <img 
-                    [src]="customBg.blobUrl" 
+                    [appLazyImage]="customBg.blobUrl" 
                     [alt]="customBg.name"
-                    class="background-preview"
-                    loading="lazy"
+                    class="background-preview lazy-image"
+                    [lazyPlaceholder]="placeholderImage"
                   />
                   
                   <!-- Delete button -->
@@ -331,6 +333,26 @@ interface BackgroundOption {
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
+    /* Lazy loading styles */
+    .lazy-image {
+      transition: opacity 0.3s ease;
+    }
+    
+    .lazy-loading {
+      opacity: 0.6;
+      filter: blur(1px);
+    }
+    
+    .lazy-loaded {
+      opacity: 1;
+      filter: none;
+    }
+    
+    .lazy-error {
+      opacity: 0.3;
+      filter: grayscale(1);
+    }
+
     @media (max-width: 768px) {
       .preview-container {
         height: 60px;
@@ -369,6 +391,9 @@ export class BackgroundSelectorComponent implements OnInit, OnChanges {
 
   // Signal for currently selected background
   selectedBackground = signal<string>('none');
+  
+  // Placeholder image for lazy loading
+  placeholderImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMTAwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjZjVmNWY1Ii8+CjxwYXRoIGQ9Ik0yMCAyMGg2MHY0MEgyMFYyMHoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2RkZCIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxjaXJjbGUgY3g9IjM1IiBjeT0iMzUiIHI9IjUiIGZpbGw9IiNkZGQiLz4KPHBhdGggZD0iTTM1IDUwbDEwLTEwbDE1IDE1SDM1eiIgZmlsbD0iI2RkZCIvPgo8L3N2Zz4K';
   
   // Custom backgrounds from service
   customBackgrounds = computed(() => this.customBackgroundService.backgrounds());
