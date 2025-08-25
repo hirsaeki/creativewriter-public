@@ -99,19 +99,22 @@ export class CodexService {
             }
           }
           
-          // Merge with the latest document, preserving _rev
+          // Clean up the codex data to ensure no duplicate tags
+          const cleanedCodex = this.cleanCodexData(codex);
+          
+          // Replace the entire codex content instead of merging
+          // This prevents accumulation of duplicate data
           const updatedDoc = {
-            ...docToUpdate,
-            ...codex,
             _id: docId,
+            _rev: docToUpdate._rev, // Preserve revision for conflict resolution
             type: 'codex',
-            _rev: docToUpdate._rev // Preserve revision
+            ...cleanedCodex
           };
           
           await this.db!.put(updatedDoc);
           
           // Update local map and notify subscribers
-          this.codexMap.set(codex.storyId, codex);
+          this.codexMap.set(codex.storyId, cleanedCodex);
           this.codexSubject.next(new Map(this.codexMap));
           
           break; // Success, exit retry loop
@@ -134,6 +137,25 @@ export class CodexService {
     }
   }
 
+  private cleanCodexData(codex: Codex): Codex {
+    // Deep clone the codex to avoid mutating the original
+    const cleaned = JSON.parse(JSON.stringify(codex));
+    
+    // Process each category and its entries
+    if (cleaned.categories && Array.isArray(cleaned.categories)) {
+      cleaned.categories = cleaned.categories.map((category: CodexCategory) => ({
+        ...category,
+        entries: category.entries?.map((entry: CodexEntry) => ({
+          ...entry,
+          // Deduplicate tags if they exist
+          tags: entry.tags ? [...new Set(entry.tags)] : []
+        })) || []
+      }));
+    }
+    
+    return cleaned;
+  }
+
 
   private deserializeCodex(codex: unknown): Codex {
     const typedCodex = codex as Codex & { createdAt: string | Date; updatedAt: string | Date };
@@ -148,7 +170,9 @@ export class CodexService {
         entries: cat.entries.map((entry: CodexEntry & { createdAt: string | Date; updatedAt: string | Date }) => ({
           ...entry,
           createdAt: new Date(entry.createdAt),
-          updatedAt: new Date(entry.updatedAt)
+          updatedAt: new Date(entry.updatedAt),
+          // Deduplicate tags when deserializing from database
+          tags: entry.tags ? [...new Set(entry.tags)] : []
         }))
       }))
     };
