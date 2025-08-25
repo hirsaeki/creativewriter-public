@@ -68,7 +68,12 @@ export class SimpleCodexAwarenessDirective implements OnInit, OnDestroy {
     if (codex.categories) {
       for (const category of codex.categories) {
         if (category.entries) {
-          entries.push(...category.entries);
+          // Create deep copies of entries to prevent mutation
+          const copiedEntries = category.entries.map(entry => ({
+            ...entry,
+            tags: entry.tags ? [...entry.tags] : []
+          }));
+          entries.push(...copiedEntries);
         }
       }
     }
