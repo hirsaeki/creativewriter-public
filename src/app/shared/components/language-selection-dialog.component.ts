@@ -106,12 +106,14 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
     ion-item {
       --background: rgba(40, 40, 40, 0.6);
       --padding-start: 16px;
-      --padding-top: 8px;
-      --padding-bottom: 8px;
-      --inner-padding-top: 4px;
-      --inner-padding-bottom: 4px;
-      --min-height: 50px;
-      margin-bottom: 8px;
+      --padding-top: 4px;
+      --padding-bottom: 4px;
+      --inner-padding-top: 2px;
+      --inner-padding-bottom: 2px;
+      --min-height: 40px !important;
+      height: 40px;
+      max-height: 40px;
+      margin-bottom: 6px;
       border-radius: 8px;
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
@@ -121,15 +123,20 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
     }
     ion-label h2 {
       font-weight: 600;
-      font-size: 1rem;
-      margin: 0 0 2px 0;
-      line-height: 1.2;
-    }
-    ion-label p {
-      font-size: 0.8rem;
-      color: var(--ion-color-medium);
+      font-size: 0.9rem;
       margin: 0;
       line-height: 1.1;
+    }
+    ion-label p {
+      font-size: 0.7rem;
+      color: var(--ion-color-medium);
+      margin: 0;
+      line-height: 1.0;
+    }
+    
+    ion-label {
+      margin: 0 !important;
+      padding: 0 !important;
     }
   `]
 })
