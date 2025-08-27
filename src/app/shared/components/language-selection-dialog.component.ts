@@ -108,24 +108,12 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
       height: 100%;
     }
 
-    /* Modal wrapper styling */
-    ion-modal {
-      --background: rgba(20, 20, 20, 0.95);
-      --border-radius: 20px;
-      --box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-      --max-width: 500px;
-      --max-height: 80vh;
-      --width: 90%;
-      --height: auto;
-    }
-
     ion-header {
       backdrop-filter: blur(15px);
       background: rgba(45, 45, 45, 0.9);
       box-shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
       position: relative;
       z-index: 100;
-      border-radius: 20px 20px 0 0;
     }
 
     ion-toolbar {
@@ -145,34 +133,29 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
 
     ion-content {
       --background: rgba(25, 25, 25, 0.95) !important;
-      background: rgba(25, 25, 25, 0.95) !important;
       backdrop-filter: blur(10px);
-      border-radius: 0 0 20px 20px;
     }
 
     ion-content::part(background) {
-      background: transparent !important;
-    }
-
-    ion-content::part(scroll) {
-      padding-bottom: 2rem;
+      background: rgba(25, 25, 25, 0.95) !important;
     }
 
     .dialog-content {
       max-width: 500px;
       margin: 0 auto;
-      padding: 1rem 1rem 2rem 1rem;
+      padding: 1rem;
       display: flex;
       flex-direction: column;
-      min-height: 100%;
+      gap: 1rem;
+      min-height: 400px;
     }
 
     .description {
       text-align: center;
-      margin: 1.5rem 0 2rem 0;
+      margin: 0.5rem 0 1rem 0;
       color: #f8f9fa;
-      font-size: 1rem;
-      line-height: 1.6;
+      font-size: 0.95rem;
+      line-height: 1.4;
       opacity: 0.9;
     }
 
@@ -184,9 +167,7 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
       -webkit-backdrop-filter: blur(8px) saturate(120%);
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
       padding: 1rem;
-      margin-bottom: 1.5rem;
-      flex: 1;
-      overflow-y: auto;
+      margin-bottom: 1rem;
     }
 
     .language-radio-group {
@@ -291,8 +272,8 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
 
     .button-container {
       text-align: center;
-      margin-top: 1rem;
-      padding-bottom: 0.5rem;
+      margin-top: auto;
+      padding-top: 1rem;
     }
 
     .create-button {
