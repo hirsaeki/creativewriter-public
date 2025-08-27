@@ -88,8 +88,8 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
     .dialog-padding {
       --padding-start: 24px;
       --padding-end: 24px;
-      --padding-top: 20px;
-      --padding-bottom: 24px;
+      --padding-top: 8px;
+      --padding-bottom: 8px;
     }
     
     .description {
