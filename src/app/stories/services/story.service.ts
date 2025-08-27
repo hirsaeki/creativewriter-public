@@ -136,6 +136,13 @@ export class StoryService {
     };
 
     const storyId = this.generateId();
+    
+    // Load language-specific templates
+    const [systemMessage, beatTemplate] = await Promise.all([
+      getSystemMessage(language),
+      getBeatGenerationTemplate(language)
+    ]);
+    
     const newStory: Story = {
       _id: storyId,
       id: storyId,
@@ -143,8 +150,8 @@ export class StoryService {
       chapters: [firstChapter],
       settings: {
         ...DEFAULT_STORY_SETTINGS,
-        systemMessage: getSystemMessage(language),
-        beatGenerationTemplate: getBeatGenerationTemplate(language),
+        systemMessage: systemMessage,
+        beatGenerationTemplate: beatTemplate,
         language: language
       },
       // Don't set order here - let it be undefined so it appears at top with latest updatedAt

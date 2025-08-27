@@ -1,0 +1,28 @@
+<messages>
+<message role="system">{systemMessage}</message>
+<message role="user">You are continuing a story. Here is the context:
+
+<story_title>{storyTitle}</story_title>
+
+<glossary>
+{codexEntries}
+</glossary>
+
+<story_context>
+{storySoFar}
+</story_context>
+
+<current_scene>
+{sceneFullText}
+</current_scene>
+
+<instructions>
+{pointOfView}
+Write approximately {wordCount} words that continue this story.
+{writingStyle}
+
+Task: {prompt}
+</instructions>
+
+Continue the story now with {wordCount} words:</message>
+</messages>
