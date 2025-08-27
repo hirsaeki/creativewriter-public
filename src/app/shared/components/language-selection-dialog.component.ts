@@ -108,17 +108,30 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
       height: 100%;
     }
 
+    /* Modal wrapper styling */
+    ion-modal {
+      --background: rgba(20, 20, 20, 0.95);
+      --border-radius: 20px;
+      --box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      --max-width: 500px;
+      --max-height: 80vh;
+      --width: 90%;
+      --height: auto;
+    }
+
     ion-header {
       backdrop-filter: blur(15px);
-      background: rgba(45, 45, 45, 0.85);
+      background: rgba(45, 45, 45, 0.9);
       box-shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
       position: relative;
       z-index: 100;
+      border-radius: 20px 20px 0 0;
     }
 
     ion-toolbar {
       --background: transparent;
       --color: #f8f9fa;
+      --border-width: 0;
     }
 
     ion-title {
@@ -131,18 +144,27 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
     }
 
     ion-content {
-      --background: transparent !important;
-      background: transparent !important;
+      --background: rgba(25, 25, 25, 0.95) !important;
+      background: rgba(25, 25, 25, 0.95) !important;
+      backdrop-filter: blur(10px);
+      border-radius: 0 0 20px 20px;
     }
 
     ion-content::part(background) {
       background: transparent !important;
     }
 
+    ion-content::part(scroll) {
+      padding-bottom: 2rem;
+    }
+
     .dialog-content {
       max-width: 500px;
       margin: 0 auto;
-      padding: 1rem;
+      padding: 1rem 1rem 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
     }
 
     .description {
@@ -155,14 +177,16 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
     }
 
     .language-selection-container {
-      background: linear-gradient(135deg, rgba(20, 20, 20, 0.3) 0%, rgba(15, 15, 15, 0.3) 100%);
+      background: linear-gradient(135deg, rgba(30, 30, 30, 0.5) 0%, rgba(25, 25, 25, 0.5) 100%);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 16px;
       backdrop-filter: blur(8px) saturate(120%);
       -webkit-backdrop-filter: blur(8px) saturate(120%);
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
       padding: 1rem;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
+      flex: 1;
+      overflow-y: auto;
     }
 
     .language-radio-group {
@@ -267,7 +291,8 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
 
     .button-container {
       text-align: center;
-      margin-top: 2rem;
+      margin-top: 1rem;
+      padding-bottom: 0.5rem;
     }
 
     .create-button {
