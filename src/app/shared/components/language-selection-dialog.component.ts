@@ -83,16 +83,14 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
     
     ion-content {
       --background: rgba(20, 20, 20, 0.95);
+      height: auto;
+      contain: content;
     }
     
-    ion-content .inner-scroll {
-      max-height: 400px;
-      overflow-y: auto;
-    }
-    
-    ion-content::part(scroll) {
-      max-height: 400px;
-      overflow-y: auto;
+    ion-list {
+      background: transparent;
+      padding: 0;
+      margin: 0;
     }
     
     .dialog-padding {
@@ -103,14 +101,12 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
     }
     
     .description {
-      margin: 16px 0;
+      margin: 8px 0 12px 0;
       color: var(--ion-color-medium);
+      font-size: 0.9rem;
     }
     .button-container {
-      margin-top: 24px;
-    }
-    ion-list {
-      background: transparent;
+      margin-top: 12px;
     }
     
     ion-item {
