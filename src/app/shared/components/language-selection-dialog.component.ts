@@ -85,6 +85,16 @@ export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
       --background: rgba(20, 20, 20, 0.95);
     }
     
+    ion-content .inner-scroll {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    ion-content::part(scroll) {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
     .dialog-padding {
       --padding-start: 24px;
       --padding-end: 24px;
