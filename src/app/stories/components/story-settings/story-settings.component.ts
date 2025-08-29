@@ -21,7 +21,7 @@ import {
 import { StoryService } from '../../services/story.service';
 import { Story, StorySettings, DEFAULT_STORY_SETTINGS } from '../../models/story.interface';
 import { getSystemMessage, getBeatGenerationTemplate } from '../../../shared/resources/system-messages';
-import { StoryLanguage } from '../../../shared/components/language-selection-dialog.component';
+import { StoryLanguage } from '../../../shared/components/language-selection-dialog/language-selection-dialog.component';
 import { SettingsTabsComponent, TabItem } from '../../../shared/components/settings-tabs.component';
 import { SettingsContentComponent } from '../../../shared/components/settings-content.component';
 import { DbMaintenanceService, OrphanedImage, DatabaseStats, DuplicateImage, IntegrityIssue } from '../../../shared/services/db-maintenance.service';

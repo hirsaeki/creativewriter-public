@@ -12,6 +12,7 @@ import { addIcons } from 'ionicons';
 import { add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { Story } from '../../models/story.interface';
+import { StoryLanguage } from '../../../shared/components/language-selection-dialog/language-selection-dialog.component';
 import { SyncStatusComponent } from '../../../shared/components/sync-status.component';
 import { LoginComponent } from '../../../shared/components/login.component';
 import { AuthService, User } from '../../../core/services/auth.service';
@@ -211,7 +212,7 @@ export class StoryListComponent implements OnInit {
   }
 
   private async handleLanguageSelection(language: string): Promise<void> {
-    const newStory = await this.storyService.createStory(language as any);
+    const newStory = await this.storyService.createStory(language as StoryLanguage);
     this.router.navigate(['/stories/editor', newStory.id]);
   }
 

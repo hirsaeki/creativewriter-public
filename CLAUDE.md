@@ -9,4 +9,5 @@
 - ALWAYS: Before implementing any feature, do a web research if a framework component (angular, ionic) exists that covers the requirements
 - !!!ALWAYS work on the main branch in the private repository!!!!
 - NEVER MERGE TO release branch on your own!
+- WHEN CREATING NEW COMPONENTS: They shall follow a common design pattern to put each component into a seperate foldern, split them into template, typescript and css files!
 ---

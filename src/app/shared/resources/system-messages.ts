@@ -1,4 +1,4 @@
-import { StoryLanguage } from '../components/language-selection-dialog.component';
+import { StoryLanguage } from '../components/language-selection-dialog/language-selection-dialog.component';
 
 // Cache for loaded system messages
 const systemMessageCache = new Map<StoryLanguage, string>();
