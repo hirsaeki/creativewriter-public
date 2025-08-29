@@ -97,7 +97,7 @@ export class DatabaseService {
           await this.initializationPromise;
         }
       } else {
-        // User logged out - switch to anonymous/demo database
+        // User logged out - switch to anonymous database
         const anonymousDb = 'creative-writer-stories-anonymous';
         if (this.db?.name !== anonymousDb) {
           this.initializationPromise = this.initializeDatabase(anonymousDb);

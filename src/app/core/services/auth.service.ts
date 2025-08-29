@@ -20,6 +20,20 @@ export class AuthService {
   }
 
   private loadCurrentUser(): void {
+    // Check for local-only mode first
+    const isLocalOnly = localStorage.getItem('creative-writer-local-only');
+    if (isLocalOnly === 'true') {
+      // Auto-login as local user
+      const localUser: User = {
+        username: 'local',
+        displayName: 'Local User',
+        lastLogin: new Date()
+      };
+      this.currentUserSubject.next(localUser);
+      return;
+    }
+
+    // Check for regular user session
     const stored = localStorage.getItem('creative-writer-user');
     if (stored) {
       try {
@@ -63,13 +77,32 @@ export class AuthService {
         lastLogin: new Date()
       };
 
+      // Clear local-only mode when logging in with a real user
+      localStorage.removeItem('creative-writer-local-only');
+      
       this.saveCurrentUser(user);
       resolve(user);
     });
   }
 
+  loginLocalOnly(): void {
+    // Set local-only flag
+    localStorage.setItem('creative-writer-local-only', 'true');
+    
+    // Create local user
+    const localUser: User = {
+      username: 'local',
+      displayName: 'Local User',
+      lastLogin: new Date()
+    };
+    
+    // Don't save to regular user storage, just update current user
+    this.currentUserSubject.next(localUser);
+  }
+
   logout(): void {
     localStorage.removeItem('creative-writer-user');
+    localStorage.removeItem('creative-writer-local-only');
     this.currentUserSubject.next(null);
   }
 
@@ -84,6 +117,12 @@ export class AuthService {
   getUserDatabaseName(): string | null {
     const user = this.getCurrentUser();
     if (!user) return null;
+    
+    // For local-only mode, use the anonymous database
+    if (user.username === 'local') {
+      return 'creative-writer-stories-anonymous';
+    }
+    
     return `creative-writer-stories-${user.username}`;
   }
 }

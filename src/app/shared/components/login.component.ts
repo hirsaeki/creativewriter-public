@@ -263,7 +263,8 @@ export class LoginComponent implements OnInit {
   }
 
   skipLogin() {
-    // Just hide the login - user will work with anonymous/local storage
-    this.isLoggedIn = true;
+    // Login as local-only user
+    this.authService.loginLocalOnly();
+    // Component will hide automatically via subscription
   }
 }
