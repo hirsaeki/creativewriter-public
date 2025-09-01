@@ -5,6 +5,37 @@ All notable changes to CreativeWriter 2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-09-01
+
+### Added
+- **Language Selection UI**: New Action Sheet interface replacing Modal for better mobile compatibility
+- **Login Dialog Enhancement**: Clearer explanation of local-only mode functionality
+- **Multilingual AI Support**: AI story generation now supports multiple languages with dedicated template files
+- **German Category Support**: Added German language categories with auto-migration to English
+- **Character Field Auto-Creation**: Automatic creation of character-specific fields in codex based on category
+- **Performance Optimizations**: 
+  - Implemented OnPush change detection strategy for major components
+  - Migrated from CommonJS to ESM modules for better optimization
+  - Added image compression and lazy loading for mobile devices
+
+### Fixed
+- **Local-Only Mode**: Now persists across page reloads
+- **Language Selection Dialog**: Multiple fixes for proper display and interaction on mobile devices
+- **Tag Management**: Prevented tag array mutation and duplication in codex entries
+- **Custom Fields Storage**: Standardized metadata storage for custom fields
+- **Template Updates**: Removed automatic template updates in story settings to prevent data loss
+
+### Changed
+- **Language Selection Dialog**: Refactored into separate component files for better maintainability
+- **System Messages**: Enhanced with detailed fiction writing guidelines for better AI output
+- **Database Operations**: Optimized saveToDatabase efficiency while preventing tag duplication
+- **Documentation**: Updated README to reference public repository for development
+
+### Technical Improvements
+- Reduced CSS file sizes across multiple components
+- Improved character category detection for auto-field creation
+- Enhanced real-time codex updates without tag mutation
+
 ## [1.3.0] - 2025-08-21
 
 ### Added
