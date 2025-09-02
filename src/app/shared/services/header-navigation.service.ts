@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { BurgerMenuItem } from '../components/app-header.component';
+import { BurgerMenuItem } from '../../ui/components/app-header.component';
 
 @Injectable({
   providedIn: 'root'

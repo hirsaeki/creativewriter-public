@@ -8,7 +8,7 @@ import {
   IonChip, IonAvatar, IonSearchbar, IonModal, IonCheckbox, IonItemDivider,
   IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader
 } from '@ionic/angular/standalone';
-import { AppHeaderComponent, HeaderAction } from '../../../shared/components/app-header.component';
+import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
 import { addIcons } from 'ionicons';
 import { 
   arrowBack, sendOutline, peopleOutline, documentTextOutline, 
@@ -23,10 +23,10 @@ import { PromptManagerService } from '../../../shared/services/prompt-manager.se
 import { CodexService } from '../../services/codex.service';
 import { AIRequestLoggerService } from '../../../core/services/ai-request-logger.service';
 import { ModelService } from '../../../core/services/model.service';
-import { OpenRouterIconComponent } from '../../../shared/components/openrouter-icon.component';
-import { ClaudeIconComponent } from '../../../shared/components/claude-icon.component';
-import { ReplicateIconComponent } from '../../../shared/components/replicate-icon.component';
-import { OllamaIconComponent } from '../../../shared/components/ollama-icon.component';
+import { OpenRouterIconComponent } from '../../../ui/icons/openrouter-icon.component';
+import { ClaudeIconComponent } from '../../../ui/icons/claude-icon.component';
+import { ReplicateIconComponent } from '../../../ui/icons/replicate-icon.component';
+import { OllamaIconComponent } from '../../../ui/icons/ollama-icon.component';
 import { Story, Scene, Chapter } from '../../models/story.interface';
 import { ModelOption } from '../../../core/models/model.interface';
 import { StoryRole } from '../../models/codex.interface';

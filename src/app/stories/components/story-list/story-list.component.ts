@@ -12,11 +12,11 @@ import { addIcons } from 'ionicons';
 import { add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { Story } from '../../models/story.interface';
-import { StoryLanguage } from '../../../shared/components/language-selection-dialog/language-selection-dialog.component';
-import { SyncStatusComponent } from '../../../shared/components/sync-status.component';
-import { LoginComponent } from '../../../shared/components/login.component';
+import { StoryLanguage } from '../../../ui/components/language-selection-dialog/language-selection-dialog.component';
+import { SyncStatusComponent } from '../../../ui/components/sync-status.component';
+import { LoginComponent } from '../../../ui/components/login.component';
 import { AuthService, User } from '../../../core/services/auth.service';
-import { AppHeaderComponent, BurgerMenuItem, HeaderAction } from '../../../shared/components/app-header.component';
+import { AppHeaderComponent, BurgerMenuItem, HeaderAction } from '../../../ui/components/app-header.component';
 import { HeaderNavigationService } from '../../../shared/services/header-navigation.service';
 import { VersionService } from '../../../core/services/version.service';
 

@@ -10,7 +10,7 @@ import {
   IonModal, IonGrid, IonRow, IonCol, IonText, IonNote, IonButtons, IonToolbar, IonTitle, IonHeader,
   IonSelect, IonSelectOption, IonToggle
 } from '@ionic/angular/standalone';
-import { AppHeaderComponent, HeaderAction } from '../../../shared/components/app-header.component';
+import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
 import { addIcons } from 'ionicons';
 import {
   arrowBack, add, ellipsisVertical, create, trash, save, close,
