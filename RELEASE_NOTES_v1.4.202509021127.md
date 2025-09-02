@@ -1,37 +1,57 @@
-Added
-- Language selection UI: Action Sheet replaces modal for better mobile UX.
-- Login dialog: Clear “local-only mode” explanation.
-- Multilingual AI support: Externalized templates and better system prompts.
-- German category support with auto-migration to English.
-- Codex auto-fields: Auto-create character fields from category.
-- Mobile performance: Image compression + lazy loading.
-- Docker/CouchDB: Hardened CouchDB container and integrated into public workflows; published full image set.
+# Release v1.4.202509021127
 
-Fixed
-- Local-only mode: Persists across reloads.
-- Language selector: Multiple fixes to layout, height, and visibility on mobile.
-- Codex tags: Prevent tag mutation and duplication; standardized custom field storage.
-- Templates: Removed automatic updates in story settings to avoid data loss.
+**Date:** 2025-09-02  
+**Commits:** 46 commits since v1.3.0
 
-Changed
-- Language selection: Split into separate component files; modern glass-morphism styling.
-- System messages: Enriched fiction-writing guidance for better AI output.
-- Database ops: More efficient saves; safer tag handling.
-- Docs: README updates for public repo, Docker guidance, and CouchDB notes.
+## ✨ Major Features
 
-Performance
-- Migrated CommonJS → ESM where possible for better optimization.
-- Adopted OnPush change detection across major components.
-- Reduced CSS in several components.
+### 🌐 Language & UX Improvements
+- Replaced language selection Modal with an Ionic Action Sheet for better mobile UX
+- Clearer explanation and flow for "Local‑Only Mode" in the login dialog
+- Modernized language selection with refined, glass‑morphism styling and compact layout
 
-Infrastructure
-- Public Docker images: app, nginx, replicate proxy, gemini proxy all published.
-- CouchDB in compose: Streamlined init, improved defaults, and removed separate init service.
+### 📝 Multilingual AI Authoring
+- Added multilingual support for AI story generation via externalized template files
+- Enhanced system messages with detailed fiction‑writing guidance for higher‑quality outputs
+- German category support with automatic migration to English
 
-Upgrade Notes
-- Persistent storage is critical: Ensure `./data` volume exists and is mounted.
-- Ollama CORS: Set `OLLAMA_ORIGINS` when using local LLMs.
-- Reverse proxy: App expects CouchDB via `/_db/{db}` when behind nginx; direct `:5984` used in localhost dev.
+### 📚 Codex Enhancements
+- Auto‑create character fields in the codex based on selected category
+- Safer metadata model for custom fields to avoid divergence
 
-Compare
-- https://github.com/MarcoDroll/creativewriter-public/compare/v1.3.0...v1.4.202509021127
+## 🐛 Bug Fixes
+
+- Local‑only mode now persists across page reloads
+- Language selector: fixed height, spacing, and visibility issues across breakpoints
+- Codex tags: prevented mutation and duplication; standardized handling during real‑time updates
+- Story settings: removed automatic template updates to avoid accidental data loss
+
+## ♻️ Code & Performance
+
+- Migrated CommonJS → ESM where possible to improve optimization
+- Adopted OnPush change detection for major components
+- Reduced CSS size across several components
+- Mobile performance optimizations: image compression and lazy loading
+
+## 🏗️ Infrastructure
+
+- CouchDB added and hardened in public workflows (improved defaults, streamlined init)
+- Full set of public Docker images published: app, nginx, replicate proxy, gemini proxy
+
+## 📊 Statistics
+
+- **Total Commits:** 46
+- **Contributors:** 1
+- **Files Changed:** 300
+- **Additions:** +914
+- **Deletions:** -18536
+
+## 🔗 Links
+
+- Compare: https://github.com/MarcoDroll/creativewriter-public/compare/v1.3.0...v1.4.202509021127
+- Docker Images: https://github.com/MarcoDroll/creativewriter-public/pkgs/container/creativewriter-public
+
+## 📦 Installation
+
+### Docker Compose
+
