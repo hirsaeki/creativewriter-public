@@ -13,13 +13,13 @@ import { SettingsService } from '../core/services/settings.service';
 import { ModelService } from '../core/services/model.service';
 import { Settings } from '../core/models/settings.interface';
 import { ModelOption } from '../core/models/model.interface';
-import { SettingsTabsComponent, TabItem } from '../shared/components/settings-tabs.component';
-import { SettingsContentComponent } from '../shared/components/settings-content.component';
+import { SettingsTabsComponent, TabItem } from '../ui/components/settings-tabs.component';
+import { SettingsContentComponent } from '../ui/components/settings-content.component';
 import { BackgroundService } from '../shared/services/background.service';
-import { DatabaseBackupComponent } from '../shared/components/database-backup.component';
-import { ApiSettingsComponent } from './components/api-settings.component';
-import { UiSettingsComponent } from './components/ui-settings.component';
-import { PromptsSettingsComponent } from './components/prompts-settings.component';
+import { DatabaseBackupComponent } from '../ui/components/database-backup.component';
+import { ApiSettingsComponent } from '../ui/settings/api-settings.component';
+import { UiSettingsComponent } from '../ui/settings/ui-settings.component';
+import { PromptsSettingsComponent } from '../ui/settings/prompts-settings.component';
 
 @Component({
   selector: 'app-settings',

@@ -2,7 +2,7 @@ import { Component, EventEmitter, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ModalController } from '@ionic/angular/standalone';
-import { ImageService, ImageUploadResult } from '../services/image.service';
+import { ImageService, ImageUploadResult } from '../../shared/services/image.service';
 import { ImageCropperModalComponent } from './image-cropper-modal.component';
 import imageCompression from 'browser-image-compression';
 

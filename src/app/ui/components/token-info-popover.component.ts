@@ -4,7 +4,7 @@ import { IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, Ion
 import { PopoverController } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { closeOutline, informationCircleOutline } from 'ionicons/icons';
-import { TokenCounterService, SupportedModel, TokenCountResult } from '../services/token-counter.service';
+import { TokenCounterService, SupportedModel, TokenCountResult } from '../../shared/services/token-counter.service';
 
 @Component({
   selector: 'app-token-info-popover',

@@ -11,7 +11,7 @@ import {
   cloudUploadOutline, imageOutline, closeCircleOutline, 
   checkmarkCircleOutline, trashOutline 
 } from 'ionicons/icons';
-import { SyncedCustomBackgroundService, CustomBackground } from '../services/synced-custom-background.service';
+import { SyncedCustomBackgroundService, CustomBackground } from '../../shared/services/synced-custom-background.service';
 
 @Component({
   selector: 'app-background-upload',

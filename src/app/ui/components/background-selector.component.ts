@@ -5,8 +5,8 @@ import { IonIcon, IonGrid, IonRow, IonCol, IonText, IonCard, IonCardContent, Ion
 import { checkmarkCircle, trashOutline } from 'ionicons/icons';
 import { addIcons } from 'ionicons';
 import { SettingsService } from '../../core/services/settings.service';
-import { SyncedCustomBackgroundService, CustomBackgroundOption } from '../services/synced-custom-background.service';
-import { LazyImageDirective } from '../directives/lazy-image.directive';
+import { SyncedCustomBackgroundService, CustomBackgroundOption } from '../../shared/services/synced-custom-background.service';
+import { LazyImageDirective } from '../../shared/directives/lazy-image.directive';
 
 interface BackgroundOption {
   filename: string;

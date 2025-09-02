@@ -1,8 +1,8 @@
 import { Component, EventEmitter, Input, Output, OnInit, OnDestroy, OnChanges, SimpleChanges, ViewChild, ElementRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { VideoService } from '../services/video.service';
-import { StoredVideo } from '../models/video.interface';
+import { VideoService } from '../../shared/services/video.service';
+import { StoredVideo } from '../../shared/models/video.interface';
 
 @Component({
   selector: 'app-video-modal',

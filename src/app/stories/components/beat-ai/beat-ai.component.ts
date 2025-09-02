@@ -9,7 +9,7 @@ import {
 import { addIcons } from 'ionicons';
 import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, createOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline } from 'ionicons/icons';
 import { BeatAIModalService } from '../../../shared/services/beat-ai-modal.service';
-import { TokenInfoPopoverComponent } from '../../../shared/components/token-info-popover.component';
+import { TokenInfoPopoverComponent } from '../../../ui/components/token-info-popover.component';
 import { TokenCounterService, SupportedModel } from '../../../shared/services/token-counter.service';
 import { BeatAI, BeatAIPromptEvent } from '../../models/beat-ai.interface';
 import { Subscription } from 'rxjs';
@@ -22,10 +22,10 @@ import { EditorView } from 'prosemirror-view';
 import { StoryService } from '../../services/story.service';
 import { Story, Scene, Chapter } from '../../models/story.interface';
 import { DatabaseService, SyncStatus } from '../../../core/services/database.service';
-import { OpenRouterIconComponent } from '../../../shared/components/openrouter-icon.component';
-import { ClaudeIconComponent } from '../../../shared/components/claude-icon.component';
-import { ReplicateIconComponent } from '../../../shared/components/replicate-icon.component';
-import { OllamaIconComponent } from '../../../shared/components/ollama-icon.component';
+import { OpenRouterIconComponent } from '../../../ui/icons/openrouter-icon.component';
+import { ClaudeIconComponent } from '../../../ui/icons/claude-icon.component';
+import { ReplicateIconComponent } from '../../../ui/icons/replicate-icon.component';
+import { OllamaIconComponent } from '../../../ui/icons/ollama-icon.component';
 
 interface SceneContext {
   chapterId: string;

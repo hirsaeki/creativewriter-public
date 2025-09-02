@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { IonPopover, IonContent } from '@ionic/angular/standalone';
 import { VersionService, VersionInfo } from '../../core/services/version.service';
 
+
 @Component({
   selector: 'app-version-tooltip',
   standalone: true,

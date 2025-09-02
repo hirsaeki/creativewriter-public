@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Story, Chapter, Scene, DEFAULT_STORY_SETTINGS } from '../models/story.interface';
 import { DatabaseService } from '../../core/services/database.service';
 import { getSystemMessage, getBeatGenerationTemplate } from '../../shared/resources/system-messages';
-import { StoryLanguage } from '../../shared/components/language-selection-dialog/language-selection-dialog.component';
+import { StoryLanguage } from '../../ui/components/language-selection-dialog/language-selection-dialog.component';
 
 @Injectable({
   providedIn: 'root'

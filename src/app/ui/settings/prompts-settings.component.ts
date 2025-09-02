@@ -129,10 +129,11 @@ import { ModelOption } from '../../core/models/model.interface';
               </ng-template>
             </ng-select>
             <div class="model-info-small">
-              <p *ngIf="!settings.sceneTitleGeneration.selectedModel" class="info-text">
+              <p *ngIf="modelLoadError" class="error-text">{{ modelLoadError }}</p>
+              <p *ngIf="!modelLoadError && !settings.sceneTitleGeneration.selectedModel" class="info-text">
                 No model selected - the global model will be used
               </p>
-              <p *ngIf="settings.sceneTitleGeneration.selectedModel" class="info-text">
+              <p *ngIf="!modelLoadError && settings.sceneTitleGeneration.selectedModel" class="info-text">
                 Specific model for scene titles: {{ getModelDisplayName(settings.sceneTitleGeneration.selectedModel) }}
               </p>
             </div>
@@ -203,7 +204,7 @@ import { ModelOption } from '../../core/models/model.interface';
             <ion-label slot="end">1.0</ion-label>
           </ion-range>
         </ion-item>
-
+        
         <ion-item>
           <ion-label position="stacked">AI Model for Scene Summary</ion-label>
           <div class="model-selection-container">
@@ -234,6 +235,10 @@ import { ModelOption } from '../../core/models/model.interface';
                       [title]="getProviderTooltip(item.provider)"></ion-icon>
                     <span class="model-label">{{ item.label }}</span>
                   </div>
+                  <div class="model-option-details">
+                    <span class="model-cost">Input: {{ item.costInputEur }} | Output: {{ item.costOutputEur }}</span>
+                    <span class="model-context">Context: {{ formatContextLength(item.contextLength) }}</span>
+                  </div>
                   <div class="model-description" *ngIf="item.description">{{ item.description }}</div>
                 </div>
               </ng-template>
@@ -254,12 +259,12 @@ import { ModelOption } from '../../core/models/model.interface';
           <ion-textarea
             [(ngModel)]="settings.sceneSummaryGeneration.customInstruction"
             (ngModelChange)="settingsChange.emit()"
-            placeholder="e.g. 'Focus on emotional aspects' or 'Mention important objects'"
+            placeholder="e.g. 'Focus on main plot' or 'Include character emotions'"
             rows="3"
             auto-grow="true">
           </ion-textarea>
         </ion-item>
-
+        
         <ion-item>
           <ion-label>Use Custom Prompt</ion-label>
           <ion-toggle
@@ -383,6 +388,7 @@ export class PromptsSettingsComponent {
   @Input() combinedModels: ModelOption[] = [];
   @Input() loadingModels = false;
   @Input() modelsDisabled = false;
+  @Input() modelLoadError: string | null = null;
   
   @Output() settingsChange = new EventEmitter<void>();
 

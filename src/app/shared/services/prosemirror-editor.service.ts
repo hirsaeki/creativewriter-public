@@ -13,12 +13,12 @@ import { BeatAINodeView } from './beat-ai-nodeview';
 import { ResizableImageNodeView } from './resizable-image-nodeview';
 import { BeatAI, BeatAIPromptEvent } from '../../stories/models/beat-ai.interface';
 import { BeatAIService } from './beat-ai.service';
-import { ImageInsertResult } from '../components/image-upload-dialog.component';
+import { ImageInsertResult } from '../../ui/components/image-upload-dialog.component';
 import { PromptManagerService } from './prompt-manager.service';
 import { createCodexHighlightingPlugin, updateCodexHighlightingPlugin } from './codex-highlighting-plugin';
 import { CodexEntry } from '../../stories/models/codex.interface';
 import { CodexService } from '../../stories/services/codex.service';
-import { AIRewriteModalComponent, AIRewriteResult } from '../components/ai-rewrite-modal.component';
+import { AIRewriteModalComponent, AIRewriteResult } from '../../ui/components/ai-rewrite-modal.component';
 
 export interface EditorConfig {
   placeholder?: string;

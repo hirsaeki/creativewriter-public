@@ -9,7 +9,7 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { closeOutline, sendOutline, refreshOutline, copyOutline, addOutline, readerOutline } from 'ionicons/icons';
-import { BeatAIService } from '../services/beat-ai.service';
+import { BeatAIService } from '../../shared/services/beat-ai.service';
 import { StoryService } from '../../stories/services/story.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { AIRequestLoggerService } from '../../core/services/ai-request-logger.service';

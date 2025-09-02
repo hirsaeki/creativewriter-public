@@ -4,6 +4,7 @@ import { IonicModule, IonPopover } from '@ionic/angular';
 import { VersionService } from '../../core/services/version.service';
 import { VersionTooltipComponent } from './version-tooltip.component';
 
+
 export interface HeaderAction {
   icon: string;
   label?: string;

@@ -10,7 +10,7 @@ import {
   downloadOutline, cloudUploadOutline, informationCircleOutline, 
   checkmarkCircleOutline, warningOutline, documentTextOutline 
 } from 'ionicons/icons';
-import { DatabaseBackupService } from '../services/database-backup.service';
+import { DatabaseBackupService } from '../../shared/services/database-backup.service';
 
 @Component({
   selector: 'app-database-backup',
@@ -126,10 +126,9 @@ import { DatabaseBackupService } from '../services/database-backup.service';
             <ion-label>
               <h3>Important Notes</h3>
               <ul>
-                <li>Exports are saved as JSON files on your device</li>
-                <li>Imports will REPLACE ALL existing data with backup data</li>
-                <li>Always export your current database before importing</li>
-                <li>Large databases may take several minutes to export/import</li>
+                <li>Export includes all documents and attachments</li>
+                <li>Import will replace the entire database</li>
+                <li>Make a backup before importing to avoid data loss</li>
                 <li>Documents with images/attachments are fully supported</li>
                 <li>Import will continue even if some documents fail</li>
               </ul>

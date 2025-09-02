@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Subject, takeUntil } from 'rxjs';
 import { DatabaseService, SyncStatus } from '../../core/services/database.service';
 
+
 @Component({
   selector: 'app-sync-status',
   standalone: true,

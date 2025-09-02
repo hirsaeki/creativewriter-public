@@ -5,9 +5,9 @@ import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent
 } from '@ionic/angular/standalone';
 import { Settings } from '../../core/models/settings.interface';
-import { ColorPickerComponent } from '../../shared/components/color-picker.component';
-import { BackgroundSelectorComponent } from '../../shared/components/background-selector.component';
-import { BackgroundUploadComponent } from '../../shared/components/background-upload.component';
+import { ColorPickerComponent } from '../components/color-picker.component';
+import { BackgroundSelectorComponent } from '../components/background-selector.component';
+import { BackgroundUploadComponent } from '../components/background-upload.component';
 import { BackgroundService } from '../../shared/services/background.service';
 import { CustomBackground } from '../../shared/services/synced-custom-background.service';
 

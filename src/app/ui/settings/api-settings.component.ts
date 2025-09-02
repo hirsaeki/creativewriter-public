@@ -11,10 +11,10 @@ import { ModelOption } from '../../core/models/model.interface';
 import { OllamaApiService } from '../../core/services/ollama-api.service';
 import { ClaudeApiService } from '../../core/services/claude-api.service';
 import { ModelService } from '../../core/services/model.service';
-import { OpenRouterIconComponent } from '../../shared/components/openrouter-icon.component';
-import { ClaudeIconComponent } from '../../shared/components/claude-icon.component';
-import { ReplicateIconComponent } from '../../shared/components/replicate-icon.component';
-import { OllamaIconComponent } from '../../shared/components/ollama-icon.component';
+import { OpenRouterIconComponent } from '../icons/openrouter-icon.component';
+import { ClaudeIconComponent } from '../icons/claude-icon.component';
+import { ReplicateIconComponent } from '../icons/replicate-icon.component';
+import { OllamaIconComponent } from '../icons/ollama-icon.component';
 
 @Component({
   selector: 'app-api-settings',
