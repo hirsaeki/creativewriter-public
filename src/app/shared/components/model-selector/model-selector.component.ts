@@ -52,7 +52,7 @@ export class ModelSelectorComponent implements OnInit {
     });
   }
 
-  onChange(value: string): void {
+  onModelChange(value: string): void {
     this.model = value;
     this.modelChange.emit(value);
   }

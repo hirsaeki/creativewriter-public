@@ -7,7 +7,7 @@
   [searchable]="searchable"
   [placeholder]="placeholder"
   [appendTo]="appendTo"
-  (change)="onChange($event)">
+  (ngModelChange)="onModelChange($event)">
   <ng-template ng-label-tmp let-item="item">
     <div class="model-option-inline">
       <app-openrouter-icon *ngIf="item.provider === 'openrouter'" size="16" color="#6467f2" class="provider-icon-inline openrouter"></app-openrouter-icon>
