@@ -11,8 +11,6 @@ import { StoryService } from '../../../stories/services/story.service';
 import { Story } from '../../../stories/models/story.interface';
 import { ClicheAnalysisService } from '../../services/cliche-analysis.service';
 import { SceneClicheResult, GlobalClicheReport, ClicheFindingType } from '../../models/cliche-analysis.interface';
-import { ModelService } from '../../../core/services/model.service';
-import { ModelOption } from '../../../core/models/model.interface';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ModelSelectorComponent } from '../../../shared/components/model-selector/model-selector.component';
 
@@ -34,7 +32,6 @@ export class ClicheAnalyzerComponent implements OnInit {
   private storyService = inject(StoryService);
   private router = inject(Router);
   private clicheService = inject(ClicheAnalysisService);
-  private modelService = inject(ModelService);
   private settingsService = inject(SettingsService);
 
   storyId = '';
@@ -44,7 +41,6 @@ export class ClicheAnalyzerComponent implements OnInit {
   isAnalyzing = false;
 
   selectedModel = '';
-  availableModels: ModelOption[] = [];
 
   burgerMenuItems: BurgerMenuItem[] = [];
   rightActions: HeaderAction[] = [];
@@ -67,8 +63,9 @@ export class ClicheAnalyzerComponent implements OnInit {
     this.storyId = this.route.snapshot.paramMap.get('id') || '';
     if (!this.storyId) return;
     this.story = await this.storyService.getStory(this.storyId);
-    // Load models and default selection
-    this.loadModels();
+    // Initialize selected model from global settings if available
+    const settings = this.settingsService.getSettings();
+    this.selectedModel = settings.selectedModel || this.selectedModel;
   }
 
   goBack(): void {
@@ -90,23 +87,26 @@ export class ClicheAnalyzerComponent implements OnInit {
     }
     this.isAnalyzing = true;
     const results: SceneClicheResult[] = [];
-    for (const ch of story.chapters || []) {
-      for (const sc of ch.scenes || []) {
-        const sceneText = this.stripHtmlTags(sc.content || '');
-        if (!sceneText) continue;
-        const sceneTitle = sc.title || `C${ch.chapterNumber || ch.order}S${sc.sceneNumber || sc.order}`;
-        const res = await this.clicheService.analyzeScene({
-          modelId: this.selectedModel,
-          sceneId: sc.id,
-          sceneTitle,
-          sceneText
-        });
-        results.push(res);
+    try {
+      for (const ch of story.chapters || []) {
+        for (const sc of ch.scenes || []) {
+          const sceneText = this.stripHtmlTags(sc.content || '');
+          if (!sceneText) continue;
+          const sceneTitle = sc.title || `C${ch.chapterNumber || ch.order}S${sc.sceneNumber || sc.order}`;
+          const res = await this.clicheService.analyzeScene({
+            modelId: this.selectedModel,
+            sceneId: sc.id,
+            sceneTitle,
+            sceneText
+          });
+          results.push(res);
+        }
       }
+      this.results = results;
+      this.overview = this.buildOverview(results);
+    } finally {
+      this.isAnalyzing = false;
     }
-    this.results = results;
-    this.overview = this.buildOverview(results);
-    this.isAnalyzing = false;
   }
 
   private extractPlainText(story: Story | null): string {
@@ -140,21 +140,6 @@ export class ClicheAnalyzerComponent implements OnInit {
       .replace(/BeatAIPrompt/gi, '')
       .trim()
       .replace(/\s+/g, ' ');
-  }
-
-  private loadModels(): void {
-    // Load models from multiple providers similar to other components
-    this.modelService.loadAllModels().subscribe(({ openRouter, gemini, ollama, claude }) => {
-      const enriched = [
-        ...openRouter.map(m => ({ ...m, id: `openrouter:${m.id}` })),
-        ...gemini.map(m => ({ ...m, id: `gemini:${m.id}` })),
-        ...ollama.map(m => ({ ...m, id: `ollama:${m.id}` })),
-        ...claude.map(m => ({ ...m, id: `claude:${m.id}` })),
-      ];
-      this.availableModels = enriched;
-      const settings = this.settingsService.getSettings();
-      this.selectedModel = settings.selectedModel || enriched[0]?.id || '';
-    });
   }
 
   private buildOverview(results: SceneClicheResult[]): GlobalClicheReport {

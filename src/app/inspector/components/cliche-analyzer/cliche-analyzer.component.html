@@ -17,7 +17,7 @@
         </ion-card-title>
       </ion-card-header>
       <ion-card-content>
-        <div class="actions" style="display:flex; gap:12px; align-items:center; flex-wrap: wrap;">
+        <div class="actions">
           <app-model-selector [(model)]="selectedModel" [placeholder]="'Select AI model'" [appendTo]="'body'"></app-model-selector>
           <ion-button color="primary" (click)="analyze()">
             <ion-icon slot="start" name="search"></ion-icon>
