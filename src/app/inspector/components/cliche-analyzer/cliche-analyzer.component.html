@@ -17,39 +17,29 @@
         </ion-card-title>
       </ion-card-header>
       <ion-card-content>
-        <ion-item lines="none">
-          <ion-label position="stacked">Text</ion-label>
-          <ion-textarea
-            [autoGrow]="true"
-            [rows]="8"
-            placeholder="Paste or edit the extracted story text…"
-            [(ngModel)]="text">
-          </ion-textarea>
-        </ion-item>
-
         <div class="actions">
           <ion-button color="primary" (click)="analyze()">
             <ion-icon slot="start" name="search"></ion-icon>
-            Analyze
+            Analyze Story
           </ion-button>
+          <ion-badge color="medium" *ngIf="findings.length > 0">{{ findings.length }} hits</ion-badge>
         </div>
 
-        <div class="results" *ngIf="findings.length > 0">
-          <h4>Findings</h4>
+        <div class="results" *ngIf="findings.length > 0; else noResults">
           <ion-list>
             <ion-item *ngFor="let f of findings">
-              <ion-badge [color]="f.type === 'cliche' ? 'warning' : 'tertiary'" slot="start">
-                {{ f.type === 'cliche' ? 'Cliché' : 'Repetition' }}
-              </ion-badge>
+              <ion-badge color="warning" slot="start">Cliché</ion-badge>
               <ion-label>
-                <div class="snippet">{{ f.snippet }}</div>
-                <div class="meta" *ngIf="f.count">Occurrences: {{ f.count }}</div>
+                <div class="snippet">{{ f.phrase }}</div>
+                <div class="meta">Scene: {{ f.sceneLabel }}</div>
               </ion-label>
             </ion-item>
           </ion-list>
         </div>
+        <ng-template #noResults>
+          <div class="meta">No clichés detected yet. Click Analyze to run a check.</div>
+        </ng-template>
       </ion-card-content>
     </ion-card>
   </ion-content>
 </div>
-

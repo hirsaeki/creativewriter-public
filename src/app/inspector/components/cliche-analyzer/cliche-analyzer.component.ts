@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, OnInit, inject } from '@angular/cor
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonTextarea, IonButton, IonIcon, IonList, IonBadge } from '@ionic/angular/standalone';
+import { IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonBadge } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { arrowBack, search } from 'ionicons/icons';
 import { AppHeaderComponent, BurgerMenuItem, HeaderAction } from '../../../../app/ui/components/app-header.component';
@@ -15,7 +15,7 @@ import { Story } from '../../../stories/models/story.interface';
   standalone: true,
   imports: [
     CommonModule, FormsModule,
-    IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonTextarea, IonButton, IonIcon, IonList, IonBadge,
+    IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonBadge,
     AppHeaderComponent
   ],
   templateUrl: './cliche-analyzer.component.html',
@@ -30,8 +30,7 @@ export class ClicheAnalyzerComponent implements OnInit {
 
   storyId = '';
   story: Story | null = null;
-  text = '';
-  findings: { type: 'cliche' | 'repetition', snippet: string, count?: number }[] = [];
+  findings: { sceneId: string; sceneLabel: string; phrase: string }[] = [];
 
   burgerMenuItems: BurgerMenuItem[] = [];
   rightActions: HeaderAction[] = [];
@@ -40,23 +39,20 @@ export class ClicheAnalyzerComponent implements OnInit {
     addIcons({ arrowBack, search });
     // Reuse common items so navigation stays consistent
     this.burgerMenuItems = this.headerNav.getCommonBurgerMenuItems();
-    this.rightActions = [
-      {
-        icon: 'search',
-        label: 'Analyze',
-        action: () => this.analyze(),
-        showOnMobile: true,
-        showOnDesktop: true,
-        tooltip: 'Analyze text for clichés and repetitions'
-      }
-    ];
+    this.rightActions = [{
+      icon: 'search',
+      label: 'Analyze',
+      action: () => this.analyze(),
+      showOnMobile: true,
+      showOnDesktop: true,
+      tooltip: 'Analyze story for clichés'
+    }];
   }
 
   async ngOnInit(): Promise<void> {
     this.storyId = this.route.snapshot.paramMap.get('id') || '';
     if (!this.storyId) return;
     this.story = await this.storyService.getStory(this.storyId);
-    this.text = this.extractPlainText(this.story);
     this.analyze();
   }
 
@@ -70,42 +66,39 @@ export class ClicheAnalyzerComponent implements OnInit {
   }
 
   analyze(): void {
-    const text = (this.text || '').trim();
-    const results: { type: 'cliche' | 'repetition', snippet: string, count?: number }[] = [];
-    if (!text) {
-      this.findings = [];
-      return;
-    }
+    const story = this.story;
+    if (!story) { this.findings = []; return; }
+    const lang = story.settings?.language || 'en';
+    const patterns = this.getClichePatterns(lang);
 
-    // Lightweight heuristic placeholders; can be replaced with AI later
-    const cliches = [
-      'at the end of the day', 'love at first sight', 'stronger than ever',
-      'suddenly', 'unexpectedly', 'out of the blue', 'heart pounding'
-    ];
-    const lower = text.toLowerCase();
-    cliches.forEach(c => {
-      const idx = lower.indexOf(c.toLowerCase());
-      if (idx !== -1) {
-        results.push({ type: 'cliche', snippet: c });
-      }
-    });
-
-    // Simple repetition finder: count repeated 2–4 word phrases
-    const tokens = lower.replace(/\n+/g, ' ').split(/[^\p{L}\p{N}']+/u).filter(Boolean);
-    for (let n = 2; n <= 4; n++) {
-      const counts = new Map<string, number>();
-      for (let i = 0; i + n <= tokens.length; i++) {
-        const phrase = tokens.slice(i, i + n).join(' ');
-        counts.set(phrase, (counts.get(phrase) || 0) + 1);
-      }
-      counts.forEach((count, phrase) => {
-        if (count >= 3 && phrase.length >= 8) {
-          results.push({ type: 'repetition', snippet: phrase, count });
-        }
+    const results: { sceneId: string; sceneLabel: string; phrase: string }[] = [];
+    story.chapters?.forEach(ch => {
+      ch.scenes?.forEach(sc => {
+        const text = this.stripHtmlTags(sc.content || '');
+        const sentences = this.splitSentences(text);
+        const sceneLabel = `C${ch.chapterNumber || ch.order}S${sc.sceneNumber || sc.order}`;
+        sentences.forEach(s => {
+          patterns.forEach(re => {
+            let m: RegExpExecArray | null;
+            // reset lastIndex for global regex
+            re.lastIndex = 0;
+            while ((m = re.exec(s)) !== null) {
+              const phrase = m[0];
+              results.push({ sceneId: sc.id, sceneLabel, phrase });
+              // avoid duplicate matches of same phrase in same sentence position
+              if (!re.global) { break; }
+            }
+          });
+        });
       });
-    }
-
-    this.findings = results.slice(0, 50);
+    });
+    // De-duplicate identical scene+phrase pairs
+    const seen = new Set<string>();
+    this.findings = results.filter(r => {
+      const key = `${r.sceneId}|${r.phrase.toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
   }
 
   private extractPlainText(story: Story | null): string {
@@ -139,5 +132,45 @@ export class ClicheAnalyzerComponent implements OnInit {
       .replace(/BeatAIPrompt/gi, '')
       .trim()
       .replace(/\s+/g, ' ');
+  }
+
+  private splitSentences(text: string): string[] {
+    if (!text) return [];
+    // Basic sentence splitter that respects ., !, ?, … and quotes
+    const parts = text
+      .replace(/\s+/g, ' ')
+      .split(/(?<=[.!?…]["\]'}»”)]?)(?:\s+|$)/u)
+      .map(s => s.trim())
+      .filter(Boolean);
+    return parts;
+  }
+
+  private getClichePatterns(lang: string): RegExp[] {
+    const en = [
+      /\b(at the end of the day)\b/gi,
+      /\b(love at first sight)\b/gi,
+      /\b(stronger than ever)\b/gi,
+      /\b(out of the blue)\b/gi,
+      /\b(all of a sudden)\b/gi,
+      /\b(suddenly)\b/g,
+      /\b(before (?:he|she|they) knew it)\b/gi,
+      /\b(it was a dark and stormy night)\b/gi,
+      /\b(heart(?:s)? (?:was|were)?\s*pounding)\b/gi,
+      /\b(cold sweat)\b/gi,
+      /\b(every fiber of (?:his|her|their) being)\b/gi
+    ];
+    const de = [
+      /\b(am ende des tages)\b/gi,
+      /\b(liebe auf den ersten blick)\b/gi,
+      /\b(wie aus heiterem himmel)\b/gi,
+      /\b(stärker als je zuvor)\b/gi,
+      /\b(plötzlich)\b/g,
+      /\b(schlug (?:ihr|sein) herz.*? (?:bis zum hals))\b/gi,
+      /\b(kalter schweiß)\b/gi
+    ];
+    if (lang === 'de') return de;
+    if (lang === 'en') return en;
+    // For unknown/custom, check both sets
+    return [...en, ...de];
   }
 }
