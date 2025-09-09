@@ -17,27 +17,49 @@
         </ion-card-title>
       </ion-card-header>
       <ion-card-content>
-        <div class="actions">
+        <div class="actions" style="display:flex; gap:12px; align-items:center; flex-wrap: wrap;">
+          <ng-select
+            [items]="availableModels"
+            bindLabel="label"
+            bindValue="id"
+            [(ngModel)]="selectedModel"
+            placeholder="Select AI model"
+            [clearable]="false"
+            style="min-width: 260px;">
+          </ng-select>
           <ion-button color="primary" (click)="analyze()">
             <ion-icon slot="start" name="search"></ion-icon>
             Analyze Story
           </ion-button>
-          <ion-badge color="medium" *ngIf="findings.length > 0">{{ findings.length }} hits</ion-badge>
+          <ion-badge color="medium" *ngIf="overview">Total: {{ (overview?.totals | json) }}</ion-badge>
+          <ion-badge color="tertiary" *ngIf="isAnalyzing">Analyzing…</ion-badge>
         </div>
 
-        <div class="results" *ngIf="findings.length > 0; else noResults">
+        <div *ngIf="overview as ov" style="margin-top:12px;">
+          <div><strong>Totals</strong>: cliche={{ov.totals.cliche}} • idiom={{ov.totals.idiom}} • redundancy={{ov.totals.redundancy}} • buzzword={{ov.totals.buzzword}} • stereotype={{ov.totals.stereotype}}</div>
+          <div *ngIf="ov.topPhrases.length > 0" style="margin-top:6px;">
+            <strong>Top phrases:</strong>
+            <span *ngFor="let p of ov.topPhrases; let i=index">{{p.phrase}} ({{p.count}}) <span *ngIf="i < ov.topPhrases.length-1">•</span> </span>
+          </div>
+        </div>
+
+        <div class="results" *ngIf="results.length > 0; else noResults">
           <ion-list>
-            <ion-item *ngFor="let f of findings">
-              <ion-badge color="warning" slot="start">Cliché</ion-badge>
+            <ion-item *ngFor="let r of results">
               <ion-label>
-                <div class="snippet">{{ f.phrase }}</div>
-                <div class="meta">Scene: {{ f.sceneLabel }}</div>
+                <div class="meta"><strong>{{ r.sceneTitle }}</strong> <span *ngIf="r.error" style="color:#e66">— {{r.error}}</span></div>
+                <div *ngFor="let f of r.findings" style="margin-top:6px;">
+                  <ion-badge [color]="f.type==='cliche' ? 'warning' : (f.type==='idiom' ? 'secondary' : 'medium')" style="margin-right:8px;" slot="start">{{ f.type }}</ion-badge>
+                  <span class="snippet">{{ f.phrase }}</span>
+                  <span class="meta" style="color: #999;"> — {{ f.why }}</span>
+                  <div *ngIf="f.suggestion" style="color:#6aa84f; margin-left: 8px;">Suggestion: {{ f.suggestion }}</div>
+                </div>
               </ion-label>
             </ion-item>
           </ion-list>
         </div>
         <ng-template #noResults>
-          <div class="meta">No clichés detected yet. Click Analyze to run a check.</div>
+          <div class="meta">No results yet. Select a model and click Analyze.</div>
         </ng-template>
       </ion-card-content>
     </ion-card>

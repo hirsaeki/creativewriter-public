@@ -9,12 +9,18 @@ import { AppHeaderComponent, BurgerMenuItem, HeaderAction } from '../../../../ap
 import { HeaderNavigationService } from '../../../../app/shared/services/header-navigation.service';
 import { StoryService } from '../../../stories/services/story.service';
 import { Story } from '../../../stories/models/story.interface';
+import { ClicheAnalysisService } from '../../services/cliche-analysis.service';
+import { SceneClicheResult, GlobalClicheReport, ClicheFindingType } from '../../models/cliche-analysis.interface';
+import { ModelService } from '../../../core/services/model.service';
+import { ModelOption } from '../../../core/models/model.interface';
+import { SettingsService } from '../../../core/services/settings.service';
+import { NgSelectModule } from '@ng-select/ng-select';
 
 @Component({
   selector: 'app-cliche-analyzer',
   standalone: true,
   imports: [
-    CommonModule, FormsModule,
+    CommonModule, FormsModule, NgSelectModule,
     IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonBadge,
     AppHeaderComponent
   ],
@@ -27,10 +33,18 @@ export class ClicheAnalyzerComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private storyService = inject(StoryService);
   private router = inject(Router);
+  private clicheService = inject(ClicheAnalysisService);
+  private modelService = inject(ModelService);
+  private settingsService = inject(SettingsService);
 
   storyId = '';
   story: Story | null = null;
-  findings: { sceneId: string; sceneLabel: string; phrase: string }[] = [];
+  results: SceneClicheResult[] = [];
+  overview: GlobalClicheReport | null = null;
+  isAnalyzing = false;
+
+  selectedModel = '';
+  availableModels: ModelOption[] = [];
 
   burgerMenuItems: BurgerMenuItem[] = [];
   rightActions: HeaderAction[] = [];
@@ -53,7 +67,8 @@ export class ClicheAnalyzerComponent implements OnInit {
     this.storyId = this.route.snapshot.paramMap.get('id') || '';
     if (!this.storyId) return;
     this.story = await this.storyService.getStory(this.storyId);
-    this.analyze();
+    // Load models and default selection
+    this.loadModels();
   }
 
   goBack(): void {
@@ -65,40 +80,33 @@ export class ClicheAnalyzerComponent implements OnInit {
     }
   }
 
-  analyze(): void {
+  async analyze(): Promise<void> {
     const story = this.story;
-    if (!story) { this.findings = []; return; }
-    const lang = story.settings?.language || 'en';
-    const patterns = this.getClichePatterns(lang);
-
-    const results: { sceneId: string; sceneLabel: string; phrase: string }[] = [];
-    story.chapters?.forEach(ch => {
-      ch.scenes?.forEach(sc => {
-        const text = this.stripHtmlTags(sc.content || '');
-        const sentences = this.splitSentences(text);
-        const sceneLabel = `C${ch.chapterNumber || ch.order}S${sc.sceneNumber || sc.order}`;
-        sentences.forEach(s => {
-          patterns.forEach(re => {
-            let m: RegExpExecArray | null;
-            // reset lastIndex for global regex
-            re.lastIndex = 0;
-            while ((m = re.exec(s)) !== null) {
-              const phrase = m[0];
-              results.push({ sceneId: sc.id, sceneLabel, phrase });
-              // avoid duplicate matches of same phrase in same sentence position
-              if (!re.global) { break; }
-            }
-          });
+    if (!story) { this.results = []; this.overview = null; return; }
+    if (!this.selectedModel) {
+      // Fallback to global settings
+      const settings = this.settingsService.getSettings();
+      this.selectedModel = settings.selectedModel || '';
+    }
+    this.isAnalyzing = true;
+    const results: SceneClicheResult[] = [];
+    for (const ch of story.chapters || []) {
+      for (const sc of ch.scenes || []) {
+        const sceneText = this.stripHtmlTags(sc.content || '');
+        if (!sceneText) continue;
+        const sceneTitle = sc.title || `C${ch.chapterNumber || ch.order}S${sc.sceneNumber || sc.order}`;
+        const res = await this.clicheService.analyzeScene({
+          modelId: this.selectedModel,
+          sceneId: sc.id,
+          sceneTitle,
+          sceneText
         });
-      });
-    });
-    // De-duplicate identical scene+phrase pairs
-    const seen = new Set<string>();
-    this.findings = results.filter(r => {
-      const key = `${r.sceneId}|${r.phrase.toLowerCase()}`;
-      if (seen.has(key)) return false;
-      seen.add(key); return true;
-    });
+        results.push(res);
+      }
+    }
+    this.results = results;
+    this.overview = this.buildOverview(results);
+    this.isAnalyzing = false;
   }
 
   private extractPlainText(story: Story | null): string {
@@ -134,43 +142,38 @@ export class ClicheAnalyzerComponent implements OnInit {
       .replace(/\s+/g, ' ');
   }
 
-  private splitSentences(text: string): string[] {
-    if (!text) return [];
-    // Basic sentence splitter that respects ., !, ?, … and quotes
-    const parts = text
-      .replace(/\s+/g, ' ')
-      .split(/(?<=[.!?…]["\]'}»”)]?)(?:\s+|$)/u)
-      .map(s => s.trim())
-      .filter(Boolean);
-    return parts;
+  private loadModels(): void {
+    // Load models from multiple providers similar to other components
+    this.modelService.loadAllModels().subscribe(({ openRouter, claude }) => {
+      const enriched = [
+        ...openRouter.map(m => ({ ...m, id: `openrouter:${m.id}` })),
+        ...claude.map(m => ({ ...m, id: `claude:${m.id}` })),
+      ];
+      this.availableModels = enriched;
+      const settings = this.settingsService.getSettings();
+      this.selectedModel = settings.selectedModel || enriched[0]?.id || '';
+    });
   }
 
-  private getClichePatterns(lang: string): RegExp[] {
-    const en = [
-      /\b(at the end of the day)\b/gi,
-      /\b(love at first sight)\b/gi,
-      /\b(stronger than ever)\b/gi,
-      /\b(out of the blue)\b/gi,
-      /\b(all of a sudden)\b/gi,
-      /\b(suddenly)\b/g,
-      /\b(before (?:he|she|they) knew it)\b/gi,
-      /\b(it was a dark and stormy night)\b/gi,
-      /\b(heart(?:s)? (?:was|were)?\s*pounding)\b/gi,
-      /\b(cold sweat)\b/gi,
-      /\b(every fiber of (?:his|her|their) being)\b/gi
-    ];
-    const de = [
-      /\b(am ende des tages)\b/gi,
-      /\b(liebe auf den ersten blick)\b/gi,
-      /\b(wie aus heiterem himmel)\b/gi,
-      /\b(stärker als je zuvor)\b/gi,
-      /\b(plötzlich)\b/g,
-      /\b(schlug (?:ihr|sein) herz.*? (?:bis zum hals))\b/gi,
-      /\b(kalter schweiß)\b/gi
-    ];
-    if (lang === 'de') return de;
-    if (lang === 'en') return en;
-    // For unknown/custom, check both sets
-    return [...en, ...de];
+  private buildOverview(results: SceneClicheResult[]): GlobalClicheReport {
+    const totals: Record<ClicheFindingType, number> = { cliche: 0, idiom: 0, redundancy: 0, buzzword: 0, stereotype: 0 };
+    const phraseCounts = new Map<string, number>();
+    for (const r of results) {
+      if (!r.summary?.counts) continue;
+      (Object.keys(totals) as ClicheFindingType[]).forEach((k) => {
+        const v = r.summary.counts[k] || 0;
+        totals[k] = (totals[k] || 0) + v;
+      });
+      for (const f of r.findings || []) {
+        const key = f.phrase.toLowerCase();
+        phraseCounts.set(key, (phraseCounts.get(key) || 0) + 1);
+      }
+    }
+    
+    const topPhrases = Array.from(phraseCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([phrase, count]) => ({ phrase, count }));
+    return { totals, topPhrases };
   }
 }
