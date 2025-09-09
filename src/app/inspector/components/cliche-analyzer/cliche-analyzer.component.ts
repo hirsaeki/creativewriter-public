@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, OnInit, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnInit, inject, NgZone, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -33,6 +33,8 @@ export class ClicheAnalyzerComponent implements OnInit {
   private router = inject(Router);
   private clicheService = inject(ClicheAnalysisService);
   private settingsService = inject(SettingsService);
+  private zone = inject(NgZone);
+  private cdr = inject(ChangeDetectorRef);
 
   storyId = '';
   story: Story | null = null;
@@ -52,7 +54,7 @@ export class ClicheAnalyzerComponent implements OnInit {
     this.rightActions = [{
       icon: 'search',
       label: 'Analyze',
-      action: () => this.analyze(),
+      action: () => this.runAnalyze(),
       showOnMobile: true,
       showOnDesktop: true,
       tooltip: 'Analyze story for clichés'
@@ -66,6 +68,13 @@ export class ClicheAnalyzerComponent implements OnInit {
     // Initialize selected model from global settings if available
     const settings = this.settingsService.getSettings();
     this.selectedModel = settings.selectedModel || this.selectedModel;
+  }
+
+  runAnalyze(): void {
+    // Ensure we execute within Angular zone so OnPush detects changes
+    this.zone.run(() => {
+      void this.analyze();
+    });
   }
 
   goBack(): void {
@@ -86,6 +95,7 @@ export class ClicheAnalyzerComponent implements OnInit {
       this.selectedModel = settings.selectedModel || '';
     }
     this.isAnalyzing = true;
+    this.cdr.markForCheck();
     const results: SceneClicheResult[] = [];
     try {
       for (const ch of story.chapters || []) {
@@ -100,12 +110,14 @@ export class ClicheAnalyzerComponent implements OnInit {
             sceneText
           });
           results.push(res);
+          this.cdr.markForCheck();
         }
       }
       this.results = results;
       this.overview = this.buildOverview(results);
     } finally {
       this.isAnalyzing = false;
+      this.cdr.markForCheck();
     }
   }
 
