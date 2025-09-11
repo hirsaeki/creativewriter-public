@@ -55,6 +55,12 @@
                   <span class="snippet">{{ f.phrase }}</span>
                   <span class="meta" style="color: #999;"> — {{ f.why }}</span>
                   <div *ngIf="f.suggestion" style="color:#6aa84f; margin-left: 8px;">Suggestion: {{ f.suggestion }}</div>
+                  <div>
+                    <ion-button size="small" fill="clear" color="primary" (click)="openInEditor(r, f)">
+                      <ion-icon name="open-outline" slot="start"></ion-icon>
+                      Open in Editor
+                    </ion-button>
+                  </div>
                 </div>
               </ion-label>
             </ion-item>

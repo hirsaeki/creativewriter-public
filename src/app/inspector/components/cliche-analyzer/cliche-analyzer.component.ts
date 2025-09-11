@@ -9,7 +9,7 @@ import {
 } from '@ionic/angular/standalone';
 import { IonSpinner, IonProgressBar } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, search, addOutline, closeOutline } from 'ionicons/icons';
+import { arrowBack, search, addOutline, closeOutline, openOutline, documentTextOutline } from 'ionicons/icons';
 import { AppHeaderComponent, BurgerMenuItem, HeaderAction } from '../../../../app/ui/components/app-header.component';
 import { HeaderNavigationService } from '../../../../app/shared/services/header-navigation.service';
 import { StoryService } from '../../../stories/services/story.service';
@@ -65,7 +65,7 @@ export class ClicheAnalyzerComponent implements OnInit {
   rightActions: HeaderAction[] = [];
 
   constructor() {
-    addIcons({ arrowBack, search, addOutline, closeOutline });
+    addIcons({ arrowBack, search, addOutline, closeOutline, openOutline, documentTextOutline });
     // Reuse common items so navigation stays consistent
     this.burgerMenuItems = this.headerNav.getCommonBurgerMenuItems();
     this.rightActions = [
@@ -281,6 +281,25 @@ export class ClicheAnalyzerComponent implements OnInit {
   getScenePreview(html: string): string {
     const clean = this.stripHtmlTags(html || '');
     return clean.substring(0, 100) + (clean.length > 100 ? '...' : '');
+  }
+
+  openInEditor(result: SceneClicheResult, finding: { phrase: string }): void {
+    if (!this.story) return;
+    let chapterId = '';
+    for (const ch of this.story.chapters) {
+      if (ch.scenes?.some(sc => sc.id === result.sceneId)) {
+        chapterId = ch.id;
+        break;
+      }
+    }
+    if (!chapterId) return;
+    this.router.navigate(['/stories/editor', this.story.id], {
+      queryParams: {
+        chapterId,
+        sceneId: result.sceneId,
+        phrase: finding.phrase
+      }
+    });
   }
 
   private persistState(): void {

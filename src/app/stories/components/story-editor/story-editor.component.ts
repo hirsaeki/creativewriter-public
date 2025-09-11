@@ -160,6 +160,10 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     );
     
     const storyId = this.route.snapshot.paramMap.get('id');
+    const qp = this.route.snapshot.queryParamMap;
+    const preferredChapterId = qp.get('chapterId');
+    const preferredSceneId = qp.get('sceneId');
+    const highlightPhrase = qp.get('phrase');
     if (storyId) {
       const existingStory = await this.storyService.getStory(storyId);
       if (existingStory) {
@@ -168,8 +172,17 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         // Initialize prompt manager with current story
         await this.promptManager.setCurrentStory(this.story.id);
         
-        // Auto-select last scene in last chapter
-        if (this.story.chapters && this.story.chapters.length > 0) {
+        // Select requested scene if provided; otherwise last scene
+        if (preferredChapterId && preferredSceneId) {
+          const ch = this.story.chapters.find(c => c.id === preferredChapterId);
+          const sc = ch?.scenes.find(s => s.id === preferredSceneId);
+          if (ch && sc) {
+            this.activeChapterId = ch.id;
+            this.activeSceneId = sc.id;
+            this.activeScene = sc;
+          }
+        }
+        if (!this.activeScene && this.story.chapters && this.story.chapters.length > 0) {
           const lastChapter = this.story.chapters[this.story.chapters.length - 1];
           if (lastChapter.scenes && lastChapter.scenes.length > 0) {
             const lastScene = lastChapter.scenes[lastChapter.scenes.length - 1];
@@ -196,6 +209,12 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
             requestAnimationFrame(() => {
               setTimeout(async () => {
                 await this.scrollToEndOfContent();
+                if (highlightPhrase) {
+                  // Give the editor a moment to settle then highlight
+                  setTimeout(() => {
+                    this.proseMirrorService.selectFirstMatchOf(highlightPhrase);
+                  }, 150);
+                }
               }, 500);
             });
           }
