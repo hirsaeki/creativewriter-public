@@ -7,6 +7,14 @@ ion-content {
   --background: transparent;
 }
 
+/* Add extra breathing room at the bottom on mobile so
+   native navigation bars don’t overlap interactive content */
+@media (max-width: 768px) {
+  ion-content {
+    --padding-bottom: max(env(safe-area-inset-bottom, 20px), 80px);
+  }
+}
+
 ion-card {
   margin: 1rem;
   background: linear-gradient(135deg, rgba(45, 45, 45, 0.4) 0%, rgba(30, 30, 30, 0.4) 100%);
