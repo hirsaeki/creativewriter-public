@@ -25,6 +25,10 @@ export class HeaderNavigationService {
     this.router.navigate(['/stories/image-generation']);
   }
 
+  goToStoryInspector(storyId: string): void {
+    this.router.navigate(['/stories/inspector', storyId]);
+  }
+
   goToNovelCrafterImport(): void {
     this.router.navigate(['/stories/import/novelcrafter']);
   }

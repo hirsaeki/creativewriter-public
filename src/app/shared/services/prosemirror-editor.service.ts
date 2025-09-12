@@ -1,5 +1,5 @@
 import { Injectable, Injector, ApplicationRef, EnvironmentInjector, inject } from '@angular/core';
-import { EditorState, Transaction, Plugin, PluginKey } from 'prosemirror-state';
+import { EditorState, Transaction, Plugin, PluginKey, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { Schema, DOMParser, DOMSerializer, Node as ProseMirrorNode, Fragment, Slice } from 'prosemirror-model';
 import { schema } from 'prosemirror-schema-basic';
@@ -654,6 +654,41 @@ export class ProseMirrorEditorService {
       this.simpleEditorView = null;
     }
     this.beatNodeViews.clear();
+  }
+
+  /**
+   * Selects the first occurrence of the given phrase in the editor and scrolls it into view.
+   * Returns true if a match was found and selection applied.
+   */
+  selectFirstMatchOf(phrase: string): boolean {
+    if (!this.editorView || !phrase) return false;
+
+    const state = this.editorView.state;
+    const lower = phrase.toLowerCase();
+    let foundPos: { from: number; to: number } | null = null;
+
+    state.doc.descendants((node, pos) => {
+      if (foundPos) return false; // stop traversal
+      if (node.isText && node.text) {
+        const idx = node.text.toLowerCase().indexOf(lower);
+        if (idx >= 0) {
+          const from = pos + idx;
+          const to = from + phrase.length;
+          foundPos = { from, to };
+          return false; // stop
+        }
+      }
+      return true;
+    });
+
+    if (foundPos !== null) {
+      const { from, to } = foundPos;
+      const tr = state.tr.setSelection(TextSelection.create(state.doc, from, to)).scrollIntoView();
+      this.editorView.dispatch(tr);
+      this.focus();
+      return true;
+    }
+    return false;
   }
 
   private setPlaceholder(placeholder: string): void {

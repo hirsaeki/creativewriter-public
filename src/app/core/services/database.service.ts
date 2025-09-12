@@ -2,7 +2,18 @@ import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { AuthService, User } from './auth.service';
 
-declare const PouchDB: new(name: string, options?: PouchDB.Configuration.DatabaseConfiguration) => PouchDB.Database;
+// Minimal static type for the PouchDB constructor when loaded via ESM
+interface PouchDBStatic {
+  new (nameOrUrl: string, options?: PouchDB.Configuration.DatabaseConfiguration): PouchDB.Database;
+  plugin(plugin: unknown): void;
+}
+
+// Minimal replication sync interface used by this service
+interface PouchSync {
+  on(event: string, handler: (info: unknown) => void): PouchSync;
+  off(event: string, handler?: (info: unknown) => void): PouchSync;
+  cancel(): void;
+}
 
 export interface SyncStatus {
   isOnline: boolean;
@@ -19,21 +30,20 @@ export class DatabaseService {
   
   private db: PouchDB.Database | null = null;
   private remoteDb: PouchDB.Database | null = null;
-  private syncHandler: PouchDB.Replication.Sync<Record<string, unknown>> | null = null;
+  private syncHandler: PouchSync | null = null;
   private initializationPromise: Promise<void> | null = null;
   private syncStatusSubject = new BehaviorSubject<SyncStatus>({
     isOnline: navigator.onLine,
     isSync: false
   });
 
+  // Runtime reference to the PouchDB constructor loaded via ESM
+  // Types for PouchDB usage remain via the ambient PouchDB namespace
+  private pouchdbCtor: PouchDBStatic | null = null;
+
   public syncStatus$: Observable<SyncStatus> = this.syncStatusSubject.asObservable();
 
   constructor() {
-    // PouchDB is loaded globally from CDN
-    if (typeof PouchDB === 'undefined') {
-      throw new Error('PouchDB is not loaded. Please check index.html');
-    }
-    
     // Initialize with default database (will be updated when user logs in)
     this.initializationPromise = this.initializeDatabase('creative-writer-stories');
     
@@ -48,6 +58,18 @@ export class DatabaseService {
   }
 
   private async initializeDatabase(dbName: string): Promise<void> {
+    // Ensure PouchDB ESM is loaded and plugin registered (lazy load to reduce initial bundle)
+    if (!this.pouchdbCtor) {
+      interface PouchDBModule { default: PouchDBStatic }
+      interface PouchDBFindModule { default: unknown }
+      const [{ default: PouchDB }, { default: PouchDBFind }] = await Promise.all([
+        import('pouchdb-browser') as Promise<PouchDBModule>,
+        import('pouchdb-find') as Promise<PouchDBFindModule>
+      ]);
+      // Register find/mango plugin
+      PouchDB.plugin(PouchDBFind);
+      this.pouchdbCtor = PouchDB;
+    }
     
     // Stop sync first
     await this.stopSync();
@@ -64,7 +86,7 @@ export class DatabaseService {
     // Small delay to ensure cleanup
     await new Promise(resolve => setTimeout(resolve, 100));
     
-    this.db = new PouchDB(dbName);
+    this.db = new this.pouchdbCtor(dbName);
     
     // Create indexes for better query performance
     try {
@@ -133,7 +155,11 @@ export class DatabaseService {
       }
 
       
-      this.remoteDb = new PouchDB(couchUrl, {
+      const Pouch = this.pouchdbCtor;
+      if (!Pouch) {
+        throw new Error('PouchDB not initialized');
+      }
+      this.remoteDb = new Pouch(couchUrl, {
         auth: {
           username: 'admin',
           password: 'password' // TODO: Make this configurable
@@ -208,11 +234,13 @@ export class DatabaseService {
   private startSync(): void {
     if (!this.remoteDb || !this.db) return;
 
-    this.syncHandler = this.db.sync(this.remoteDb, {
+    const handler = this.db.sync(this.remoteDb, {
       live: true,
       retry: true,
       timeout: 30000
-    })
+    }) as unknown as PouchSync;
+
+    this.syncHandler = (handler as unknown as PouchDB.Replication.Sync<Record<string, unknown>>)
     .on('change', () => {
       this.updateSyncStatus({ 
         isSync: false, 

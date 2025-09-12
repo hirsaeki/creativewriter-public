@@ -144,4 +144,5 @@ declare namespace PouchDB {
   }
 }
 
-declare const PouchDB: new(name: string, options?: PouchDB.Configuration.DatabaseConfiguration) => PouchDB.Database;
+// Use module-bundled PouchDB; avoid declaring a global runtime constructor.
+// Ambient namespace types remain available for typing in the app.

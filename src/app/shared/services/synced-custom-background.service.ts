@@ -303,7 +303,7 @@ export class SyncedCustomBackgroundService {
       });
 
       const docsToDelete = result.docs.map((doc: unknown) => {
-        const existingDoc = doc as PouchDB.Core.ExistingDocument & CustomBackground;
+        const existingDoc = doc as PouchDB.Core.ExistingDocument<CustomBackground>;
         return {
           _id: existingDoc._id,
           _rev: existingDoc._rev,
