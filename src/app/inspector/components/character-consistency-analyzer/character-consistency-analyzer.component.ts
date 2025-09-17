@@ -278,7 +278,7 @@ export class CharacterConsistencyAnalyzerComponent implements OnInit {
     return clean.substring(0, 100) + (clean.length > 100 ? '...' : '');
   }
 
-  openInEditor(result: SceneCharacterConsistencyResult): void {
+  openInEditor(result: SceneCharacterConsistencyResult, issue?: { snippet?: string }): void {
     if (!this.story) return;
     let chapterId = '';
     for (const ch of this.story.chapters) {
@@ -291,7 +291,9 @@ export class CharacterConsistencyAnalyzerComponent implements OnInit {
     this.router.navigate(['/stories/editor', this.story.id], {
       queryParams: {
         chapterId,
-        sceneId: result.sceneId
+        sceneId: result.sceneId,
+        // Pass a snippet (if available) so the editor can highlight it
+        ...(issue?.snippet ? { phrase: issue.snippet } : {})
       }
     });
   }

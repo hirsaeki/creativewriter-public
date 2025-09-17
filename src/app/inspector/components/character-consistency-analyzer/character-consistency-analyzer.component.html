@@ -56,7 +56,7 @@
                   <span class="meta" style="color:#999;"> — {{ i.why }}</span>
                   <div *ngIf="i.suggestion" style="color:#6aa84f; margin-left: 8px;">Suggestion: {{ i.suggestion }}</div>
                   <div>
-                    <ion-button size="small" fill="clear" color="primary" (click)="openInEditor(r)">
+                    <ion-button size="small" fill="clear" color="primary" (click)="openInEditor(r, i)">
                       <ion-icon name="open-outline" slot="start"></ion-icon>
                       Open in Editor
                     </ion-button>
@@ -109,4 +109,3 @@
     </ion-content>
   </ng-template>
 </ion-modal>
-

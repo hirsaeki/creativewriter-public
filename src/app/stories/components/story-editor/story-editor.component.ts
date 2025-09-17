@@ -212,7 +212,10 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
                 if (highlightPhrase) {
                   // Give the editor a moment to settle then highlight
                   setTimeout(() => {
-                    this.proseMirrorService.selectFirstMatchOf(highlightPhrase);
+                    const ok = this.proseMirrorService.selectFirstMatchOf(highlightPhrase);
+                    if (ok) {
+                      this.proseMirrorService.flashSelection();
+                    }
                   }, 150);
                 }
               }, 500);
