@@ -347,7 +347,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async saveStory(): Promise<void> {
+  async saveStory(): Promise<void> {
     // Prevent concurrent saves
     if (this.isSaving) {
       this.pendingSave = true;
@@ -574,7 +574,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
 
     // Use StoryStatsService to compute total word count safely
     try {
-      const totalWords = this.storyStatsService.calculateTotalStoryWordCount(this.story as any);
+      const totalWords = this.storyStatsService.calculateTotalStoryWordCount(this.story);
       return totalWords === 0;
     } catch {
       // Fallback: if stats service fails, perform a minimal check on the first scene

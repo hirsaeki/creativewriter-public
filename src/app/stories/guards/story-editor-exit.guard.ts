@@ -10,7 +10,7 @@ export class StoryEditorExitGuard implements CanDeactivate<StoryEditorComponent>
   async canDeactivate(component: StoryEditorComponent): Promise<boolean> {
     try {
       // Offer deletion for empty, untitled default drafts on any route change
-      if (typeof (component as any).isDefaultEmptyDraft === 'function' && component.isDefaultEmptyDraft()) {
+      if (typeof component.isDefaultEmptyDraft === 'function' && component.isDefaultEmptyDraft()) {
         const shouldDelete = confirm('This draft has no title or content. Delete it?');
         if (shouldDelete) {
           try {
