@@ -427,7 +427,7 @@ export class PromptsSettingsComponent {
   }
 
   resetToDefaultSummaryPrompt(): void {
-    const defaultPrompt = 'Create a summary of the following scene:\n\nTitle: {sceneTitle}\n\nContent:\n{sceneContent}\n\nThe summary should capture the most important plot points and character developments. Write a complete and comprehensive summary with at least 3-5 sentences.';
+    const defaultPrompt = 'Create a summary of the following scene:\n\nTitle: {sceneTitle}\n\nContent:\n{sceneContent}\n\nThe summary should capture the most important plot points and character developments. Write a complete and comprehensive summary with at least 3-5 sentences.\n\n{languageInstruction}';
     this.settings.sceneSummaryGeneration.customPrompt = defaultPrompt;
     this.settingsChange.emit();
   }

@@ -284,13 +284,36 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
       contentTruncated = true;
     }
     
+    // Determine language instruction for summary based on story language
+    const storyLanguage = this.story.settings?.language || 'en';
+    const languageInstruction = (() => {
+      switch (storyLanguage) {
+        case 'de':
+          return 'Antworte auf Deutsch.';
+        case 'fr':
+          return 'Réponds en français.';
+        case 'es':
+          return 'Responde en español.';
+        case 'en':
+          return 'Respond in English.';
+        case 'custom':
+        default:
+          return 'Write the summary in the same language as the scene content.';
+      }
+    })();
+
     // Build prompt based on settings
     let prompt: string;
     if (settings.sceneSummaryGeneration.useCustomPrompt) {
       prompt = settings.sceneSummaryGeneration.customPrompt
         .replace(/{sceneTitle}/g, scene.title || 'Untitled')
         .replace(/{sceneContent}/g, sceneContent + (contentTruncated ? '\n\n[Note: Content was truncated as it was too long]' : ''))
-        .replace(/{customInstruction}/g, settings.sceneSummaryGeneration.customInstruction || '');
+        .replace(/{customInstruction}/g, settings.sceneSummaryGeneration.customInstruction || '')
+        .replace(/{languageInstruction}/g, languageInstruction);
+      // Ensure language instruction is present even if template doesn't include placeholder
+      if (!prompt.includes(languageInstruction)) {
+        prompt += `\n\n${languageInstruction}`;
+      }
     } else {
       // Default prompt
       prompt = `Create a summary of the following scene:
@@ -306,6 +329,8 @@ The summary should capture the most important plot points and character developm
       if (settings.sceneSummaryGeneration.customInstruction) {
         prompt += `\n\nZusätzliche Anweisungen: ${settings.sceneSummaryGeneration.customInstruction}`;
       }
+      // Add language instruction at the end
+      prompt += `\n\n${languageInstruction}`;
     }
 
     // Extract provider from model if available
