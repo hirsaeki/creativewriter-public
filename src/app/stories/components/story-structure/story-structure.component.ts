@@ -302,6 +302,10 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
       }
     })();
 
+    // Desired summary length in words (bounded for safety)
+    const desiredWordCount = Math.max(20, Math.min(1000, settings.sceneSummaryGeneration.wordCount || 120));
+    const wordCountInstruction = `Aim for about ${desiredWordCount} words.`;
+
     // Build prompt based on settings
     let prompt: string;
     if (settings.sceneSummaryGeneration.useCustomPrompt) {
@@ -309,21 +313,19 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
         .replace(/{sceneTitle}/g, scene.title || 'Untitled')
         .replace(/{sceneContent}/g, sceneContent + (contentTruncated ? '\n\n[Note: Content was truncated as it was too long]' : ''))
         .replace(/{customInstruction}/g, settings.sceneSummaryGeneration.customInstruction || '')
-        .replace(/{languageInstruction}/g, languageInstruction);
+        .replace(/{languageInstruction}/g, languageInstruction)
+        .replace(/{summaryWordCount}/g, String(desiredWordCount));
       // Ensure language instruction is present even if template doesn't include placeholder
       if (!prompt.includes(languageInstruction)) {
         prompt += `\n\n${languageInstruction}`;
       }
+      // Ensure approximate word count guidance present if template omits it
+      if (!/\bword(s)?\b/i.test(prompt)) {
+        prompt += `\n\n${wordCountInstruction}`;
+      }
     } else {
       // Default prompt
-      prompt = `Create a summary of the following scene:
-
-Title: ${scene.title || 'Untitled'}
-
-Content:
-${sceneContent}${contentTruncated ? '\n\n[Note: Content was truncated as it was too long]' : ''}
-
-The summary should capture the most important plot points and character developments. Write a complete and comprehensive summary with at least 3-5 sentences.`;
+      prompt = `Create a summary of the following scene:\n\nTitle: ${scene.title || 'Untitled'}\n\nContent:\n${sceneContent}${contentTruncated ? '\n\n[Note: Content was truncated as it was too long]' : ''}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments. ${wordCountInstruction}`;
       
       // Add custom instruction if provided
       if (settings.sceneSummaryGeneration.customInstruction) {
