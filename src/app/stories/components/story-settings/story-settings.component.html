@@ -81,7 +81,28 @@
           <ion-card-content>
             <ion-text color="medium">
               <p>This message defines the context and personality of the AI assistant for this story.</p>
-              <p><small><strong>Language:</strong> {{ settings.language || 'en' | uppercase }}</small></p>
+            </ion-text>
+
+            <ion-item>
+              <ion-label position="stacked">Story Language</ion-label>
+              <ion-select
+                [(ngModel)]="settings.language"
+                (ionChange)="onSettingsChange()"
+                interface="popover"
+                aria-label="Select story language">
+                <ion-select-option value="en">English</ion-select-option>
+                <ion-select-option value="de">Deutsch</ion-select-option>
+                <ion-select-option value="fr">Français</ion-select-option>
+                <ion-select-option value="es">Español</ion-select-option>
+                <ion-select-option value="custom">Custom (use scene language)</ion-select-option>
+              </ion-select>
+            </ion-item>
+            <ion-note>
+              <small>Changing the language affects AI outputs (titles, summaries, beats). Use “Reload templates” to load language-specific templates.</small>
+            </ion-note>
+
+            <ion-text color="medium">
+              <p><small><strong>Current:</strong> {{ (settings.language || 'en') | uppercase }}</small></p>
             </ion-text>
             <ion-textarea
               [(ngModel)]="settings.systemMessage"

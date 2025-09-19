@@ -7,7 +7,7 @@ import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
   IonTextarea, IonCheckbox, IonRadio, IonRadioGroup, IonChip, IonNote,
   IonText, IonGrid, IonRow, IonCol, IonProgressBar, IonList, IonThumbnail,
-  IonBadge
+  IonBadge, IonSelect, IonSelectOption
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
@@ -36,7 +36,7 @@ import { ImageUploadComponent, ImageUploadResult } from '../../../ui/components/
     IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
     IonTextarea, IonCheckbox, IonRadio, IonRadioGroup, IonChip, IonNote,
     IonText, IonGrid, IonRow, IonCol, IonProgressBar, IonList, IonThumbnail,
-    IonBadge,
+    IonBadge, IonSelect, IonSelectOption,
     SettingsTabsComponent, SettingsContentComponent, ImageUploadComponent
   ],
   templateUrl: './story-settings.component.html',
