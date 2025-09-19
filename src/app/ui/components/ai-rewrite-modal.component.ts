@@ -14,6 +14,7 @@ import { StoryService } from '../../stories/services/story.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { AIRequestLoggerService } from '../../core/services/ai-request-logger.service';
 import { ModelService } from '../../core/services/model.service';
+import { ModelSelectorComponent } from '../../shared/components/model-selector/model-selector.component';
 import { Story, Scene, Chapter } from '../../stories/models/story.interface';
 import { Observable, of, from } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
@@ -40,7 +41,8 @@ interface SceneContext {
     CommonModule, FormsModule,
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
     IonContent, IonItem, IonLabel, IonTextarea, IonIcon, IonChip, IonSpinner,
-    IonModal, IonList, IonCheckbox, IonItemDivider, IonSearchbar
+    IonModal, IonList, IonCheckbox, IonItemDivider, IonSearchbar,
+    ModelSelectorComponent
   ],
   template: `
     <ion-header>
@@ -100,6 +102,12 @@ interface SceneContext {
           </ion-chip>
         </div>
       </div>
+
+      <!-- Model Selection -->
+      <ion-item>
+        <ion-label position="stacked">AI Model</ion-label>
+        <app-model-selector [(model)]="selectedModel" [placeholder]="'Select AI model'" [appendTo]="'body'"></app-model-selector>
+      </ion-item>
 
       <!-- Original Text -->
       <ion-item class="original-text-item">
@@ -387,6 +395,7 @@ export class AIRewriteModalComponent implements OnInit {
   customPrompt = '';
   rewrittenText = '';
   isRewriting = false;
+  selectedModel = '';
   
   // Context management
   story: Story | null = null;
@@ -416,6 +425,9 @@ export class AIRewriteModalComponent implements OnInit {
     if (this.storyId) {
       await this.loadStoryAndSetupContext();
     }
+    // Initialize selected model from global settings if available
+    const settings = this.settingsService.getSettings();
+    this.selectedModel = settings.selectedModel || this.selectedModel;
     
     // Focus the custom prompt textarea after a short delay
     setTimeout(() => {
@@ -678,8 +690,8 @@ export class AIRewriteModalComponent implements OnInit {
   private callAIDirectly(prompt: string, beatId: string, options: { wordCount: number }): Observable<string> {
     const settings = this.settingsService.getSettings();
     
-    // Use global model from settings
-    const modelToUse = settings.selectedModel;
+    // Prefer locally selected model, fall back to global
+    const modelToUse = this.selectedModel || settings.selectedModel;
     
     // Extract provider from the selected model
     let provider: string | null = null;
