@@ -570,8 +570,9 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
       }
     }, 30000); // 30 second timeout
     
-    // Remove embedded images from content to reduce token count
+    // Remove embedded images and strip HTML/Beat AI nodes for clean prompt text
     let sceneContent = this.removeEmbeddedImages(scene.content);
+    sceneContent = this.promptManager.extractPlainTextFromHtml(sceneContent);
     
     // Limit content length for title generation - we need even less content for a title
     // For title generation, 50k characters should be more than enough
