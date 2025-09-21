@@ -8,6 +8,7 @@ import {
   IonChip, IonAvatar, IonSearchbar, IonModal, IonCheckbox, IonItemDivider,
   IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader
 } from '@ionic/angular/standalone';
+import { AlertController } from '@ionic/angular';
 import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
 import { addIcons } from 'ionicons';
 import { 
@@ -87,6 +88,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
   private modelService = inject(ModelService);
   private sanitizer = inject(DomSanitizer);
   private cdr = inject(ChangeDetectorRef);
+  private readonly alertController = inject(AlertController);
 
   @ViewChild('scrollContainer') scrollContainer!: ElementRef;
   @ViewChild('messageInput') messageInput!: ElementRef;
@@ -116,6 +118,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
   private subscriptions = new Subscription();
   private abortController: AbortController | null = null;
   keyboardVisible = false;
+  private chatSessionId = Date.now();
 
   constructor() {
     addIcons({ 
@@ -189,6 +192,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
       }
 
       // Call AI directly without the beat generation template
+      const sessionIdSnapshot = this.chatSessionId;
       let accumulatedResponse = '';
       const subscription = this.callAIDirectly(
         prompt,
@@ -196,10 +200,12 @@ export class SceneChatComponent implements OnInit, OnDestroy {
         { wordCount: 400 }
       ).subscribe({
         next: (chunk) => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
           accumulatedResponse = chunk;
           this.cdr.markForCheck();
         },
         complete: () => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
           this.messages.push({
             role: 'assistant',
             content: accumulatedResponse,
@@ -211,6 +217,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
           this.cdr.markForCheck();
         },
         error: (error) => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
           console.error('Error generating response:', error);
           this.messages.push({
             role: 'assistant',
@@ -356,6 +363,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
       }
       
       // Call AI directly without the beat generation template
+      const sessionIdSnapshot = this.chatSessionId;
       let accumulatedResponse = '';
       const subscription = this.callAIDirectly(
         prompt,
@@ -363,10 +371,12 @@ export class SceneChatComponent implements OnInit, OnDestroy {
         { wordCount: 400 }
       ).subscribe({
         next: (chunk) => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
           accumulatedResponse = chunk;
           this.cdr.markForCheck();
         },
         complete: () => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
           this.messages.push({
             role: 'assistant',
             content: accumulatedResponse,
@@ -378,6 +388,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
           this.cdr.markForCheck();
         },
         error: (error) => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
           console.error('Error generating response:', error);
           this.messages.push({
             role: 'assistant',
@@ -1148,7 +1159,57 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
         action: () => this.showSceneSelector = true,
         showOnMobile: true,
         showOnDesktop: true
+      },
+      {
+        icon: 'chatbubble-outline',
+        action: () => this.confirmNewChat(),
+        showOnMobile: true,
+        showOnDesktop: true
       }
     ];
+  }
+
+  private async confirmNewChat(): Promise<void> {
+    if (this.isGenerating) {
+      // To avoid mixing streams, ask for explicit confirmation
+      const alert = await this.alertController.create({
+        header: 'Start New Chat?',
+        message: 'This will clear the current conversation. Ongoing generation will be ignored.',
+        buttons: [
+          { text: 'Cancel', role: 'cancel' },
+          { text: 'Start New Chat', role: 'destructive', handler: () => this.startNewChat() }
+        ]
+      });
+      await alert.present();
+      return;
+    }
+
+    const alert = await this.alertController.create({
+      header: 'Start New Chat?',
+      message: 'This will clear the current conversation history.',
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        { text: 'Start New Chat', role: 'destructive', handler: () => this.startNewChat() }
+      ]
+    });
+    await alert.present();
+  }
+
+  private startNewChat(): void {
+    // Bump session id so any in-flight responses are ignored
+    this.chatSessionId = Date.now();
+    this.isGenerating = false;
+    this.currentMessage = '';
+
+    // Clear chat messages and push greeting
+    this.messages = [];
+    this.messages.push({
+      role: 'assistant',
+      content: 'Hello! I am your AI assistant for this scene. I work exclusively with the context of selected scenes. You can ask me questions to extract characters, analyze details, or develop ideas.',
+      timestamp: new Date()
+    });
+
+    this.scrollToBottom();
+    this.cdr.markForCheck();
   }
 }
