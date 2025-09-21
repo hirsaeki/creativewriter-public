@@ -132,9 +132,108 @@ export class SceneChatComponent implements OnInit, OnDestroy {
 
   resendMessage(message: ChatMessage): void {
     if (this.isGenerating) return;
-    // Reuse the exact message content and extraction type
-    this.currentMessage = message.content;
-    this.sendMessage(message.extractionType);
+    const index = this.messages.indexOf(message);
+    if (index === -1) return;
+
+    // Remove all messages after the clicked one
+    if (index < this.messages.length - 1) {
+      this.messages.splice(index + 1);
+      this.cdr.markForCheck();
+    }
+
+    const userMessage = message.content;
+    const extractionType = message.extractionType;
+
+    this.isGenerating = true;
+    this.scrollToBottom();
+
+    try {
+      // Prepare scene context
+      const sceneContext = this.selectedScenes
+        .map(s => `<scene chapter="${s.chapterTitle}" title="${s.sceneTitle}">\n${s.content}\n</scene>`)
+        .join('\n\n');
+
+      // Prepare story outline if enabled
+      let storyOutline = '';
+      if (this.includeStoryOutline) {
+        storyOutline = this.buildStoryOutline();
+      }
+
+      // Generate a unique beat ID for this chat message
+      const beatId = 'chat-' + Date.now();
+
+      let prompt = '';
+
+      // Always use direct AI calls without system prompt or codex
+      let contextText = '';
+      if (storyOutline) {
+        contextText += `Story Overview:\n${storyOutline}\n\n`;
+      }
+      if (sceneContext) {
+        contextText += `Scene Text:\n${sceneContext}\n\n`;
+      }
+
+      // Add chat history context (exclude initial system message and preset prompts)
+      const chatHistory = this.buildChatHistory();
+      if (chatHistory) {
+        contextText += `Previous chat history:\n${chatHistory}\n\n`;
+      }
+
+      // Build prompt based on type
+      if (extractionType) {
+        // Use the extraction prompt directly
+        prompt = `${contextText}${userMessage}`;
+      } else {
+        // For normal chat, just add the user's question
+        prompt = `${contextText}User Question: ${userMessage}\n\nPlease answer helpfully and creatively based on the given context and previous conversation.`;
+      }
+
+      // Call AI directly without the beat generation template
+      let accumulatedResponse = '';
+      const subscription = this.callAIDirectly(
+        prompt,
+        beatId,
+        { wordCount: 400 }
+      ).subscribe({
+        next: (chunk) => {
+          accumulatedResponse = chunk;
+          this.cdr.markForCheck();
+        },
+        complete: () => {
+          this.messages.push({
+            role: 'assistant',
+            content: accumulatedResponse,
+            timestamp: new Date(),
+            extractionType
+          });
+          this.isGenerating = false;
+          this.scrollToBottom();
+          this.cdr.markForCheck();
+        },
+        error: (error) => {
+          console.error('Error generating response:', error);
+          this.messages.push({
+            role: 'assistant',
+            content: 'Sorry, an error occurred. Please try again.',
+            timestamp: new Date()
+          });
+          this.isGenerating = false;
+          this.scrollToBottom();
+        }
+      });
+
+      this.subscriptions.add(subscription);
+
+    } catch (error) {
+      console.error('Error generating response:', error);
+      this.messages.push({
+        role: 'assistant',
+        content: 'Entschuldigung, es ist ein Fehler aufgetreten. Bitte versuche es erneut.',
+        timestamp: new Date()
+      });
+      this.isGenerating = false;
+      this.scrollToBottom();
+    }
   }
 
   ngOnInit() {
