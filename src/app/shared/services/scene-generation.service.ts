@@ -45,7 +45,9 @@ export class SceneGenerationService {
     const prompt = this.messagesToPrompt(systemMessage, messages);
 
     const { provider, modelId } = this.splitProvider(options.model);
-    const maxTokens = Math.max(3000, Math.ceil((options.wordCount || 600) * 3));
+    const requestedWordCount = Math.max(200, Math.min(25000, options.wordCount || 600));
+    const calculatedTokens = Math.ceil(requestedWordCount * 3);
+    const maxTokens = Math.max(3000, Math.min(calculatedTokens, 100000));
     const temperature = options.temperature ?? this.getDefaultTemperature(provider);
 
     let content = '';
@@ -146,7 +148,7 @@ export class SceneGenerationService {
 
     const langPref = (options.language || story.settings?.language || 'en') as 'en' | 'de' | 'fr' | 'es' | 'custom';
     const languageInstruction = this.getLanguageInstruction(langPref);
-    const wordCount = Math.max(200, Math.min(2000, options.wordCount || 600));
+    const wordCount = Math.max(200, Math.min(25000, options.wordCount || 600));
 
     let userContent = '';
     if (appSettings.sceneGenerationFromOutline?.useCustomPrompt) {

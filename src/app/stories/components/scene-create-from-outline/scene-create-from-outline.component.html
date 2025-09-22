@@ -29,7 +29,7 @@
   <div class="controls">
     <ion-item>
       <ion-label>Target word count: {{ wordCount }}</ion-label>
-      <ion-range min="200" max="1500" step="50" snaps="true" [(ngModel)]="wordCount"></ion-range>
+      <ion-range min="200" max="25000" step="100" [(ngModel)]="wordCount"></ion-range>
     </ion-item>
 
     <ion-item>
@@ -71,4 +71,3 @@
     </ion-buttons>
   </ion-toolbar>
 </ion-footer>
-

@@ -23,9 +23,9 @@ import { ModelOption } from '../../core/models/model.interface';
           <ion-label>Default Target Length (words)</ion-label>
           <ion-range [(ngModel)]="settings.sceneGenerationFromOutline.wordCount"
                      (ngModelChange)="settingsChange.emit()"
-                     min="200" max="1500" step="50" snaps="true" slot="end">
+                     min="200" max="25000" step="100" slot="end">
             <ion-label slot="start">200</ion-label>
-            <ion-label slot="end">1500</ion-label>
+            <ion-label slot="end">25000</ion-label>
           </ion-range>
         </ion-item>
 
