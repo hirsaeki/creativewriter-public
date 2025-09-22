@@ -47,8 +47,8 @@ export class SceneGenerationService {
     const story = await this.storyService.getStory(options.storyId);
     if (!story) throw new Error('Story not found');
 
-    // Build initial prompt + messages
-    const { systemMessage, messages, languageInstruction } = await this.buildMessages(story, options);
+    // Build initial prompt + messages using the story's Beat Generation template
+    const { systemMessage, messages, languageInstruction } = await this.buildInitialBeatMessages(story, options);
     const { provider, modelId } = this.splitProvider(options.model);
     const temperature = options.temperature ?? this.getDefaultTemperature(provider);
 
@@ -157,7 +157,7 @@ export class SceneGenerationService {
       }
     };
 
-    // 1) Initial segment from outline
+    // 1) Initial segment from outline using beat template (sceneFullText empty)
     {
       const initialGoal = Math.min(segmentMax, targetWords);
       const initialText = await callProvider(messages, initialGoal);
@@ -175,20 +175,8 @@ export class SceneGenerationService {
       // Use a modest tail of prior output for continuity (avoid bloating context)
       const tail = this.tailText(combined, 6000);
 
-      // Keep continuation context lean: outline + instructions. The previous prose comes as assistant.
-      const continueUser = [
-        options.outline ? `<scene_outline>\n${options.outline}\n</scene_outline>` : '',
-        `<instructions>\nContinue the same scene seamlessly from the previous text without repeating any sentences. Maintain POV, tense, style, and characterization. Aim for about ${goal} words. ${languageInstruction}` +
-        `${this.settingsService.getSettings().sceneGenerationFromOutline?.customInstruction ? `\n${this.settingsService.getSettings().sceneGenerationFromOutline!.customInstruction}` : ''}` +
-        `\nDo not add headings or summaries. Output only the next part of the prose.\n</instructions>`
-      ].filter(Boolean).join('\n\n');
-
-      const continuationMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
-        // Provide the last part of the scene as the assistant's prior message,
-        // then ask the model (user message) to continue.
-        { role: 'assistant', content: tail },
-        { role: 'user', content: continueUser }
-      ];
+      //  Build continuation prompt via the beat template with sceneFullText as tail
+      const continuationMessages = await this.buildContinuationBeatMessages(story, options, tail, goal, languageInstruction);
 
       if (wasCanceled) {
         break;
@@ -216,17 +204,7 @@ export class SceneGenerationService {
         const topUpGoal = Math.min(segmentMax, Math.max(200, needed));
 
         const tail2 = this.tailText((cleaned.length > 100 ? cleaned : (combined + '\n\n' + cleaned)), 6000);
-        const continueUser2 = [
-          options.outline ? `<scene_outline>\n${options.outline}\n</scene_outline>` : '',
-          `<instructions>\nContinue immediately from the previous text with more detail, dialogue, and action. Aim for about ${topUpGoal} words for this continuation. ${languageInstruction}` +
-          `${this.settingsService.getSettings().sceneGenerationFromOutline?.customInstruction ? `\n${this.settingsService.getSettings().sceneGenerationFromOutline!.customInstruction}` : ''}` +
-          `\nDo not add headings or summaries. Output only the next part of the prose.\n</instructions>`
-        ].filter(Boolean).join('\n\n');
-
-        const continuationMessages2: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
-          { role: 'assistant', content: tail2 },
-          { role: 'user', content: continueUser2 }
-        ];
+        const continuationMessages2 = await this.buildContinuationBeatMessages(story, options, tail2, topUpGoal, languageInstruction);
 
         let more = '';
         try {
@@ -269,79 +247,125 @@ export class SceneGenerationService {
     return 0.7;
   }
 
-  private async buildMessages(story: Story, options: SceneFromOutlineOptions): Promise<{ systemMessage: string; messages: { role: 'user' | 'assistant' | 'system'; content: string }[]; languageInstruction: string; storyContext: string; codexText: string }> {
-    // System message
+  private async buildInitialBeatMessages(story: Story, options: SceneFromOutlineOptions): Promise<{ systemMessage: string; messages: { role: 'user' | 'assistant' | 'system'; content: string }[]; languageInstruction: string }> {
     const systemMessage = story.settings?.systemMessage || DEFAULT_STORY_SETTINGS.systemMessage;
-    const appSettings = this.settingsService.getSettings();
-
-    // Optional story context
-    let storyContext = '';
-    if (options.includeStoryOutline) {
-      storyContext = options.useFullStoryContext
-        ? this.promptManager.getFullStoryContext()
-        : this.promptManager.getSummaryContext();
-    }
-
-    // Optional codex summary
-    let codexText = '';
-    if (options.includeCodex) {
-      try {
-        const codex = await this.codexService.getOrCreateCodex(options.storyId);
-        const lines: string[] = [];
-        for (const cat of codex.categories) {
-          const entries = cat.entries.slice(0, 10); // limit for prompt brevity
-          if (entries.length) {
-            lines.push(`[${cat.title}]`);
-            for (const e of entries) {
-              const title = e.title || 'Untitled';
-              const desc = (e.content || '').replace(/\s+/g, ' ').trim();
-              lines.push(`- ${title}${desc ? ': ' + desc : ''}`);
-            }
-          }
-        }
-        codexText = lines.join('\n');
-      } catch {
-        codexText = '';
-      }
-    }
-
     const langPref = (options.language || story.settings?.language || 'en') as 'en' | 'de' | 'fr' | 'es' | 'custom';
     const languageInstruction = this.getLanguageInstruction(langPref);
     const wordCount = Math.max(200, Math.min(25000, options.wordCount || 600));
 
-    let userContent = '';
-    if (appSettings.sceneGenerationFromOutline?.useCustomPrompt) {
-      const tpl = appSettings.sceneGenerationFromOutline.customPrompt || '';
-      const customInstr = appSettings.sceneGenerationFromOutline.customInstruction || '';
-      userContent = tpl
-        .replace(/\{systemMessage\}/g, systemMessage)
-        .replace(/\{storyTitle\}/g, story.title || '')
-        .replace(/\{codexEntries\}/g, codexText)
-        .replace(/\{storySoFar\}/g, storyContext)
-        .replace(/\{sceneOutline\}/g, options.outline)
-        .replace(/\{wordCount\}/g, String(wordCount))
-        .replace(/\{languageInstruction\}/g, languageInstruction)
-        .replace(/\{customInstruction\}/g, customInstr ? `\n${customInstr}` : '');
-      // Ensure language instruction present if omitted in template
-      if (!userContent.includes(languageInstruction)) {
-        userContent += `\n\n${languageInstruction}`;
-      }
-    } else {
-      userContent = [
-        `<story_title>${story.title}</story_title>`,
-        codexText ? `<glossary>\n${codexText}\n</glossary>` : '',
-        storyContext ? `<story_context>\n${storyContext}\n</story_context>` : '',
-        `<scene_outline>\n${options.outline}\n</scene_outline>`,
-        `<instructions>\nWrite a complete, coherent scene based strictly on the outline. Aim for ~${wordCount} words. ${languageInstruction}` +
-        `${appSettings.sceneGenerationFromOutline?.customInstruction ? `\n${appSettings.sceneGenerationFromOutline.customInstruction}` : ''}` +
-        `\nDo not include meta comments or headings. Output only the scene prose.\n</instructions>`
-      ].filter(Boolean).join('\n\n');
-    }
+    const storySoFar = story.settings?.useFullStoryContext
+      ? await this.promptManager.getStoryXmlFormat(options.sceneId)
+      : await this.promptManager.getStoryXmlFormatWithoutSummaries(options.sceneId);
 
-    const messages: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
-      { role: 'user', content: userContent }
-    ];
-    return { systemMessage, messages, languageInstruction, storyContext, codexText };
+    const codexText = await this.buildSimpleCodexText(options.storyId);
+
+    const writingStyle = story.settings?.beatInstruction === 'stay' ? 'Stay in the moment' : 'Continue the story';
+    const pointOfView = '';
+
+    const template = story.settings?.beatGenerationTemplate || DEFAULT_STORY_SETTINGS.beatGenerationTemplate;
+
+    const placeholders: Record<string, string> = {
+      systemMessage,
+      codexEntries: codexText,
+      storySoFar,
+      storyTitle: story.title || 'Story',
+      sceneFullText: '',
+      wordCount: String(wordCount),
+      prompt: options.outline,
+      pointOfView,
+      writingStyle
+    };
+
+    const processed = this.applyTemplatePlaceholders(template, placeholders);
+    const messages = this.parseStructuredPrompt(processed);
+    // Ensure system message is present as proper system role for providers that support it
+    if (!messages.some(m => m.role === 'system')) {
+      messages.unshift({ role: 'system', content: systemMessage });
+    }
+    return { systemMessage, messages, languageInstruction };
+  }
+
+  private async buildContinuationBeatMessages(
+    story: Story,
+    options: SceneFromOutlineOptions,
+    sceneTail: string,
+    goalWords: number,
+    languageInstruction: string
+  ): Promise<{ role: 'user' | 'assistant' | 'system'; content: string }[]> {
+    const systemMessage = story.settings?.systemMessage || DEFAULT_STORY_SETTINGS.systemMessage;
+    const storySoFar = story.settings?.useFullStoryContext
+      ? await this.promptManager.getStoryXmlFormat(options.sceneId)
+      : await this.promptManager.getStoryXmlFormatWithoutSummaries(options.sceneId);
+
+    const codexText = await this.buildSimpleCodexText(options.storyId);
+    const writingStyle = story.settings?.beatInstruction === 'stay' ? 'Stay in the moment' : 'Continue the story';
+    const pointOfView = '';
+    const template = story.settings?.beatGenerationTemplate || DEFAULT_STORY_SETTINGS.beatGenerationTemplate;
+
+    const placeholders: Record<string, string> = {
+      systemMessage,
+      codexEntries: codexText,
+      storySoFar,
+      storyTitle: story.title || 'Story',
+      sceneFullText: sceneTail,
+      wordCount: String(goalWords),
+      prompt: `Continue the same scene seamlessly without repeating sentences. Use the outline as guide. ${languageInstruction}\n\nOutline:\n${options.outline}`,
+      pointOfView,
+      writingStyle
+    };
+
+    const processed = this.applyTemplatePlaceholders(template, placeholders);
+    const messages = this.parseStructuredPrompt(processed);
+    if (!messages.some(m => m.role === 'system')) {
+      messages.unshift({ role: 'system', content: systemMessage });
+    }
+    return messages;
+  }
+
+  private async buildSimpleCodexText(storyId: string): Promise<string> {
+    try {
+      const codex = await this.codexService.getOrCreateCodex(storyId);
+      const lines: string[] = [];
+      for (const cat of codex.categories) {
+        const entries = cat.entries.slice(0, 10);
+        if (entries.length) {
+          lines.push(`[${cat.title}]`);
+          for (const e of entries) {
+            const title = e.title || 'Untitled';
+            const desc = (e.content || '').replace(/\s+/g, ' ').trim();
+            lines.push(`- ${title}${desc ? ': ' + desc : ''}`);
+          }
+        }
+      }
+      return lines.join('\n');
+    } catch {
+      return '';
+    }
+  }
+
+  private applyTemplatePlaceholders(template: string, placeholders: Record<string, string>): string {
+    let out = template;
+    Object.entries(placeholders).forEach(([key, value]) => {
+      const placeholder = `{${key}}`;
+      const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      out = out.replace(regex, value || '');
+    });
+    return out;
+  }
+
+  private parseStructuredPrompt(prompt: string): { role: 'system' | 'user' | 'assistant'; content: string }[] {
+    const messagePattern = /<message role="(system|user|assistant)">([\s\S]*?)<\/message>/gi;
+    const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = messagePattern.exec(prompt)) !== null) {
+      const role = match[1] as 'system' | 'user' | 'assistant';
+      const content = match[2].trim();
+      messages.push({ role, content });
+    }
+    if (messages.length === 0) {
+      messages.push({ role: 'user', content: prompt });
+    }
+    return messages;
   }
 
   private getLanguageInstruction(lang: SceneFromOutlineOptions['language']): string {
