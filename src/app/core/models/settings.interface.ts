@@ -167,7 +167,7 @@ export const DEFAULT_SETTINGS: Settings = {
     temperature: 0.7,
     includeStoryOutline: true,
     useFullStoryContext: false,
-    includeCodex: false,
+    includeCodex: true,
     customInstruction: '',
     useCustomPrompt: false,
     customPrompt: '<messages>\n<message role="system">{systemMessage}</message>\n<message role="user">You are writing a complete scene for a story.\n\n<story_title>{storyTitle}</story_title>\n\n<glossary>\n{codexEntries}\n</glossary>\n\n<story_context>\n{storySoFar}\n</story_context>\n\n<scene_outline>\n{sceneOutline}\n</scene_outline>\n\n<instructions>\nWrite a complete, coherent scene based strictly on the outline. Aim for about {wordCount} words.\n{languageInstruction}{customInstruction}\nDo not include meta comments or headings. Output only the scene prose.\n</instructions>\n</message>\n</messages>',
