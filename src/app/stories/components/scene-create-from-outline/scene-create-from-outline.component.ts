@@ -13,6 +13,7 @@ import { ModelSelectorComponent } from '../../../shared/components/model-selecto
 import { SettingsService } from '../../../core/services/settings.service';
 import { StoryService } from '../../services/story.service';
 import { SceneGenerationService } from '../../../shared/services/scene-generation.service';
+import { Subject } from 'rxjs';
 
 @Component({
   selector: 'app-scene-create-from-outline',
@@ -47,6 +48,11 @@ export class SceneCreateFromOutlineComponent {
   temperature = 0.7;
   generating = false;
   error: string | null = null;
+  // Progress + cancel
+  progressWords = 0;
+  progressSegments = 0;
+  private cancel$ = new Subject<void>();
+  cancelRequested = false;
 
   constructor() {
     addIcons({ closeOutline, sparklesOutline, sendOutline });
@@ -72,6 +78,8 @@ export class SceneCreateFromOutlineComponent {
     }
 
     this.generating = true;
+    this.progressWords = 0;
+    this.progressSegments = 0;
     try {
       // 1) Create placeholder scene first to obtain sceneId/order
       const newScene = await this.storyService.addScene(this.storyId, this.chapterId);
@@ -88,6 +96,12 @@ export class SceneCreateFromOutlineComponent {
         useFullStoryContext: this.useFullStoryContext,
         includeCodex: this.includeCodex,
         temperature: this.temperature
+      }, {
+        cancel$: this.cancel$,
+        onProgress: ({ words, segments }) => {
+          this.progressWords = words;
+          this.progressSegments = segments;
+        }
       });
 
       // 3) Update the newly created scene with generated content
@@ -107,6 +121,12 @@ export class SceneCreateFromOutlineComponent {
 
   dismiss(): void {
     this.modalCtrl.dismiss();
+  }
+
+  cancel(): void {
+    if (!this.generating || this.cancelRequested) return;
+    this.cancelRequested = true;
+    this.cancel$.next();
   }
 
   // Language is derived in the service from story settings

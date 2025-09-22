@@ -1,13 +1,13 @@
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 import { SettingsService } from '../../core/services/settings.service';
 import { PromptManagerService } from './prompt-manager.service';
 import { StoryService } from '../../stories/services/story.service';
 import { CodexService } from '../../stories/services/codex.service';
-import { OpenRouterApiService } from '../../core/services/openrouter-api.service';
-import { GoogleGeminiApiService } from '../../core/services/google-gemini-api.service';
+import { OpenRouterApiService, OpenRouterResponse } from '../../core/services/openrouter-api.service';
+import { GoogleGeminiApiService, GoogleGeminiResponse } from '../../core/services/google-gemini-api.service';
 import { OllamaApiService, OllamaResponse, OllamaChatResponse } from '../../core/services/ollama-api.service';
-import { ClaudeApiService } from '../../core/services/claude-api.service';
+import { ClaudeApiService, ClaudeResponse } from '../../core/services/claude-api.service';
 import { Story, DEFAULT_STORY_SETTINGS } from '../../stories/models/story.interface';
 
 export interface SceneFromOutlineOptions {
@@ -35,7 +35,13 @@ export class SceneGenerationService {
   private ollama = inject(OllamaApiService);
   private claude = inject(ClaudeApiService);
 
-  async generateFromOutline(options: SceneFromOutlineOptions): Promise<{ content: string; title?: string }> {
+  async generateFromOutline(
+    options: SceneFromOutlineOptions,
+    control?: {
+      cancel$?: Observable<void>;
+      onProgress?: (p: { words: number; segments: number }) => void;
+    }
+  ): Promise<{ content: string; title?: string; canceled?: boolean }> {
     // Ensure prompt manager watches current story
     await this.promptManager.setCurrentStory(options.storyId);
     const story = await this.storyService.getStory(options.storyId);
@@ -60,44 +66,92 @@ export class SceneGenerationService {
       const maxTokens = Math.max(3000, Math.min(calculatedTokens, 100000));
       const promptForLogging = this.messagesToPrompt(systemMessage, msgs.filter(m => m.role !== 'system'));
 
-      if (provider === 'gemini') {
-        const resp = await firstValueFrom(this.gemini.generateText(promptForLogging, {
-          model: modelId,
-          maxTokens,
-          temperature,
-          messages: [{ role: 'system', content: systemMessage }, ...msgs]
-        }));
-        return resp.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-      } else if (provider === 'openrouter') {
-        const resp = await firstValueFrom(this.openRouter.generateText(promptForLogging, {
-          model: modelId,
-          maxTokens,
-          temperature,
-          messages: [{ role: 'system', content: systemMessage }, ...msgs]
-        }));
-        return resp.choices?.[0]?.message?.content?.trim() || '';
-      } else if (provider === 'ollama') {
-        const resp = await firstValueFrom(this.ollama.generateText(promptForLogging, {
-          model: modelId,
-          maxTokens,
-          temperature,
-          messages: [{ role: 'system', content: systemMessage }, ...msgs]
-        }));
-        if ((resp as OllamaResponse).response !== undefined) {
-          return (resp as OllamaResponse).response?.trim() || '';
-        } else {
-          return (resp as OllamaChatResponse).message?.content?.trim() || '';
-        }
-      } else if (provider === 'claude') {
-        const resp = await firstValueFrom(this.claude.generateText(promptForLogging, {
-          model: modelId,
-          maxTokens,
-          temperature,
-          messages: [{ role: 'system', content: systemMessage }, ...msgs]
-        }));
-        return resp.content?.[0]?.text?.trim() || '';
+      const requestId = this.generateRequestId();
+      let cancelSub: Subscription | undefined;
+      try {
+        return await new Promise<string>((resolve, reject) => {
+          let resolved = false;
+          const finalize = (value: string, isError = false) => {
+            if (!resolved) {
+              resolved = true;
+              cancelSub?.unsubscribe();
+              if (isError) { reject(value); } else { resolve(value); }
+            }
+          };
+
+        const obs = provider === 'gemini'
+          ? this.gemini.generateText(promptForLogging, {
+              model: modelId,
+              maxTokens,
+              temperature,
+              messages: [{ role: 'system', content: systemMessage }, ...msgs],
+              requestId
+            })
+          : provider === 'openrouter'
+          ? this.openRouter.generateText(promptForLogging, {
+              model: modelId,
+              maxTokens,
+              temperature,
+              messages: [{ role: 'system', content: systemMessage }, ...msgs],
+              requestId
+            })
+          : provider === 'ollama'
+          ? this.ollama.generateText(promptForLogging, {
+              model: modelId,
+              maxTokens,
+              temperature,
+              messages: [{ role: 'system', content: systemMessage }, ...msgs],
+              requestId
+            })
+          : this.claude.generateText(promptForLogging, {
+              model: modelId,
+              maxTokens,
+              temperature,
+              messages: [{ role: 'system', content: systemMessage }, ...msgs],
+              requestId
+            });
+
+          const sub = (obs as unknown as Observable<unknown>).subscribe({
+            next: (response: unknown) => {
+              if (provider === 'gemini') {
+                const r = response as GoogleGeminiResponse;
+                finalize(r.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '');
+              } else if (provider === 'openrouter') {
+                const r = response as OpenRouterResponse;
+                finalize(r.choices?.[0]?.message?.content?.trim() || '');
+              } else if (provider === 'ollama') {
+                const r = response as OllamaResponse | OllamaChatResponse;
+                if ((r as OllamaResponse).response !== undefined) {
+                  finalize((r as OllamaResponse).response?.trim() || '');
+                } else {
+                  finalize((r as OllamaChatResponse).message?.content?.trim() || '');
+                }
+              } else {
+                const r = response as ClaudeResponse;
+                finalize(r.content?.[0]?.text?.trim() || '');
+              }
+              sub.unsubscribe();
+            },
+            error: () => {
+              finalize('', true);
+              sub.unsubscribe();
+            }
+          });
+
+          if (control?.cancel$) {
+            cancelSub = control.cancel$.subscribe(() => {
+              try {
+                if (provider === 'gemini') this.gemini.abortRequest(requestId);
+                else if (provider === 'openrouter') this.openRouter.abortRequest(requestId);
+                else if (provider === 'claude') this.claude.abortRequest(requestId);
+                else this.ollama.abortRequest(requestId);
+              } catch {/* noop */}
+            });
+          }
+        });
+      } finally {
+        cancelSub?.unsubscribe();
       }
-      throw new Error('Unsupported provider: ' + provider);
     };
 
     // 1) Initial segment from outline
@@ -107,6 +161,7 @@ export class SceneGenerationService {
       combined = initialText;
       currentWords = this.countWords(initialText);
       segments++;
+      control?.onProgress?.({ words: currentWords, segments });
     }
 
     // 2) Continue generation iteratively until target reached or safety cap
@@ -135,6 +190,16 @@ export class SceneGenerationService {
         { role: 'user', content: `Continue where you left off for about ${goal} words. Do not repeat anything from the prior text.` }
       ];
 
+      if (control?.cancel$) {
+        let canceled = false;
+        const sub = control.cancel$?.subscribe(() => canceled = true);
+        if (canceled) {
+          sub?.unsubscribe();
+          break;
+        }
+        sub?.unsubscribe();
+      }
+
       const next = await callProvider(continuationMessages, goal);
       const cleaned = next.trim();
 
@@ -146,6 +211,7 @@ export class SceneGenerationService {
       combined += (combined.endsWith('\n') ? '' : '\n\n') + cleaned;
       currentWords = this.countWords(combined);
       segments++;
+      control?.onProgress?.({ words: currentWords, segments });
     }
 
     const normalized = this.plainTextToHtml(combined);
@@ -284,5 +350,9 @@ export class SceneGenerationService {
     // For logging/compat; real calls pass structured messages, but our providers also log the prompt string
     const msgs = [`[system]\n${system}`].concat(messages.map(m => `[${m.role}]\n${m.content}`));
     return msgs.join('\n\n');
+  }
+
+  private generateRequestId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2);
   }
 }
