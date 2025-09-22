@@ -2,9 +2,9 @@ import { Component, Input, Output, EventEmitter, AfterViewInit, OnInit, OnChange
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import {
+import { 
   IonContent, IonList, IonItem, IonLabel, IonButton, IonIcon, IonInput,
-  IonChip, IonTextarea, IonSelect, IonSelectOption, IonBadge
+  IonChip, IonTextarea, IonSelect, IonSelectOption, IonBadge, ActionSheetController, ModalController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
@@ -20,6 +20,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { PromptManagerService } from '../../../shared/services/prompt-manager.service';
 import { ModelOption } from '../../../core/models/model.interface';
 import { Subscription } from 'rxjs';
+import { SceneCreateFromOutlineComponent } from '../scene-create-from-outline/scene-create-from-outline.component';
 
 @Component({
   selector: 'app-story-structure',
@@ -42,6 +43,8 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
   private cdr = inject(ChangeDetectorRef);
   private promptManager = inject(PromptManagerService);
   private router = inject(Router);
+  private actionSheetCtrl = inject(ActionSheetController);
+  private modalCtrl = inject(ModalController);
 
   @Input() story!: Story;
   @Input() activeChapterId: string | null = null;
@@ -173,15 +176,63 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
   }
 
   async addScene(chapterId: string): Promise<void> {
+    // Offer choice: empty or generate from outline
+    const sheet = await this.actionSheetCtrl.create({
+      header: 'Create Scene',
+      subHeader: 'Choose how to create the new scene',
+      buttons: [
+        {
+          text: 'Empty scene',
+          role: 'empty',
+          icon: 'add',
+          handler: async () => {
+            await this.createEmptyScene(chapterId);
+          }
+        },
+        {
+          text: 'Generate from outline (AI)',
+          role: 'ai',
+          icon: 'sparkles-outline',
+          handler: async () => {
+            await this.openCreateFromOutlineModal(chapterId);
+          }
+        },
+        { text: 'Cancel', role: 'cancel' }
+      ]
+    });
+    await sheet.present();
+  }
+
+  private async createEmptyScene(chapterId: string): Promise<void> {
     await this.storyService.addScene(this.story.id, chapterId);
     const updatedStory = await this.storyService.getStory(this.story.id);
     if (updatedStory) {
       this.story = updatedStory;
-      // Auto-select new scene
       const chapter = this.story.chapters.find(c => c.id === chapterId);
       if (chapter) {
         const newScene = chapter.scenes[chapter.scenes.length - 1];
         this.selectScene(chapterId, newScene.id);
+      }
+    }
+  }
+
+  private async openCreateFromOutlineModal(chapterId: string): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: SceneCreateFromOutlineComponent,
+      componentProps: {
+        storyId: this.story.id,
+        chapterId
+      },
+      cssClass: 'scene-create-from-outline-modal'
+    });
+
+    await modal.present();
+    const result = await modal.onWillDismiss<{ createdSceneId?: string; chapterId?: string }>();
+    if (result.data?.createdSceneId && result.data?.chapterId) {
+      const updatedStory = await this.storyService.getStory(this.story.id);
+      if (updatedStory) {
+        this.story = updatedStory;
+        this.selectScene(result.data.chapterId, result.data.createdSceneId);
       }
     }
   }
