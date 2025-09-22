@@ -4,7 +4,8 @@ import { FormsModule } from '@angular/forms';
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
   IonContent, IonItem, IonLabel, IonTextarea, IonIcon,
-  IonRange, IonToggle, IonFooter, IonSpinner
+  IonRange, IonToggle, IonFooter, IonSpinner,
+  ToastController, AlertController
 } from '@ionic/angular/standalone';
 import { ModalController } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -32,6 +33,8 @@ import { Subject } from 'rxjs';
 })
 export class SceneCreateFromOutlineComponent {
   private modalCtrl = inject(ModalController);
+  private toastCtrl = inject(ToastController);
+  private alertCtrl = inject(AlertController);
   private settingsService = inject(SettingsService);
   private storyService = inject(StoryService);
   private sceneGenService = inject(SceneGenerationService);
@@ -104,12 +107,63 @@ export class SceneCreateFromOutlineComponent {
         }
       });
 
-      // 3) Update the newly created scene with generated content
-      await this.storyService.updateScene(this.storyId, this.chapterId, newScene.id, {
-        content: result.content
-      });
-
-      this.modalCtrl.dismiss({ createdSceneId: newScene.id, chapterId: this.chapterId });
+      if (result.canceled) {
+        // Ask whether to keep or discard partial content
+        const alert = await this.alertCtrl.create({
+          header: 'Generation canceled',
+          message: `Keep partial content? (Segments: ${this.progressSegments}, Words: ${this.progressWords})`,
+          buttons: [
+            {
+              text: 'Discard',
+              role: 'cancel',
+              handler: async () => {
+                // Delete the placeholder scene
+                try {
+                  await this.storyService.deleteScene(this.storyId, this.chapterId, newScene.id);
+                } catch (err) {
+                  console.warn('Failed to delete placeholder scene after cancel:', err);
+                }
+                const toast = await this.toastCtrl.create({
+                  message: 'Partial content discarded',
+                  duration: 2000,
+                  color: 'medium',
+                  position: 'bottom'
+                });
+                await toast.present();
+                this.modalCtrl.dismiss();
+              }
+            },
+            {
+              text: 'Keep',
+              handler: async () => {
+                await this.storyService.updateScene(this.storyId, this.chapterId, newScene.id, { content: result.content });
+                const toast = await this.toastCtrl.create({
+                  message: `Kept partial content (Seg: ${this.progressSegments}, Words: ${this.progressWords})`,
+                  duration: 2000,
+                  color: 'success',
+                  position: 'bottom'
+                });
+                await toast.present();
+                this.modalCtrl.dismiss({ createdSceneId: newScene.id, chapterId: this.chapterId });
+              }
+            }
+          ]
+        });
+        await alert.present();
+      } else {
+        // Completed normally: save content and show toast
+        await this.storyService.updateScene(this.storyId, this.chapterId, newScene.id, {
+          content: result.content
+        });
+        const toast = await this.toastCtrl.create({
+          message: `Scene generated (Seg: ${this.progressSegments}, Words: ${this.progressWords})`,
+          duration: 2000,
+          color: 'success',
+          position: 'bottom'
+        });
+        await toast.present();
+        this.modalCtrl.dismiss({ createdSceneId: newScene.id, chapterId: this.chapterId });
+      }
     } catch (e: unknown) {
       console.error('Failed to generate scene from outline:', e);
       const message = typeof e === 'object' && e && 'message' in e ? String((e as { message?: unknown }).message) : undefined;

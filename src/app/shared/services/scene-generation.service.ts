@@ -59,6 +59,8 @@ export class SceneGenerationService {
     let combined = '';
     let currentWords = 0;
     let segments = 0;
+    let wasCanceled = false;
+    const rootCancelSub = control?.cancel$?.subscribe(() => { wasCanceled = true; });
 
     // Helper to call provider with messages and token budget derived from a word goal
     const callProvider = async (msgs: { role: 'system' | 'user' | 'assistant'; content: string }[], wordGoal: number): Promise<string> => {
@@ -190,14 +192,8 @@ export class SceneGenerationService {
         { role: 'user', content: `Continue where you left off for about ${goal} words. Do not repeat anything from the prior text.` }
       ];
 
-      if (control?.cancel$) {
-        let canceled = false;
-        const sub = control.cancel$?.subscribe(() => canceled = true);
-        if (canceled) {
-          sub?.unsubscribe();
-          break;
-        }
-        sub?.unsubscribe();
+      if (wasCanceled) {
+        break;
       }
 
       const next = await callProvider(continuationMessages, goal);
@@ -215,7 +211,8 @@ export class SceneGenerationService {
     }
 
     const normalized = this.plainTextToHtml(combined);
-    return { content: normalized };
+    rootCancelSub?.unsubscribe();
+    return { content: normalized, canceled: wasCanceled };
   }
 
   private splitProvider(model: string): { provider: string; modelId: string } {
