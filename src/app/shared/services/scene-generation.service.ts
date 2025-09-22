@@ -55,6 +55,7 @@ export class SceneGenerationService {
     const targetWords = Math.max(200, Math.min(25000, options.wordCount || 600));
     const segmentMax = 3000; // conservative per-call word goal to stay within limits
     const maxSegments = 30;  // safety cap
+    const minChunkWords = 180; // encourage reasonably sized chunks per iteration
 
     let combined = '';
     let currentWords = 0;
@@ -200,11 +201,47 @@ export class SceneGenerationService {
         // On provider error during continuation, stop iterating and return what we have
         break;
       }
-      const cleaned = next.trim();
+      let cleaned = next.trim();
 
       // Break if model returns nothing meaningful to avoid loops
       if (!cleaned || cleaned.split(/\s+/).length < 30) {
         break;
+      }
+
+      // If the chunk is quite short, try up to 2 quick top-ups to reach a more useful size
+      let chunkWords = this.countWords(cleaned);
+      let retries = 0;
+      while (!wasCanceled && chunkWords < minChunkWords && retries < 2) {
+        const needed = Math.max(minChunkWords - chunkWords, Math.round(goal * 0.3));
+        const topUpGoal = Math.min(segmentMax, Math.max(200, needed));
+
+        const tail2 = this.tailText((cleaned.length > 100 ? cleaned : (combined + '\n\n' + cleaned)), 6000);
+        const continueUser2 = [
+          options.outline ? `<scene_outline>\n${options.outline}\n</scene_outline>` : '',
+          `<instructions>\nContinue immediately from the previous text with more detail, dialogue, and action. Aim for about ${topUpGoal} words for this continuation. ${languageInstruction}` +
+          `${this.settingsService.getSettings().sceneGenerationFromOutline?.customInstruction ? `\n${this.settingsService.getSettings().sceneGenerationFromOutline!.customInstruction}` : ''}` +
+          `\nDo not add headings or summaries. Output only the next part of the prose.\n</instructions>`
+        ].filter(Boolean).join('\n\n');
+
+        const continuationMessages2: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+          { role: 'assistant', content: tail2 },
+          { role: 'user', content: continueUser2 }
+        ];
+
+        let more = '';
+        try {
+          more = await callProvider(continuationMessages2, topUpGoal);
+        } catch {
+          break;
+        }
+        const cleanedMore = more.trim();
+        const moreWords = this.countWords(cleanedMore);
+        if (!cleanedMore || moreWords < 20) {
+          break;
+        }
+        cleaned += (cleaned.endsWith('\n') ? '' : '\n\n') + cleanedMore;
+        chunkWords += moreWords;
+        retries++;
       }
 
       combined += (combined.endsWith('\n') ? '' : '\n\n') + cleaned;

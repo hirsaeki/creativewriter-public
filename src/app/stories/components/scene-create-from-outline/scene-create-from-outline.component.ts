@@ -1,4 +1,5 @@
 import { Component, Input, ChangeDetectionStrategy, inject } from '@angular/core';
+import { ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -38,6 +39,8 @@ export class SceneCreateFromOutlineComponent {
   private settingsService = inject(SettingsService);
   private storyService = inject(StoryService);
   private sceneGenService = inject(SceneGenerationService);
+  private cdr = inject(ChangeDetectorRef);
+  private zone = inject(NgZone);
 
   @Input() storyId!: string;
   @Input() chapterId!: string;
@@ -102,8 +105,12 @@ export class SceneCreateFromOutlineComponent {
       }, {
         cancel$: this.cancel$,
         onProgress: ({ words, segments }) => {
-          this.progressWords = words;
-          this.progressSegments = segments;
+          // Ensure UI updates under OnPush by running inside Angular zone
+          this.zone.run(() => {
+            this.progressWords = words;
+            this.progressSegments = segments;
+            this.cdr.markForCheck();
+          });
         }
       });
 
