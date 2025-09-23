@@ -49,3 +49,26 @@
     font-size: 0.9em;
   }
 }
+.host, :host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100vh;
+}
+
+ion-content {
+  flex: 1 1 auto;
+  --background: transparent !important;
+}
+
+/* Fix mobile height: avoid double offsets and ensure full-height scroll area */
+@media (max-width: 768px) {
+  ion-content {
+    --offset-top: 0px !important;
+    --offset-bottom: 0px !important;
+  }
+  ion-content::part(scroll) {
+    padding-top: 56px; /* header height compensation */
+    padding-bottom: var(--ion-safe-area-bottom, 0px);
+  }
+}
