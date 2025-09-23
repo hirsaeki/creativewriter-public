@@ -116,6 +116,21 @@
               </ng-template>
 
               <div class="actions">
+                <ion-button *ngIf="!isEditingTitle(scene.id) && !isEditing(scene.id)"
+                            size="small" fill="outline" color="primary"
+                            (click)="generateSceneTitle(chapter.id, scene.id)"
+                            [disabled]="isGeneratingTitle(scene.id) || !(scene.content && scene.content.trim())">
+                  <ion-icon [name]="isGeneratingTitle(scene.id) ? 'time-outline' : 'sparkles-outline'" slot="start"></ion-icon>
+                  {{ isGeneratingTitle(scene.id) ? 'Generating…' : 'AI Title' }}
+                </ion-button>
+
+                <ion-button *ngIf="!isEditingTitle(scene.id) && !isEditing(scene.id)"
+                            size="small" color="success"
+                            (click)="generateSceneSummary(chapter.id, scene.id)"
+                            [disabled]="isGeneratingSummary(scene.id) || !(scene.content && scene.content.trim())">
+                  <ion-icon [name]="isGeneratingSummary(scene.id) ? 'time-outline' : 'flash-outline'" slot="start"></ion-icon>
+                  {{ isGeneratingSummary(scene.id) ? 'Generating…' : 'AI Summary' }}
+                </ion-button>
                 <ion-button *ngIf="!isEditingTitle(scene.id)" size="small" fill="outline" color="medium" (click)="startEditTitle(scene.id, scene.title)" title="Edit title">
                   <ion-icon name="create-outline" slot="start"></ion-icon>
                   Edit Title

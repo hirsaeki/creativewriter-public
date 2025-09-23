@@ -2,17 +2,21 @@ import { Component, ChangeDetectionStrategy, OnInit, inject, computed, signal } 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import {
+import { 
   IonContent, IonSearchbar, IonAccordion, IonAccordionGroup, IonItem, IonLabel,
   IonButton, IonIcon, IonChip, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonTextarea, IonInput,
   IonBadge, IonSkeletonText, IonNote
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline } from 'ionicons/icons';
+import { arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline } from 'ionicons/icons';
 import { Story, Chapter } from '../../models/story.interface';
 import { StoryService } from '../../services/story.service';
 import { AppHeaderComponent, HeaderAction, BurgerMenuItem } from '../../../ui/components/app-header.component';
+import { SettingsService } from '../../../core/services/settings.service';
+import { OpenRouterApiService } from '../../../core/services/openrouter-api.service';
+import { GoogleGeminiApiService } from '../../../core/services/google-gemini-api.service';
+import { PromptManagerService } from '../../../shared/services/prompt-manager.service';
 
 @Component({
   selector: 'app-story-outline-overview',
@@ -33,6 +37,10 @@ export class StoryOutlineOverviewComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private storyService = inject(StoryService);
+  private settingsService = inject(SettingsService);
+  private openRouterApi = inject(OpenRouterApiService);
+  private geminiApi = inject(GoogleGeminiApiService);
+  private promptManager = inject(PromptManagerService);
 
   // Header config
   leftActions: HeaderAction[] = [];
@@ -68,7 +76,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
   });
 
   constructor() {
-    addIcons({ arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline });
+    addIcons({ arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline });
   }
 
   async ngOnInit(): Promise<void> {
@@ -219,6 +227,13 @@ export class StoryOutlineOverviewComponent implements OnInit {
     }
   }
 
+  // AI generation states
+  private generatingSummary = new Set<string>();
+  private generatingTitle = new Set<string>();
+
+  isGeneratingSummary(sceneId: string): boolean { return this.generatingSummary.has(sceneId); }
+  isGeneratingTitle(sceneId: string): boolean { return this.generatingTitle.has(sceneId); }
+
   // Inline title editing state
   editingTitles: Record<string, string> = {};
   private savingTitleSet = new Set<string>();
@@ -268,6 +283,269 @@ export class StoryOutlineOverviewComponent implements OnInit {
     } finally {
       this.savingTitleSet.delete(sceneId);
     }
+  }
+
+  // --- AI Generation (reuse logic from StoryStructureComponent) ---
+  generateSceneSummary(chapterId: string, sceneId: string): void {
+    const s = this.story();
+    if (!s) return;
+    const chapter = s.chapters.find(c => c.id === chapterId);
+    const scene = chapter?.scenes.find(sc => sc.id === sceneId);
+    if (!scene || !scene.content?.trim()) return;
+
+    const settings = this.settingsService.getSettings();
+    const modelToUse = settings.sceneSummaryGeneration.selectedModel || settings.selectedModel;
+    if (!modelToUse) { alert('No AI model configured.'); return; }
+
+    const openRouterAvailable = settings.openRouter.enabled && settings.openRouter.apiKey;
+    const geminiAvailable = settings.googleGemini.enabled && settings.googleGemini.apiKey;
+    if (!openRouterAvailable && !geminiAvailable) {
+      alert('No AI API configured. Please configure OpenRouter or Google Gemini in settings.');
+      return;
+    }
+
+    this.generatingSummary.add(sceneId);
+    const timeoutId = setTimeout(() => {
+      if (this.generatingSummary.has(sceneId)) {
+        this.generatingSummary.delete(sceneId);
+        alert('Summary generation is taking too long. Please try again.');
+      }
+    }, 30000);
+
+    // Clean content and build prompt
+    let sceneContent = this.removeEmbeddedImages(scene.content);
+    sceneContent = this.promptManager.extractPlainTextFromHtml(sceneContent);
+    const maxContentLength = 200000;
+    let truncated = false;
+    if (sceneContent.length > maxContentLength) { sceneContent = sceneContent.slice(0, maxContentLength); truncated = true; }
+
+    const storyLanguage = s.settings?.language || 'en';
+    const languageInstruction = (() => {
+      switch (storyLanguage) {
+        case 'de': return 'Antworte auf Deutsch.';
+        case 'fr': return 'Réponds en français.';
+        case 'es': return 'Responde en español.';
+        case 'en': return 'Respond in English.';
+        default: return 'Write the summary in the same language as the scene content.';
+      }
+    })();
+
+    const desiredWordCount = Math.max(20, Math.min(1000, settings.sceneSummaryGeneration.wordCount || 120));
+    const wordCountInstruction = `Aim for about ${desiredWordCount} words.`;
+
+    let prompt: string;
+    if (settings.sceneSummaryGeneration.useCustomPrompt) {
+      prompt = settings.sceneSummaryGeneration.customPrompt
+        .replace(/{sceneTitle}/g, scene.title || 'Untitled')
+        .replace(/{sceneContent}/g, sceneContent + (truncated ? '\n\n[Note: Content was truncated as it was too long]' : ''))
+        .replace(/{customInstruction}/g, settings.sceneSummaryGeneration.customInstruction || '')
+        .replace(/{languageInstruction}/g, languageInstruction)
+        .replace(/{summaryWordCount}/g, String(desiredWordCount));
+      if (!prompt.includes(languageInstruction)) prompt += `\n\n${languageInstruction}`;
+      if (!/\bword(s)?\b/i.test(prompt)) prompt += `\n\n${wordCountInstruction}`;
+    } else {
+      prompt = `Create a summary of the following scene:\n\nTitle: ${scene.title || 'Untitled'}\n\nContent:\n${sceneContent}${truncated ? '\n\n[Note: Content was truncated as it was too long]' : ''}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments. ${wordCountInstruction}`;
+      if (settings.sceneSummaryGeneration.customInstruction) prompt += `\n\nZusätzliche Anweisungen: ${settings.sceneSummaryGeneration.customInstruction}`;
+      prompt += `\n\n${languageInstruction}`;
+    }
+
+    let provider: string | null = null; let actualModelId: string | null = null;
+    const [prov, ...parts] = modelToUse.split(':'); provider = prov; actualModelId = parts.join(':');
+    const useGemini = (provider === 'gemini' && geminiAvailable) || (provider !== 'gemini' && provider !== 'openrouter' && geminiAvailable && !openRouterAvailable);
+    const useOpenRouter = (provider === 'openrouter' && openRouterAvailable) || (provider !== 'gemini' && provider !== 'openrouter' && openRouterAvailable);
+    if (provider !== 'gemini' && provider !== 'openrouter') actualModelId = modelToUse;
+
+    const finalize = async (summary: string) => {
+      if (!summary) return;
+      if (summary && !summary.match(/[.!?]$/)) summary += '.';
+      // Update local signal story immutably and persist
+      const current = this.story(); if (!current) return;
+      const updatedChapters = current.chapters.map(ch => ch.id === chapterId ? {
+        ...ch,
+        scenes: ch.scenes.map(sc => sc.id === sceneId ? { ...sc, summary, summaryGeneratedAt: new Date(), updatedAt: new Date() } : sc),
+        updatedAt: new Date()
+      } : ch);
+      this.story.set({ ...current, chapters: updatedChapters, updatedAt: new Date() });
+      await this.storyService.updateScene(current.id, chapterId, sceneId, { summary, summaryGeneratedAt: new Date() });
+      this.promptManager.refresh();
+      clearTimeout(timeoutId);
+      this.generatingSummary.delete(sceneId);
+    };
+
+    if (useGemini) {
+      this.geminiApi.generateText(prompt, { model: actualModelId!, maxTokens: 3000, temperature: settings.sceneSummaryGeneration.temperature })
+        .subscribe({
+          next: async (response) => {
+            const cand = response.candidates?.[0];
+            const text = cand?.content?.parts?.[0]?.text?.trim() || '';
+            await finalize(text);
+          },
+          error: (error) => {
+            console.error('Error generating scene summary:', error);
+            clearTimeout(timeoutId);
+            this.generatingSummary.delete(sceneId);
+            alert(this.describeGeminiError(error));
+          }
+        });
+    } else if (useOpenRouter) {
+      this.openRouterApi.generateText(prompt, { model: actualModelId!, maxTokens: 3000, temperature: settings.sceneSummaryGeneration.temperature })
+        .subscribe({
+          next: async (response) => {
+            const choice = response.choices?.[0];
+            let text = choice?.message?.content?.trim() || '';
+            if (choice?.finish_reason === 'length') text += ' [Summary was truncated due to token limit]';
+            await finalize(text);
+          },
+          error: (error) => {
+            console.error('Error generating scene summary:', error);
+            clearTimeout(timeoutId);
+            this.generatingSummary.delete(sceneId);
+            alert(this.describeOpenRouterError(error));
+          }
+        });
+    }
+  }
+
+  generateSceneTitle(chapterId: string, sceneId: string): void {
+    const s = this.story();
+    if (!s) return;
+    const chapter = s.chapters.find(c => c.id === chapterId);
+    const scene = chapter?.scenes.find(sc => sc.id === sceneId);
+    if (!scene || !scene.content?.trim()) return;
+
+    const settings = this.settingsService.getSettings();
+    const titleSettings = settings.sceneTitleGeneration;
+    const modelToUse = titleSettings.selectedModel || settings.selectedModel;
+    if (!modelToUse) { alert('No AI model configured.'); return; }
+
+    const openRouterAvailable = settings.openRouter.enabled && settings.openRouter.apiKey;
+    const geminiAvailable = settings.googleGemini.enabled && settings.googleGemini.apiKey;
+    if (!openRouterAvailable && !geminiAvailable) {
+      alert('No AI API configured. Please configure OpenRouter or Google Gemini in settings.');
+      return;
+    }
+
+    this.generatingTitle.add(sceneId);
+    const timeoutId = setTimeout(() => {
+      if (this.generatingTitle.has(sceneId)) {
+        this.generatingTitle.delete(sceneId);
+        alert('Title generation is taking too long. Please try again.');
+      }
+    }, 30000);
+
+    let sceneContent = this.removeEmbeddedImages(scene.content);
+    sceneContent = this.promptManager.extractPlainTextFromHtml(sceneContent);
+    const maxContentLength = 50000;
+    if (sceneContent.length > maxContentLength) sceneContent = sceneContent.slice(0, maxContentLength);
+
+    let styleInstruction = '';
+    switch (titleSettings.style) {
+      case 'descriptive': styleInstruction = 'The title should be descriptive and atmospheric.'; break;
+      case 'action': styleInstruction = 'The title should be action-packed and dynamic.'; break;
+      case 'emotional': styleInstruction = 'The title should reflect the emotional mood of the scene.'; break;
+      case 'concise': default: styleInstruction = 'The title should be concise and impactful.'; break;
+    }
+    const languageInstruction = titleSettings.language === 'english' ? 'Respond in English.' : 'Respond in German.';
+    const genreInstruction = titleSettings.includeGenre ? 'Consider the genre of the story when choosing the title.' : '';
+    const customInstruction = titleSettings.customInstruction ? `\n${titleSettings.customInstruction}` : '';
+
+    let prompt: string;
+    if (titleSettings.useCustomPrompt && titleSettings.customPrompt) {
+      prompt = titleSettings.customPrompt
+        .replace('{maxWords}', titleSettings.maxWords.toString())
+        .replace('{styleInstruction}', styleInstruction)
+        .replace('{genreInstruction}', genreInstruction)
+        .replace('{languageInstruction}', languageInstruction)
+        .replace('{customInstruction}', customInstruction)
+        .replace('{sceneContent}', sceneContent);
+    } else {
+      prompt = `Create a title for the following scene. The title should be up to ${titleSettings.maxWords} words \n` +
+        `${styleInstruction}\n${genreInstruction}\n${languageInstruction}${customInstruction}\n\nScene content (only this one scene):\n${sceneContent}\n\nRespond only with the title, without further explanations or quotation marks.`;
+    }
+
+    let provider: string | null = null; let actualModelId: string | null = null;
+    const [prov, ...parts] = modelToUse.split(':'); provider = prov; actualModelId = parts.join(':');
+    const useGemini = (provider === 'gemini' && geminiAvailable) || (provider !== 'gemini' && provider !== 'openrouter' && geminiAvailable && !openRouterAvailable);
+    const useOpenRouter = (provider === 'openrouter' && openRouterAvailable) || (provider !== 'gemini' && provider !== 'openrouter' && openRouterAvailable);
+    if (provider !== 'gemini' && provider !== 'openrouter') actualModelId = modelToUse;
+
+    const finalize = async (title: string) => {
+      title = (title || '').trim().replace(/^\s*"|"\s*$/g, '');
+      if (!title) return;
+      const current = this.story(); if (!current) return;
+      const updatedChapters = current.chapters.map(ch => ch.id === chapterId ? {
+        ...ch,
+        scenes: ch.scenes.map(sc => sc.id === sceneId ? { ...sc, title, updatedAt: new Date() } : sc),
+        updatedAt: new Date()
+      } : ch);
+      this.story.set({ ...current, chapters: updatedChapters, updatedAt: new Date() });
+      await this.storyService.updateScene(current.id, chapterId, sceneId, { title });
+      this.promptManager.refresh();
+      clearTimeout(timeoutId);
+      this.generatingTitle.delete(sceneId);
+    };
+
+    if (useGemini) {
+      this.geminiApi.generateText(prompt, { model: actualModelId!, maxTokens: 200, temperature: titleSettings.temperature })
+        .subscribe({
+          next: async (response) => {
+            const cand = response.candidates?.[0];
+            const text = cand?.content?.parts?.[0]?.text?.trim() || '';
+            await finalize(text);
+          },
+          error: (error) => {
+            console.error('Error generating scene title:', error);
+            clearTimeout(timeoutId);
+            this.generatingTitle.delete(sceneId);
+            alert(this.describeGeminiError(error));
+          }
+        });
+    } else if (useOpenRouter) {
+      this.openRouterApi.generateText(prompt, { model: actualModelId!, maxTokens: 200, temperature: titleSettings.temperature })
+        .subscribe({
+          next: async (response) => {
+            const text = response.choices?.[0]?.message?.content?.trim() || '';
+            await finalize(text);
+          },
+          error: (error) => {
+            console.error('Error generating scene title:', error);
+            clearTimeout(timeoutId);
+            this.generatingTitle.delete(sceneId);
+            alert(this.describeOpenRouterError(error));
+          }
+        });
+    }
+  }
+
+  private removeEmbeddedImages(content: string): string {
+    let cleaned = content.replace(/<img[^>]*src="data:image\/[^"]*"[^>]*>/gi, '[Image removed]');
+    cleaned = cleaned.replace(/!\[[^\]]*\]\(data:image\/[^)]*\)/gi, '[Image removed]');
+    cleaned = cleaned.replace(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/]{1000,}={0,2}/g, '[Image data removed]');
+    return cleaned;
+  }
+
+  private describeOpenRouterError(error: unknown): string {
+    const err = (error || {}) as { status?: number; message?: string; error?: { error?: { message?: string }, message?: string } };
+    if (!error) return 'Error generating text.';
+    if (err.status === 400) return 'Invalid request. Please check your API settings.';
+    if (err.status === 401) return 'Invalid API key. Please check your OpenRouter API key in settings.';
+    if (err.status === 403) return 'Access denied. Your API key may not have the required permissions.';
+    if (err.status === 429) return 'Rate limit reached. Please wait a moment and try again.';
+    if (err.status === 500) return 'OpenRouter server error. Please try again later.';
+    if (err.message?.includes('nicht aktiviert')) return err.message;
+    return 'Error generating text.';
+  }
+
+  private describeGeminiError(error: unknown): string {
+    const err = (error || {}) as { status?: number; message?: string };
+    if (!error) return 'Error generating text.';
+    if (err.status === 400) return 'Invalid request. Please check your API settings.';
+    if (err.status === 401) return 'Invalid API key. Please check your Google Gemini API key in settings.';
+    if (err.status === 403) return 'Access denied. Your API key may not have the required permissions.';
+    if (err.status === 429) return 'Rate limit reached. Please wait a moment and try again.';
+    if (err.status === 500) return 'Gemini server error. Please try again later.';
+    if (err.message?.includes('nicht aktiviert')) return err.message;
+    return 'Error generating text.';
   }
 
   // Chapter title inline editing
