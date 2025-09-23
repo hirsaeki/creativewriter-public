@@ -11,6 +11,35 @@
   align-items: baseline;
 }
 
+.chapter-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.chapter-actions ion-button {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  height: 28px;
+}
+
+.chapter-edit-input {
+  --background: rgba(0, 0, 0, 0.2);
+  --color: var(--ion-text-color);
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --padding-top: 4px;
+  --padding-bottom: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  min-width: 180px;
+}
+
+.chapter-edit-input::part(native) {
+  background: transparent !important;
+}
+
 .idx {
   opacity: 0.7;
 }

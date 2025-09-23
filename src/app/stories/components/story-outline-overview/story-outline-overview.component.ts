@@ -269,4 +269,52 @@ export class StoryOutlineOverviewComponent implements OnInit {
       this.savingTitleSet.delete(sceneId);
     }
   }
+
+  // Chapter title inline editing
+  editingChapterTitles: Record<string, string> = {};
+  private savingChapterTitleSet = new Set<string>();
+
+  isEditingChapterTitle(chapterId: string): boolean {
+    return Object.prototype.hasOwnProperty.call(this.editingChapterTitles, chapterId);
+  }
+
+  startEditChapterTitle(chapterId: string, current: string | undefined, event?: Event): void {
+    if (event) event.stopPropagation();
+    this.editingChapterTitles = { ...this.editingChapterTitles, [chapterId]: current || '' };
+  }
+
+  cancelEditChapterTitle(chapterId: string, event?: Event): void {
+    if (event) event.stopPropagation();
+    const rest = { ...this.editingChapterTitles };
+    delete rest[chapterId];
+    this.editingChapterTitles = rest;
+  }
+
+  onEditChapterTitleChange(chapterId: string, value: string, event?: Event): void {
+    if (event) event.stopPropagation();
+    this.editingChapterTitles = { ...this.editingChapterTitles, [chapterId]: value };
+  }
+
+  savingChapterTitle(chapterId: string): boolean {
+    return this.savingChapterTitleSet.has(chapterId);
+  }
+
+  async saveChapterTitle(chapterId: string, event?: Event): Promise<void> {
+    if (event) event.stopPropagation();
+    const s = this.story();
+    if (!s) return;
+    const title = (this.editingChapterTitles[chapterId] ?? '').trim();
+    if (!title) return;
+    this.savingChapterTitleSet.add(chapterId);
+    try {
+      await this.storyService.updateChapter(s.id, chapterId, { title });
+      const updatedChapters = s.chapters.map(ch => ch.id === chapterId ? { ...ch, title, updatedAt: new Date() } : ch);
+      this.story.set({ ...s, chapters: updatedChapters, updatedAt: new Date() });
+      this.cancelEditChapterTitle(chapterId);
+    } catch (e) {
+      console.error('Failed to save chapter title', e);
+    } finally {
+      this.savingChapterTitleSet.delete(chapterId);
+    }
+  }
 }

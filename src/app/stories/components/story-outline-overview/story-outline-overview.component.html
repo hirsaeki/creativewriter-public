@@ -32,9 +32,41 @@
     <ion-accordion *ngFor="let chapter of filteredChapters()" [value]="chapter.id">
       <ion-item slot="header" lines="full">
         <ion-label>
-          <div class="chapter-title">
-            <span class="idx">{{chapter.chapterNumber}}.</span>
-            <span>{{ chapter.title || 'Untitled Chapter' }}</span>
+          <div class="chapter-header-row">
+            <div class="chapter-title">
+              <ng-container *ngIf="!isEditingChapterTitle(chapter.id); else editChapterTpl">
+                <span class="idx">{{chapter.chapterNumber}}.</span>
+                <span>{{ chapter.title || 'Untitled Chapter' }}</span>
+              </ng-container>
+              <ng-template #editChapterTpl>
+                <div class="chapter-edit">
+                  <span class="idx">{{chapter.chapterNumber}}.</span>
+                  <ion-input
+                    class="chapter-edit-input"
+                    [ngModel]="editingChapterTitles[chapter.id] || ''"
+                    (ngModelChange)="onEditChapterTitleChange(chapter.id, $event, $event)"
+                    placeholder="Untitled Chapter"
+                    (click)="$event.stopPropagation()"
+                    (keydown)="$event.stopPropagation()"
+                    (keydown.enter)="saveChapterTitle(chapter.id, $event)">
+                  </ion-input>
+                </div>
+              </ng-template>
+            </div>
+            <div class="chapter-actions">
+              <ion-button *ngIf="!isEditingChapterTitle(chapter.id)" fill="outline" size="small" color="medium" (click)="startEditChapterTitle(chapter.id, chapter.title, $event)">
+                <ion-icon name="create-outline" slot="start"></ion-icon>
+                Edit Title
+              </ion-button>
+              <ion-button *ngIf="isEditingChapterTitle(chapter.id)" size="small" color="primary" [disabled]="savingChapterTitle(chapter.id)" (click)="saveChapterTitle(chapter.id, $event)">
+                <ion-icon name="save-outline" slot="start"></ion-icon>
+                Save
+              </ion-button>
+              <ion-button *ngIf="isEditingChapterTitle(chapter.id)" fill="outline" size="small" color="medium" [disabled]="savingChapterTitle(chapter.id)" (click)="cancelEditChapterTitle(chapter.id, $event)">
+                <ion-icon name="close-outline" slot="start"></ion-icon>
+                Cancel
+              </ion-button>
+            </div>
           </div>
           <ion-note>{{ chapter.scenes.length }} scene(s)</ion-note>
         </ion-label>
