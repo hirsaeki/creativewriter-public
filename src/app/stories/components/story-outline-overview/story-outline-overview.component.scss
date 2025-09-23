@@ -19,9 +19,11 @@
 }
 
 .chapter-actions ion-button {
-  --padding-start: 8px;
-  --padding-end: 8px;
-  height: 28px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+  --height: 32px;
 }
 
 .chapter-edit-input {
@@ -154,6 +156,14 @@
   display: flex;
   justify-content: flex-end;
   margin-top: 8px;
+}
+
+/* Give scene action buttons comfortable inner spacing */
+.actions ion-button {
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --padding-top: 6px;
+  --padding-bottom: 6px;
 }
 
 .loading, .empty {
