@@ -36,6 +36,11 @@
   background: transparent !important;
 }
 
+.scene-card ion-card-header::part(native),
+.scene-card ion-card-content::part(native) {
+  background: transparent !important;
+}
+
 .scene-card ion-card-header,
 .scene-card ion-card-content {
   background: transparent !important;
@@ -59,6 +64,12 @@
 .summary.placeholder {
   opacity: 0.7;
   font-style: italic;
+}
+
+/* Ensure list container inside accordion content is transparent */
+.chapter-content ion-list {
+  background: transparent !important;
+  --background: transparent !important;
 }
 
 /* Keep scene action button subtle on glassy background */
