@@ -21,11 +21,51 @@
 
 .scene-card {
   margin-bottom: 12px;
+  /* Glassy transparent card styling */
+  background: linear-gradient(135deg, rgba(20, 20, 20, 0.3) 0%, rgba(15, 15, 15, 0.3) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 14px !important;
+  backdrop-filter: blur(8px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(120%) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.25s ease;
+  --background: transparent !important;
+}
+
+.scene-card::part(native) {
+  background: transparent !important;
+}
+
+.scene-card ion-card-header,
+.scene-card ion-card-content {
+  background: transparent !important;
+  --background: transparent !important;
+}
+
+.scene-card ion-card-title {
+  color: #f8f9fa !important;
+  --color: #f8f9fa !important;
+  font-size: 0.98rem !important;
+  font-weight: 600 !important;
+}
+
+.scene-card:hover {
+  background: linear-gradient(135deg, rgba(25, 25, 25, 0.4) 0%, rgba(20, 20, 20, 0.4) 100%) !important;
+  border-color: rgba(71, 118, 230, 0.3) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3) !important;
+  transform: translateY(-2px);
 }
 
 .summary.placeholder {
   opacity: 0.7;
   font-style: italic;
+}
+
+/* Keep scene action button subtle on glassy background */
+.actions ion-button[color="medium"] {
+  --background: rgba(255, 255, 255, 0.08);
+  --background-hover: rgba(255, 255, 255, 0.15);
+  --border-radius: 8px;
 }
 
 .actions {
