@@ -5,10 +5,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 import {
   IonContent, IonSearchbar, IonAccordion, IonAccordionGroup, IonItem, IonLabel,
   IonButton, IonIcon, IonChip, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
+  IonTextarea,
   IonBadge, IonSkeletonText, IonNote
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline } from 'ionicons/icons';
+import { arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline } from 'ionicons/icons';
 import { Story, Chapter } from '../../models/story.interface';
 import { StoryService } from '../../services/story.service';
 import { AppHeaderComponent, HeaderAction, BurgerMenuItem } from '../../../ui/components/app-header.component';
@@ -21,6 +22,7 @@ import { AppHeaderComponent, HeaderAction, BurgerMenuItem } from '../../../ui/co
     AppHeaderComponent,
     IonContent, IonSearchbar, IonAccordion, IonAccordionGroup, IonItem, IonLabel,
     IonButton, IonIcon, IonChip, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
+    IonTextarea,
     IonBadge, IonSkeletonText, IonNote
   ],
   templateUrl: './story-outline-overview.component.html',
@@ -66,7 +68,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
   });
 
   constructor() {
-    addIcons({ arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline });
+    addIcons({ arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline });
   }
 
   async ngOnInit(): Promise<void> {
@@ -157,5 +159,63 @@ export class StoryOutlineOverviewComponent implements OnInit {
     navigator.clipboard?.writeText(text).catch(() => {
       // ignore clipboard errors in non-secure contexts
     });
+  }
+
+  // Inline summary editing state
+  editingSummaries: Record<string, string> = {};
+  private savingSet = new Set<string>();
+
+  isEditing(sceneId: string): boolean {
+    return Object.prototype.hasOwnProperty.call(this.editingSummaries, sceneId);
+  }
+
+  startEdit(sceneId: string, current: string | undefined): void {
+    this.editingSummaries = { ...this.editingSummaries, [sceneId]: current || '' };
+  }
+
+  cancelEdit(sceneId: string): void {
+    const rest = { ...this.editingSummaries };
+    delete rest[sceneId];
+    this.editingSummaries = rest;
+  }
+
+  onEditSummaryChange(sceneId: string, value: string): void {
+    this.editingSummaries = { ...this.editingSummaries, [sceneId]: value };
+  }
+
+  saving(sceneId: string): boolean {
+    return this.savingSet.has(sceneId);
+  }
+
+  async saveSceneSummary(chapterId: string, sceneId: string): Promise<void> {
+    const s = this.story();
+    if (!s) return;
+    const summary = this.editingSummaries[sceneId] ?? '';
+    this.savingSet.add(sceneId);
+    try {
+      await this.storyService.updateScene(s.id, chapterId, sceneId, { summary });
+      // Update local story signal immutably to avoid full reload
+      const updatedChapters = s.chapters.map(ch => {
+        if (ch.id !== chapterId) return ch;
+        return {
+          ...ch,
+          updatedAt: new Date(),
+          scenes: ch.scenes.map(sc => sc.id === sceneId ? { ...sc, summary, updatedAt: new Date() } : sc)
+        };
+      });
+      this.story.set({ ...s, chapters: updatedChapters, updatedAt: new Date() });
+      this.cancelEdit(sceneId);
+    } catch (e) {
+      console.error('Failed to save scene summary', e);
+    } finally {
+      this.savingSet.delete(sceneId);
+    }
+  }
+
+  onSummaryKeydown(event: KeyboardEvent, chapterId: string, sceneId: string): void {
+    if ((event.key === 'Enter' || event.key === 'NumpadEnter') && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      this.saveSceneSummary(chapterId, sceneId);
+    }
   }
 }

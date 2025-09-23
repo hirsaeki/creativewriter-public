@@ -66,6 +66,17 @@
   font-style: italic;
 }
 
+.summary-edit ion-textarea {
+  --background: rgba(0, 0, 0, 0.2);
+  --color: var(--ion-text-color);
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --padding-top: 12px;
+  --padding-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
 /* Ensure list container inside accordion content is transparent */
 .chapter-content ion-list {
   background: transparent !important;

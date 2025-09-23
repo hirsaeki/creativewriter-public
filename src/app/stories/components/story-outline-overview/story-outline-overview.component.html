@@ -50,10 +50,38 @@
               </ion-card-title>
             </ion-card-header>
             <ion-card-content>
-              <div class="summary" [class.placeholder]="!scene.summary">
-                {{ scene.summary || 'No summary available for this scene.' }}
-              </div>
+              <ng-container *ngIf="!isEditing(scene.id); else editSummaryTpl">
+                <div class="summary" [class.placeholder]="!scene.summary">
+                  {{ scene.summary || 'No summary available for this scene.' }}
+                </div>
+              </ng-container>
+
+              <ng-template #editSummaryTpl>
+                <div class="summary-edit">
+                  <ion-textarea
+                    [ngModel]="editingSummaries[scene.id] || ''"
+                    (ngModelChange)="onEditSummaryChange(scene.id, $event)"
+                    [autoGrow]="true"
+                    rows="6"
+                    placeholder="Write a short summary for this scene..."
+                    (keydown)="onSummaryKeydown($event, chapter.id, scene.id)">
+                  </ion-textarea>
+                </div>
+              </ng-template>
+
               <div class="actions">
+                <ion-button *ngIf="!isEditing(scene.id)" size="small" fill="outline" color="medium" (click)="startEdit(scene.id, scene.summary)" title="Edit summary">
+                  <ion-icon name="create-outline" slot="start"></ion-icon>
+                  Edit Summary
+                </ion-button>
+                <ion-button *ngIf="isEditing(scene.id)" size="small" color="primary" (click)="saveSceneSummary(chapter.id, scene.id)" [disabled]="saving(scene.id)" title="Save summary (Ctrl+Enter)">
+                  <ion-icon name="save-outline" slot="start"></ion-icon>
+                  Save
+                </ion-button>
+                <ion-button *ngIf="isEditing(scene.id)" size="small" fill="outline" color="medium" (click)="cancelEdit(scene.id)" [disabled]="saving(scene.id)" title="Cancel">
+                  <ion-icon name="close-outline" slot="start"></ion-icon>
+                  Cancel
+                </ion-button>
                 <ion-button size="small" color="medium" (click)="openInEditor(chapter.id, scene.id)" title="Open in editor">
                   <ion-icon name="open-outline" slot="start"></ion-icon>
                   Open Scene
