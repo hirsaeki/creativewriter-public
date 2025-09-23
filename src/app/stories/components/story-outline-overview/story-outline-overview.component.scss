@@ -61,6 +61,30 @@ ion-content {
   --background: transparent !important;
 }
 
+/* Transparent accordion styling for outline overview */
+ion-accordion-group {
+  background: transparent !important;
+}
+
+ion-accordion {
+  background: transparent !important;
+}
+
+/* Header row */
+ion-accordion ion-item[slot="header"] {
+  --background: transparent !important;
+  --color: var(--ion-text-color);
+  --inner-border-width: 0 0 1px 0;
+  --border-color: rgba(255, 255, 255, 0.08);
+  backdrop-filter: none;
+}
+
+/* Content wrapper */
+ion-accordion [slot="content"],
+.chapter-content {
+  background: transparent !important;
+}
+
 /* Fix mobile height: avoid double offsets and ensure full-height scroll area */
 @media (max-width: 768px) {
   ion-content {
