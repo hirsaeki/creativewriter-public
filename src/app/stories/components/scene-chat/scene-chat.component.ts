@@ -25,6 +25,7 @@ import { PromptManagerService } from '../../../shared/services/prompt-manager.se
 import { CodexService } from '../../services/codex.service';
 import { AIRequestLoggerService } from '../../../core/services/ai-request-logger.service';
 import { ModelService } from '../../../core/services/model.service';
+import { ChatHistoryService } from '../../services/chat-history.service';
 import { OpenRouterIconComponent } from '../../../ui/icons/openrouter-icon.component';
 import { ClaudeIconComponent } from '../../../ui/icons/claude-icon.component';
 import { ReplicateIconComponent } from '../../../ui/icons/replicate-icon.component';
@@ -89,6 +90,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
   private sanitizer = inject(DomSanitizer);
   private cdr = inject(ChangeDetectorRef);
   private readonly alertController = inject(AlertController);
+  private chatHistoryService = inject(ChatHistoryService);
 
   @ViewChild('scrollContainer') scrollContainer!: ElementRef;
   @ViewChild('messageInput') messageInput!: ElementRef;
@@ -124,6 +126,9 @@ export class SceneChatComponent implements OnInit, OnDestroy {
   isEditing = false;
   private editingIndex = -1;
   private editingExtractionType?: 'characters' | 'locations' | 'objects';
+  
+  // Persistence state
+  private activeHistoryId: string | null = null;
 
   constructor() {
     addIcons({ 
@@ -249,6 +254,8 @@ export class SceneChatComponent implements OnInit, OnDestroy {
           });
           this.isGenerating = false;
           this.scrollToBottom();
+          // Persist snapshot of conversation
+          this.saveHistorySnapshot().catch(() => void 0);
           this.cdr.markForCheck();
         },
         error: (error) => {
@@ -284,7 +291,12 @@ export class SceneChatComponent implements OnInit, OnDestroy {
     const sceneId = this.route.snapshot.paramMap.get('sceneId');
 
     if (storyId && chapterId && sceneId) {
-      this.loadStory(storyId, chapterId, sceneId).catch(error => {
+      this.loadStory(storyId, chapterId, sceneId).then(() => {
+        // Try restoring latest chat history after story is loaded
+        if (storyId) {
+          this.restoreLatestHistory(storyId).catch(() => void 0);
+        }
+      }).catch(error => {
         console.error('Error loading story:', error);
         this.goBack();
       });
@@ -322,12 +334,14 @@ export class SceneChatComponent implements OnInit, OnDestroy {
         });
       }
       
-      // Add initial system message
-      this.messages.push({
-        role: 'assistant',
-        content: 'Hello! I am your AI assistant for this scene. I work exclusively with the context of selected scenes. You can ask me questions to extract characters, analyze details, or develop ideas.',
-        timestamp: new Date()
-      });
+      // Add initial system message if empty
+      if (this.messages.length === 0) {
+        this.messages.push({
+          role: 'assistant',
+          content: 'Hello! I am your AI assistant for this scene. I work exclusively with the context of selected scenes. You can ask me questions to extract characters, analyze details, or develop ideas.',
+          timestamp: new Date()
+        });
+      }
     }
   }
 
@@ -437,6 +451,8 @@ export class SceneChatComponent implements OnInit, OnDestroy {
           });
           this.isGenerating = false;
           this.scrollToBottom();
+          // Persist snapshot of conversation
+          this.saveHistorySnapshot().catch(() => void 0);
           this.cdr.markForCheck();
         },
         error: (error) => {
@@ -1272,7 +1288,62 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
       timestamp: new Date()
     });
 
+    // Reset active history; next save creates a new one
+    this.activeHistoryId = null;
+
     this.scrollToBottom();
     this.cdr.markForCheck();
+  }
+
+  private async restoreLatestHistory(storyId: string): Promise<void> {
+    const latest = await this.chatHistoryService.getLatest(storyId);
+    if (!latest) return;
+    // Replace current chat with stored one
+    this.messages = latest.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
+    this.includeStoryOutline = !!latest.includeStoryOutline;
+    if (latest.selectedModel) this.selectedModel = latest.selectedModel;
+    // Restore selected scenes best-effort if story is loaded
+    if (latest.selectedScenes && this.story) {
+      const restored: SceneContext[] = [];
+      for (const ref of latest.selectedScenes) {
+        const chapter = this.story.chapters.find(c => c.id === ref.chapterId);
+        const scene = chapter?.scenes.find(s => s.id === ref.sceneId);
+        if (chapter && scene) {
+          restored.push({
+            chapterId: chapter.id,
+            sceneId: scene.id,
+            chapterTitle: ref.chapterTitle || `C${chapter.chapterNumber || chapter.order}:${chapter.title}`,
+            sceneTitle: ref.sceneTitle || `C${chapter.chapterNumber || chapter.order}S${scene.sceneNumber || scene.order}:${scene.title}`,
+            content: this.extractFullTextFromScene(scene),
+            selected: true
+          });
+        }
+      }
+      if (restored.length) this.selectedScenes = restored;
+    }
+    this.activeHistoryId = latest.historyId;
+    this.cdr.markForCheck();
+  }
+
+  private async saveHistorySnapshot(): Promise<void> {
+    if (!this.story) return;
+    // Skip if only greeting
+    const hasRealMessages = this.messages.some(m => m.role === 'user' || (m.role === 'assistant' && !m.content.includes('Hello! I am your AI assistant')));
+    if (!hasRealMessages) return;
+    const selectedScenesRefs = this.selectedScenes.map(s => ({
+      chapterId: s.chapterId,
+      sceneId: s.sceneId,
+      chapterTitle: s.chapterTitle,
+      sceneTitle: s.sceneTitle
+    }));
+    const saved = await this.chatHistoryService.saveSnapshot({
+      storyId: this.story.id,
+      messages: this.messages,
+      selectedScenes: selectedScenesRefs,
+      includeStoryOutline: this.includeStoryOutline,
+      selectedModel: this.selectedModel || undefined,
+      historyId: this.activeHistoryId
+    });
+    this.activeHistoryId = saved.historyId;
   }
 }
