@@ -22,6 +22,18 @@ export class SettingsService {
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
         // Merge with defaults to ensure all properties exist
+        const beatInputFavorites = Array.isArray(parsed.favoriteModelLists?.beatInput)
+          ? parsed.favoriteModelLists.beatInput
+          : Array.isArray(parsed.favoriteModels)
+            ? parsed.favoriteModels
+            : DEFAULT_SETTINGS.favoriteModelLists.beatInput;
+
+        const favoriteModelLists = {
+          ...DEFAULT_SETTINGS.favoriteModelLists,
+          ...(parsed.favoriteModelLists ?? {}),
+          beatInput: [...beatInputFavorites]
+        };
+
         return {
           ...DEFAULT_SETTINGS,
           ...parsed,
@@ -61,7 +73,8 @@ export class SettingsService {
             ...DEFAULT_SETTINGS.appearance,
             ...parsed.appearance
           },
-          favoriteModels: parsed.favoriteModels || DEFAULT_SETTINGS.favoriteModels,
+          favoriteModelLists,
+          favoriteModels: [...favoriteModelLists.beatInput],
           updatedAt: new Date(parsed.updatedAt || new Date())
         };
       }
@@ -84,12 +97,37 @@ export class SettingsService {
   }
 
   updateSettings(settings: Partial<Settings>): void {
-    const updatedSettings = {
-      ...this.settingsSubject.value,
+    const currentSettings = this.settingsSubject.value;
+    const mergedFavoriteLists = {
+      ...currentSettings.favoriteModelLists,
+      ...(settings.favoriteModelLists ?? {})
+    } as Settings['favoriteModelLists'];
+
+    if (settings.favoriteModelLists?.beatInput) {
+      mergedFavoriteLists.beatInput = [...settings.favoriteModelLists.beatInput];
+    } else {
+      mergedFavoriteLists.beatInput = [...mergedFavoriteLists.beatInput];
+    }
+
+    const updatedSettings: Settings = {
+      ...currentSettings,
       ...settings,
+      favoriteModelLists: mergedFavoriteLists,
       updatedAt: new Date()
     };
-    
+
+    if (settings.favoriteModelLists?.beatInput) {
+      updatedSettings.favoriteModels = [...settings.favoriteModelLists.beatInput];
+    } else if (settings.favoriteModels) {
+      updatedSettings.favoriteModels = [...settings.favoriteModels];
+      updatedSettings.favoriteModelLists = {
+        ...updatedSettings.favoriteModelLists,
+        beatInput: [...settings.favoriteModels]
+      };
+    } else {
+      updatedSettings.favoriteModels = [...updatedSettings.favoriteModelLists.beatInput];
+    }
+
     this.saveSettings(updatedSettings);
     this.settingsSubject.next(updatedSettings);
   }
@@ -146,7 +184,16 @@ export class SettingsService {
 
   clearSettings(): void {
     localStorage.removeItem(this.STORAGE_KEY);
-    this.settingsSubject.next({ ...DEFAULT_SETTINGS });
+    const resetFavorites = [...DEFAULT_SETTINGS.favoriteModelLists.beatInput];
+    this.settingsSubject.next({
+      ...DEFAULT_SETTINGS,
+      favoriteModelLists: {
+        ...DEFAULT_SETTINGS.favoriteModelLists,
+        beatInput: resetFavorites
+      },
+      favoriteModels: [...resetFavorites],
+      updatedAt: new Date()
+    });
   }
 
   // Utility methods for checking API availability

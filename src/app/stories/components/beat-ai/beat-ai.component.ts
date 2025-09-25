@@ -14,6 +14,7 @@ import { TokenCounterService, SupportedModel } from '../../../shared/services/to
 import { BeatAI, BeatAIPromptEvent } from '../../models/beat-ai.interface';
 import { Subscription } from 'rxjs';
 import { ModelOption } from '../../../core/models/model.interface';
+import { Settings } from '../../../core/models/settings.interface';
 import { ModelService } from '../../../core/services/model.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { BeatAIService } from '../../../shared/services/beat-ai.service';
@@ -726,11 +727,16 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   private updateFavoriteModels(): void {
     const settings = this.settingsService.getSettings();
-    const favoriteIds = settings.favoriteModels || [];
-    
-    this.favoriteModels = this.availableModels.filter(model => 
+    const favoriteIds = this.getBeatInputFavorites(settings);
+
+    this.favoriteModels = this.availableModels.filter(model =>
       favoriteIds.includes(model.id)
     );
+  }
+
+  private getBeatInputFavorites(settings: Settings): string[] {
+    const favorites = settings.favoriteModelLists?.beatInput ?? settings.favoriteModels ?? [];
+    return [...favorites];
   }
   
   selectFavoriteModel(model: ModelOption): void {
@@ -758,8 +764,8 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     event.preventDefault();
     
     const settings = this.settingsService.getSettings();
-    const favoriteIds = settings.favoriteModels || [];
-    
+    const favoriteIds = this.getBeatInputFavorites(settings);
+
     const index = favoriteIds.indexOf(model.id);
     if (index > -1) {
       // Remove from favorites
@@ -777,14 +783,17 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     
     // Save updated favorites
     this.settingsService.updateSettings({
-      ...settings,
-      favoriteModels: favoriteIds
+      favoriteModels: favoriteIds,
+      favoriteModelLists: {
+        ...settings.favoriteModelLists,
+        beatInput: favoriteIds
+      }
     });
   }
   
   isFavorite(modelId: string): boolean {
     const settings = this.settingsService.getSettings();
-    return (settings.favoriteModels || []).includes(modelId);
+    return this.getBeatInputFavorites(settings).includes(modelId);
   }
 
   // Context selection methods

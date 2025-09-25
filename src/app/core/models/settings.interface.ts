@@ -1,3 +1,7 @@
+export interface FavoriteModelLists {
+  beatInput: string[];
+}
+
 export interface Settings {
   openRouter: OpenRouterSettings;
   replicate: ReplicateSettings;
@@ -8,7 +12,8 @@ export interface Settings {
   sceneSummaryGeneration: SceneSummaryGenerationSettings;
   sceneGenerationFromOutline: SceneGenerationFromOutlineSettings;
   selectedModel: string; // Global selected model (format: "provider:model_id")
-  favoriteModels: string[]; // List of favorite model IDs for quick access
+  favoriteModels: string[]; // Legacy list of favorite model IDs for quick access (mirrors favoriteModelLists.beatInput)
+  favoriteModelLists: FavoriteModelLists; // Structured favorite model lists by feature
   appearance: AppearanceSettings;
   updatedAt: Date;
 }
@@ -179,5 +184,8 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   selectedModel: '',
   favoriteModels: [],
+  favoriteModelLists: {
+    beatInput: []
+  },
   updatedAt: new Date()
 };

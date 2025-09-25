@@ -1,0 +1,92 @@
+<ion-card>
+  <ion-card-header>
+    <ion-card-title>Model Favorites</ion-card-title>
+  </ion-card-header>
+  <ion-card-content>
+    <p class="description">
+      Configure reusable favorite lists for story tools. Updates are applied immediately to the beat input quick-select buttons.
+    </p>
+
+    <section class="favorites-section">
+      <h3 class="section-heading">Beat Input Favorites</h3>
+      <p class="section-subheading">
+        Choose up to {{ maxFavorites }} models to surface as shortcuts inside the beat input panel.
+      </p>
+
+      <div class="select-wrapper">
+        <ng-select
+          [(ngModel)]="selectedFavorites"
+          (ngModelChange)="onFavoritesChange($event)"
+          [items]="combinedModels"
+          bindLabel="label"
+          bindValue="id"
+          [multiple]="true"
+          [maxSelectedItems]="maxFavorites"
+          [loading]="loadingModels"
+          [virtualScroll]="true"
+          [searchable]="true"
+          appendTo="body"
+          placeholder="Select favorite models"
+          class="ng-select-custom"
+          [clearable]="false">
+          <ng-template ng-option-tmp let-item="item">
+            <div class="model-option">
+              <app-openrouter-icon *ngIf="item.provider === 'openrouter'" size="16" color="#6467f2" class="provider-icon openrouter"></app-openrouter-icon>
+              <app-claude-icon *ngIf="item.provider === 'claude'" size="16" color="#C15F3C" class="provider-icon claude"></app-claude-icon>
+              <app-replicate-icon *ngIf="item.provider === 'replicate'" size="16" color="#9c27b0" class="provider-icon replicate"></app-replicate-icon>
+              <app-ollama-icon *ngIf="item.provider === 'ollama'" size="16" color="#ff9800" class="provider-icon ollama"></app-ollama-icon>
+              <ion-icon *ngIf="isGenericProvider(item.provider)" [name]="getProviderIcon(item.provider)" class="provider-icon" [class.gemini]="item.provider === 'gemini'"></ion-icon>
+              <div class="model-info">
+                <div class="model-label">{{ item.label }}</div>
+                <div class="model-meta">{{ item.provider }}</div>
+              </div>
+            </div>
+          </ng-template>
+          <ng-template ng-multi-label-tmp let-items="items">
+            <div class="selected-chips">
+              <div class="selected-chip" *ngFor="let item of items">
+                {{ item.label }}
+              </div>
+            </div>
+          </ng-template>
+        </ng-select>
+      </div>
+
+      <ion-note color="danger" *ngIf="modelLoadError">{{ modelLoadError }}</ion-note>
+      <p class="info-note" *ngIf="!modelLoadError && !loadingModels && !combinedModels.length">
+        Connect at least one AI provider in the API tab to see available models.
+      </p>
+      <div class="loading-state" *ngIf="loadingModels">
+        <ion-spinner name="crescent"></ion-spinner>
+        <span>Loading models…</span>
+      </div>
+
+      <div class="favorites-list" *ngIf="favoriteModelOptions.length > 0">
+        <ion-reorder-group (ionItemReorder)="onReorder($event)" [disabled]="favoriteModelOptions.length <= 1">
+          <ion-item *ngFor="let model of favoriteModelOptions; let index = index; trackBy: trackById">
+            <ion-reorder slot="start"></ion-reorder>
+            <div class="favorite-item-content">
+              <span class="favorite-index">#{{ index + 1 }}</span>
+              <app-openrouter-icon *ngIf="model.provider === 'openrouter'" size="18" color="#6467f2" class="provider-icon openrouter"></app-openrouter-icon>
+              <app-claude-icon *ngIf="model.provider === 'claude'" size="18" color="#C15F3C" class="provider-icon claude"></app-claude-icon>
+              <app-replicate-icon *ngIf="model.provider === 'replicate'" size="18" color="#9c27b0" class="provider-icon replicate"></app-replicate-icon>
+              <app-ollama-icon *ngIf="model.provider === 'ollama'" size="18" color="#ff9800" class="provider-icon ollama"></app-ollama-icon>
+              <ion-icon *ngIf="isGenericProvider(model.provider)" [name]="getProviderIcon(model.provider)" class="provider-icon" [class.gemini]="model.provider === 'gemini'"></ion-icon>
+              <ion-label>
+                <h4>{{ model.label }}</h4>
+                <p>{{ model.provider }}</p>
+              </ion-label>
+            </div>
+            <ion-button fill="clear" color="medium" slot="end" (click)="removeFavorite(model.id)">
+              <ion-icon name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-item>
+        </ion-reorder-group>
+      </div>
+
+      <p class="empty-state" *ngIf="!favoriteModelOptions.length && !loadingModels">
+        No favorites selected yet. Use the selector above to add models.
+      </p>
+    </section>
+  </ion-card-content>
+</ion-card>
