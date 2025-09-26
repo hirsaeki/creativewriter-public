@@ -1,0 +1,148 @@
+.research-content {
+  --background: transparent;
+}
+
+.content-wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.task-card ion-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cost-warning {
+  display: flex;
+  gap: 12px;
+  background: rgba(255, 196, 0, 0.08);
+  border: 1px solid rgba(255, 196, 0, 0.25);
+  border-radius: 12px;
+  padding: 12px 16px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cost-warning ion-icon {
+  font-size: 20px;
+  color: var(--ion-color-warning);
+  margin-top: 2px;
+}
+
+.cost-metrics {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.selector-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.selector-row label {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.task-input {
+  --background: rgba(255, 255, 255, 0.04);
+  --padding-start: 12px;
+  --padding-end: 12px;
+  border-radius: 12px;
+}
+
+.progress-card .progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.progress-card ion-progress-bar {
+  margin-bottom: 8px;
+}
+
+.progress-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.metadata-card ion-item {
+  --background: transparent;
+  --min-height: 0;
+}
+
+.metadata-card h3 {
+  font-size: 16px;
+  margin: 0;
+  white-space: pre-line;
+}
+
+.metadata-card .item-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.progress-list-card ion-item {
+  --background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.finding-response {
+  margin-top: 6px;
+  white-space: pre-line;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.findings-card ion-item {
+  align-items: flex-start;
+}
+
+.findings-card ion-icon {
+  margin-top: 4px;
+}
+
+.summary-text {
+  white-space: pre-line;
+  line-height: 1.6;
+  font-size: 15px;
+}
+
+.error-card {
+  border-left: 4px solid var(--ion-color-danger);
+  background: rgba(220, 53, 69, 0.08);
+}
+
+.error-card p {
+  margin: 0;
+  white-space: pre-line;
+}
+
+@media (max-width: 768px) {
+  .content-wrapper {
+    padding: 16px 12px 32px;
+  }
+
+  .cost-warning {
+    flex-direction: column;
+  }
+}

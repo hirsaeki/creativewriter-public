@@ -9,6 +9,7 @@ import { CodexComponent } from './components/codex/codex.component';
 import { ImageGenerationComponent } from './components/image-generation/image-generation.component';
 import { SceneChatComponent } from './components/scene-chat/scene-chat.component';
 import { StoryOutlineOverviewComponent } from './components/story-outline-overview/story-outline-overview.component';
+import { StoryResearchComponent } from './components/story-research/story-research.component';
 
 @NgModule({
   imports: [
@@ -22,6 +23,7 @@ import { StoryOutlineOverviewComponent } from './components/story-outline-overvi
     ImageGenerationComponent,
     SceneChatComponent,
     StoryOutlineOverviewComponent,
+    StoryResearchComponent,
   ]
 })
 export class StoriesModule { }

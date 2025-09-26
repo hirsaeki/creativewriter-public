@@ -11,7 +11,7 @@ import {
   arrowBack, bookOutline, book, settingsOutline, statsChartOutline, statsChart,
   saveOutline, checkmarkCircleOutline, menuOutline, chevronBack, chevronForward,
   chatbubblesOutline, bugOutline, menu, close, images, documentTextOutline, heart, search,
-  listOutline, list
+  listOutline, list, flaskOutline
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { Story, Scene } from '../../models/story.interface';
@@ -137,7 +137,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       arrowBack, bookOutline, book, settingsOutline, statsChartOutline, statsChart,
       saveOutline, checkmarkCircleOutline, menuOutline, chevronBack, chevronForward,
       chatbubblesOutline, bugOutline, menu, close, images, documentTextOutline, heart, search,
-      listOutline, list
+      listOutline, list, flaskOutline
     });
   }
 
@@ -518,6 +518,11 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         action: () => this.goToInspector()
       },
       {
+        icon: 'flask-outline',
+        label: 'Story Research',
+        action: () => this.goToStoryResearch()
+      },
+      {
         icon: 'book-outline',
         label: 'Codex',
         action: () => this.goToCodex()
@@ -553,6 +558,11 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
 
   goToInspector(): void {
     this.router.navigate(['/stories/inspector', this.story.id]);
+  }
+
+  goToStoryResearch(): void {
+    if (!this.story?.id) return;
+    this.router.navigate(['/stories/research', this.story.id]);
   }
 
   private updateHeaderActions(): void {

@@ -7,6 +7,7 @@ import { CodexComponent } from './components/codex/codex.component';
 import { NovelCrafterImportComponent } from './components/novelcrafter-import/novelcrafter-import.component';
 import { ImageGenerationComponent } from './components/image-generation/image-generation.component';
 import { SceneChatComponent } from './components/scene-chat/scene-chat.component';
+import { StoryResearchComponent } from './components/story-research/story-research.component';
 import { StoryOutlineOverviewComponent } from './components/story-outline-overview/story-outline-overview.component';
 
 const routes: Routes = [
@@ -34,6 +35,10 @@ const routes: Routes = [
   {
     path: 'chat/:storyId/:chapterId/:sceneId',
     component: SceneChatComponent
+  },
+  {
+    path: 'research/:id',
+    component: StoryResearchComponent
   },
   {
     path: 'outline/:id',
