@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { Observable, Subject, map, scan, catchError, of, switchMap, from, tap } from 'rxjs';
 import { BeatAI, BeatAIGenerationEvent } from '../../stories/models/beat-ai.interface';
 import { Story } from '../../stories/models/story.interface';
@@ -26,12 +27,35 @@ export class BeatAIService {
   private readonly codexService = inject(CodexService);
   private readonly promptManager = inject(PromptManagerService);
   private readonly codexRelevanceService = inject(CodexRelevanceService);
+  private readonly document = inject(DOCUMENT);
   
   private generationSubject = new Subject<BeatAIGenerationEvent>();
   public generation$ = this.generationSubject.asObservable();
   private activeGenerations = new Map<string, string>(); // beatId -> requestId
   private isStreamingSubject = new Subject<boolean>();
   public isStreaming$ = this.isStreamingSubject.asObservable();
+  private htmlEntityDecoder: HTMLTextAreaElement | null = null;
+
+  private decodeHtmlEntities(text: string): string {
+    if (!text || text.indexOf('&') === -1) {
+      return text;
+    }
+
+    const doc = this.document;
+    if (!doc || typeof doc.createElement !== 'function') {
+      return text;
+    }
+
+    if (!this.htmlEntityDecoder) {
+      this.htmlEntityDecoder = doc.createElement('textarea');
+    }
+
+    this.htmlEntityDecoder.innerHTML = text;
+    const decoded = this.htmlEntityDecoder.value || this.htmlEntityDecoder.textContent || text;
+    this.htmlEntityDecoder.value = '';
+    this.htmlEntityDecoder.textContent = '';
+    return decoded;
+  }
 
   generateBeatContent(prompt: string, beatId: string, options: {
     wordCount?: number;
@@ -146,16 +170,17 @@ export class BeatAIService {
       requestId: requestId,
       messages: messages
     }).pipe(
-      tap((chunk: string) => {
+      map(chunk => this.decodeHtmlEntities(chunk)),
+      tap((decodedChunk: string) => {
         // Emit each chunk as it arrives
-        accumulatedContent += chunk;
+        accumulatedContent += decodedChunk;
         this.generationSubject.next({
           beatId,
-          chunk: chunk,
+          chunk: decodedChunk,
           isComplete: false
         });
       }),
-      scan((acc, chunk) => acc + chunk, ''), // Accumulate chunks
+      scan((acc, decodedChunk) => acc + decodedChunk, ''), // Accumulate chunks
       tap({
         complete: () => {
           // Post-process to remove duplicate character analyses
@@ -200,13 +225,14 @@ export class BeatAIService {
           messages: messages
         }).pipe(
           map(response => {
-            const content = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            accumulatedContent = content;
+            const rawContent = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const decodedContent = this.decodeHtmlEntities(rawContent);
+            accumulatedContent = decodedContent;
             
             // Simulate streaming by emitting in chunks
             const chunkSize = 50;
-            for (let i = 0; i < content.length; i += chunkSize) {
-              const chunk = content.substring(i, i + chunkSize);
+            for (let i = 0; i < decodedContent.length; i += chunkSize) {
+              const chunk = decodedContent.substring(i, i + chunkSize);
               this.generationSubject.next({
                 beatId,
                 chunk: chunk,
@@ -229,7 +255,7 @@ export class BeatAIService {
               this.isStreamingSubject.next(false);
             }
             
-            return content;
+            return decodedContent;
           })
         );
       })
@@ -249,16 +275,17 @@ export class BeatAIService {
       requestId: requestId,
       messages: messages
     }).pipe(
-      tap((chunk: string) => {
+      map(chunk => this.decodeHtmlEntities(chunk)),
+      tap((decodedChunk: string) => {
         // Emit each chunk as it arrives
-        accumulatedContent += chunk;
+        accumulatedContent += decodedChunk;
         this.generationSubject.next({
           beatId,
-          chunk: chunk,
+          chunk: decodedChunk,
           isComplete: false
         });
       }),
-      scan((acc, chunk) => acc + chunk, ''), // Accumulate chunks
+      scan((acc, decodedChunk) => acc + decodedChunk, ''), // Accumulate chunks
       tap({
         complete: () => {
           // Post-process to remove duplicate character analyses
@@ -299,16 +326,17 @@ export class BeatAIService {
       requestId: requestId,
       messages: messages
     }).pipe(
-      tap((chunk: string) => {
+      map(chunk => this.decodeHtmlEntities(chunk)),
+      tap((decodedChunk: string) => {
         // Emit each chunk as it arrives
-        accumulatedContent += chunk;
+        accumulatedContent += decodedChunk;
         this.generationSubject.next({
           beatId,
-          chunk: chunk,
+          chunk: decodedChunk,
           isComplete: false
         });
       }),
-      scan((acc, chunk) => acc + chunk, ''), // Accumulate chunks
+      scan((acc, decodedChunk) => acc + decodedChunk, ''), // Accumulate chunks
       tap({
         complete: () => {
           // Post-process to remove duplicate character analyses
@@ -349,16 +377,17 @@ export class BeatAIService {
       requestId: requestId,
       messages: messages
     }).pipe(
-      tap((chunk: string) => {
+      map(chunk => this.decodeHtmlEntities(chunk)),
+      tap((decodedChunk: string) => {
         // Emit each chunk as it arrives
-        accumulatedContent += chunk;
+        accumulatedContent += decodedChunk;
         this.generationSubject.next({
           beatId,
-          chunk: chunk,
+          chunk: decodedChunk,
           isComplete: false
         });
       }),
-      scan((acc, chunk) => acc + chunk, ''), // Accumulate chunks
+      scan((acc, decodedChunk) => acc + decodedChunk, ''), // Accumulate chunks
       tap({
         complete: () => {
           // Post-process to remove duplicate character analyses
@@ -402,13 +431,14 @@ export class BeatAIService {
           messages: messages
         }).pipe(
           map(response => {
-            const content = response.content?.[0]?.text || '';
-            accumulatedContent = content;
+            const rawContent = response.content?.[0]?.text || '';
+            const decodedContent = this.decodeHtmlEntities(rawContent);
+            accumulatedContent = decodedContent;
             
             // Simulate streaming by emitting in chunks
             const chunkSize = 50;
-            for (let i = 0; i < content.length; i += chunkSize) {
-              const chunk = content.substring(i, i + chunkSize);
+            for (let i = 0; i < decodedContent.length; i += chunkSize) {
+              const chunk = decodedContent.substring(i, i + chunkSize);
               this.generationSubject.next({
                 beatId,
                 chunk: chunk,
@@ -431,7 +461,7 @@ export class BeatAIService {
               this.isStreamingSubject.next(false);
             }
             
-            return content;
+            return decodedContent;
           })
         );
       })
