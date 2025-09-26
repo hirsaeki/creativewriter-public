@@ -5,8 +5,8 @@
 - ALWAYS: Before declaring a task as complete, test if the app builds using `npm run build`!
 - ALWAYS: Before declaring a task as complete, test if the app has linting errors using `npm run lint`!
 - Keep the App modular!
-- ALWAYS: Before implementing any feature, do a web research for best practices in 2025.
-- ALWAYS: Before implementing any feature, do a web research if a framework component (angular, ionic) exists that covers the requirements
+- ALWAYS: Consider if a web research for best practices in 2025 could be useful.
+- ALWAYS: Consider if a web research for existing framework components (angular, ionic) that cover the requirements
 - !!!ALWAYS work on the main branch in the private repository!!!!
 - NEVER MERGE TO release branch on your own!
 - WHEN CREATING NEW COMPONENTS: They shall follow a common design pattern to put each component into a seperate foldern, split them into template, typescript and css files!
