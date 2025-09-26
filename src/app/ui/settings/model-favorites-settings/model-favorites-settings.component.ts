@@ -17,7 +17,6 @@ import {
 } from '@ionic/angular/standalone';
 import { ItemReorderEventDetail } from '@ionic/angular';
 import { NgSelectModule } from '@ng-select/ng-select';
-import { Settings } from '../../../core/models/settings.interface';
 import { ModelOption } from '../../../core/models/model.interface';
 import { addIcons } from 'ionicons';
 import { closeOutline, logoGoogle, globeOutline, sparklesOutline } from 'ionicons/icons';
@@ -54,11 +53,17 @@ import { OllamaIconComponent } from '../../icons/ollama-icon.component';
   styleUrls: ['./model-favorites-settings.component.css']
 })
 export class ModelFavoritesSettingsComponent implements OnChanges {
-  @Input() settings!: Settings;
+  @Input() favoriteIds: string[] = [];
   @Input() combinedModels: ModelOption[] = [];
   @Input() loadingModels = false;
   @Input() modelLoadError: string | null = null;
-  @Output() settingsChange = new EventEmitter<void>();
+  @Input() cardTitle = 'Model Favorites';
+  @Input() heading = 'Beat Input Favorites';
+  @Input() subheading = 'Choose up to 6 models to surface as quick actions.';
+  @Input() description = 'Configure the models available as quick-access favorites.';
+  @Input() emptyState = 'No favorites selected yet. Use the selector above to add models.';
+  @Input() infoNote?: string;
+  @Output() favoriteIdsChange = new EventEmitter<string[]>();
 
   readonly maxFavorites = 6;
   selectedFavorites: string[] = [];
@@ -68,8 +73,8 @@ export class ModelFavoritesSettingsComponent implements OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['settings']) {
-      this.syncFromSettings();
+    if (changes['favoriteIds']) {
+      this.syncFromFavorites();
     }
 
     if (changes['combinedModels'] && !changes['combinedModels'].firstChange) {
@@ -120,14 +125,9 @@ export class ModelFavoritesSettingsComponent implements OnChanges {
     }
   }
 
-  private syncFromSettings(): void {
-    if (!this.settings) {
-      this.selectedFavorites = [];
-      return;
-    }
-
-    const beatFavorites = this.settings.favoriteModelLists?.beatInput ?? this.settings.favoriteModels ?? [];
-    this.selectedFavorites = [...beatFavorites].slice(0, this.maxFavorites);
+  private syncFromFavorites(): void {
+    const favorites = Array.isArray(this.favoriteIds) ? this.favoriteIds : [];
+    this.selectedFavorites = [...favorites].slice(0, this.maxFavorites);
     this.pruneUnknownFavorites();
   }
 
@@ -145,22 +145,8 @@ export class ModelFavoritesSettingsComponent implements OnChanges {
   }
 
   private persistFavorites(): void {
-    if (!this.settings) {
-      return;
-    }
-
     const nextFavorites = this.selectedFavorites.slice(0, this.maxFavorites);
-
-    if (!this.settings.favoriteModelLists) {
-      this.settings.favoriteModelLists = { beatInput: [] };
-    }
-
-    this.settings.favoriteModelLists = {
-      ...this.settings.favoriteModelLists,
-      beatInput: [...nextFavorites]
-    };
-    this.settings.favoriteModels = [...nextFavorites];
-    this.settingsChange.emit();
+    this.favoriteIdsChange.emit(nextFavorites);
   }
 
   private reorderArray(list: string[], from: number, to: number): string[] {

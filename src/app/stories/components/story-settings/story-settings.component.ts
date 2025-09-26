@@ -20,12 +20,15 @@ import {
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { Story, StorySettings, DEFAULT_STORY_SETTINGS } from '../../models/story.interface';
+import { ModelOption } from '../../../core/models/model.interface';
+import { ModelService } from '../../../core/services/model.service';
 import { getSystemMessage, getBeatGenerationTemplate } from '../../../shared/resources/system-messages';
 import { StoryLanguage } from '../../../ui/components/language-selection-dialog/language-selection-dialog.component';
 import { SettingsTabsComponent, TabItem } from '../../../ui/components/settings-tabs.component';
 import { SettingsContentComponent } from '../../../ui/components/settings-content.component';
 import { DbMaintenanceService, OrphanedImage, DatabaseStats, DuplicateImage, IntegrityIssue } from '../../../shared/services/db-maintenance.service';
 import { ImageUploadComponent, ImageUploadResult } from '../../../ui/components/image-upload.component';
+import { ModelFavoritesSettingsComponent } from '../../../ui/settings/model-favorites-settings/model-favorites-settings.component';
 
 @Component({
   selector: 'app-story-settings',
@@ -37,7 +40,8 @@ import { ImageUploadComponent, ImageUploadResult } from '../../../ui/components/
     IonTextarea, IonCheckbox, IonRadio, IonRadioGroup, IonChip, IonNote,
     IonText, IonGrid, IonRow, IonCol, IonProgressBar, IonList, IonThumbnail,
     IonBadge, IonSelect, IonSelectOption,
-    SettingsTabsComponent, SettingsContentComponent, ImageUploadComponent
+    SettingsTabsComponent, SettingsContentComponent, ImageUploadComponent,
+    ModelFavoritesSettingsComponent
   ],
   templateUrl: './story-settings.component.html',
   styleUrls: ['./story-settings.component.scss']
@@ -77,11 +81,15 @@ export class StorySettingsComponent implements OnInit {
   scanProgress = { operation: '', progress: 0, message: '' };
   selectedOrphanedImages = new Set<string>();
   selectedDuplicates = new Set<string>();
+  combinedModels: ModelOption[] = [];
+  loadingModels = false;
+  modelLoadError: string | null = null;
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly storyService = inject(StoryService);
   private readonly dbMaintenanceService = inject(DbMaintenanceService);
+  private readonly modelService = inject(ModelService);
 
   constructor() {
     addIcons({ 
@@ -103,6 +111,8 @@ export class StorySettingsComponent implements OnInit {
         this.settings = this.story.settings 
           ? { ...this.story.settings } 
           : { ...DEFAULT_STORY_SETTINGS };
+
+        this.ensureFavoriteStructure();
         
         this.originalSettings = { ...this.settings };
       } else {
@@ -115,6 +125,8 @@ export class StorySettingsComponent implements OnInit {
       this.scanProgress = progress;
       this.isScanning = progress.progress > 0 && progress.progress < 100;
     });
+
+    this.loadCombinedModels();
   }
 
   onSettingsChange(): void {
@@ -136,6 +148,7 @@ export class StorySettingsComponent implements OnInit {
   async resetToDefaults(): Promise<void> {
     if (confirm('Do you really want to reset the settings to default values?')) {
       this.settings = { ...DEFAULT_STORY_SETTINGS };
+      this.ensureFavoriteStructure();
       this.onSettingsChange();
     }
   }
@@ -161,6 +174,43 @@ export class StorySettingsComponent implements OnInit {
     } catch (error) {
       console.error('Error loading language-specific templates:', error);
     }
+  }
+
+  onFavoriteModelsChange(favoriteIds: string[]): void {
+    this.ensureFavoriteStructure();
+    this.settings.favoriteModelLists.beatInput = [...favoriteIds];
+    this.settings.favoriteModels = [...favoriteIds];
+    this.onSettingsChange();
+  }
+
+  private ensureFavoriteStructure(): void {
+    if (!Array.isArray(this.settings.favoriteModels)) {
+      this.settings.favoriteModels = [];
+    }
+    if (!this.settings.favoriteModelLists || !Array.isArray(this.settings.favoriteModelLists.beatInput)) {
+      this.settings.favoriteModelLists = {
+        beatInput: [...this.settings.favoriteModels]
+      };
+    } else {
+      this.settings.favoriteModelLists.beatInput = [...this.settings.favoriteModelLists.beatInput];
+    }
+  }
+
+  private loadCombinedModels(): void {
+    this.loadingModels = true;
+    this.modelLoadError = null;
+
+    this.modelService.getCombinedModels().subscribe({
+      next: models => {
+        this.combinedModels = models;
+        this.loadingModels = false;
+      },
+      error: error => {
+        console.error('Failed to load models for story settings:', error);
+        this.modelLoadError = 'Error loading models. Check API configuration.';
+        this.loadingModels = false;
+      }
+    });
   }
 
   goBack(): void {

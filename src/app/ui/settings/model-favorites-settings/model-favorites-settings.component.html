@@ -1,16 +1,16 @@
 <ion-card>
   <ion-card-header>
-    <ion-card-title>Model Favorites</ion-card-title>
+    <ion-card-title>{{ cardTitle }}</ion-card-title>
   </ion-card-header>
   <ion-card-content>
     <p class="description">
-      Configure reusable favorite lists for story tools. Updates are applied immediately to the beat input quick-select buttons.
+      {{ description }}
     </p>
 
     <section class="favorites-section">
-      <h3 class="section-heading">Beat Input Favorites</h3>
+      <h3 class="section-heading">{{ heading }}</h3>
       <p class="section-subheading">
-        Choose up to {{ maxFavorites }} models to surface as shortcuts inside the beat input panel.
+        {{ subheading }}
       </p>
 
       <div class="select-wrapper">
@@ -53,8 +53,8 @@
       </div>
 
       <ion-note color="danger" *ngIf="modelLoadError">{{ modelLoadError }}</ion-note>
-      <p class="info-note" *ngIf="!modelLoadError && !loadingModels && !combinedModels.length">
-        Connect at least one AI provider in the API tab to see available models.
+      <p class="info-note" *ngIf="!modelLoadError && !loadingModels && !combinedModels.length && infoNote">
+        {{ infoNote }}
       </p>
       <div class="loading-state" *ngIf="loadingModels">
         <ion-spinner name="crescent"></ion-spinner>
@@ -85,7 +85,7 @@
       </div>
 
       <p class="empty-state" *ngIf="!favoriteModelOptions.length && !loadingModels">
-        No favorites selected yet. Use the selector above to add models.
+        {{ emptyState }}
       </p>
     </section>
   </ion-card-content>

@@ -246,6 +246,18 @@ export class StoryService {
       
       // Remove old beatTemplate field
       delete settingsAny.beatTemplate;
+
+      if (!Array.isArray(migrated.settings.favoriteModels)) {
+        migrated.settings.favoriteModels = [];
+      }
+
+      if (!migrated.settings.favoriteModelLists || !Array.isArray(migrated.settings.favoriteModelLists.beatInput)) {
+        migrated.settings.favoriteModelLists = {
+          beatInput: [...migrated.settings.favoriteModels]
+        };
+      } else {
+        migrated.settings.favoriteModelLists.beatInput = [...migrated.settings.favoriteModelLists.beatInput];
+      }
     }
 
     // If old story format with content field, migrate to chapter/scene structure

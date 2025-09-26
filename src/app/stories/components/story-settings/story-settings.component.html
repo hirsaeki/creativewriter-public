@@ -203,6 +203,20 @@
             </ion-radio-group>
           </ion-card-content>
         </ion-card>
+
+        <app-model-favorites-settings
+          [favoriteIds]="settings.favoriteModelLists?.beatInput || []"
+          [combinedModels]="combinedModels"
+          [loadingModels]="loadingModels"
+          [modelLoadError]="modelLoadError"
+          cardTitle="Beat Model Favorites"
+          heading="Beat Input Favorites"
+          subheading="Choose up to 6 models to surface as quick shortcuts for Beat AI."
+          description="Favorites are stored with this story and power the quick-select buttons in Beat AI."
+          emptyState="No favorites defined for this story yet. Use the selector above to add models."
+          infoNote="Connect at least one AI provider in the global API settings to populate the list."
+          (favoriteIdsChange)="onFavoriteModelsChange($event)">
+        </app-model-favorites-settings>
       </div>
 
       <!-- DB Maintenance Tab -->
