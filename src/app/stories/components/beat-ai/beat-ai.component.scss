@@ -449,6 +449,8 @@
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.08);
       background: rgba(18, 18, 18, 0.6);
+      grid-column: 1 / -1;
+      margin-bottom: 0.25rem;
     }
 
     .favorite-icon {
