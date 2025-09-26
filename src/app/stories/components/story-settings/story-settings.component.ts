@@ -178,12 +178,20 @@ export class StorySettingsComponent implements OnInit {
 
   onFavoriteModelsChange(list: keyof StorySettings['favoriteModelLists'], favoriteIds: string[]): void {
     this.ensureFavoriteStructure();
-    this.settings.favoriteModelLists[list] = [...favoriteIds];
+    const nextFavorites = [...favoriteIds];
 
-    if (list === 'beatInput') {
-      this.settings.favoriteModels = [...favoriteIds];
-    }
+    const nextFavoriteLists = {
+      ...this.settings.favoriteModelLists,
+      [list]: nextFavorites
+    };
 
+    const nextSettings: StorySettings = {
+      ...this.settings,
+      favoriteModelLists: nextFavoriteLists,
+      favoriteModels: list === 'beatInput' ? [...nextFavorites] : [...(this.settings.favoriteModels ?? [])]
+    };
+
+    this.settings = nextSettings;
     this.onSettingsChange();
   }
 
