@@ -58,6 +58,7 @@ interface SceneProgressState {
   prompt?: string;
   errorMessage?: string;
   tokenEstimate?: number;
+  plainText?: string;
 }
 
 interface OrderedScene {
@@ -235,14 +236,20 @@ export class StoryResearchComponent implements OnInit {
       return;
     }
     this.totalScenes = orderedScenes.length;
-    this.sceneProgress = orderedScenes.map(item => ({
-      chapterId: item.chapter.id,
-      sceneId: item.scene.id,
-      chapterTitle: item.chapter.title,
-      sceneTitle: item.scene.title,
-      status: item.scene.content?.trim() ? 'pending' : 'skipped',
-      tokenEstimate: this.estimateTokens(item.scene.content || '')
-    }));
+    this.sceneProgress = orderedScenes.map(item => {
+      const plainText = this.extractSceneText(item.scene);
+      const hasContent = plainText.trim().length > 0;
+      const progressState: SceneProgressState = {
+        chapterId: item.chapter.id,
+        sceneId: item.scene.id,
+        chapterTitle: item.chapter.title,
+        sceneTitle: item.scene.title,
+        status: hasContent ? 'pending' : 'skipped',
+        tokenEstimate: hasContent ? this.estimateTokens(plainText) : 0,
+        plainText
+      };
+      return progressState;
+    });
 
     this.cdr.markForCheck();
 
@@ -251,7 +258,8 @@ export class StoryResearchComponent implements OnInit {
         const { chapter, scene } = orderedScenes[index];
         const progress = this.sceneProgress[index];
 
-        if (!scene.content || !scene.content.trim()) {
+        const plainText = progress.plainText ?? this.extractSceneText(scene);
+        if (!plainText.trim()) {
           progress.status = 'skipped';
           continue;
         }
@@ -261,7 +269,7 @@ export class StoryResearchComponent implements OnInit {
         progress.status = 'running';
         this.cdr.markForCheck();
 
-        const prompt = this.buildScenePrompt(chapter, scene, trimmedTask);
+        const prompt = this.buildScenePrompt(chapter, scene, trimmedTask, plainText);
         progress.prompt = prompt;
 
         const response = await this.callModel(prompt, { maxTokens: 900 });
@@ -408,13 +416,15 @@ export class StoryResearchComponent implements OnInit {
 
   private calculatePromptCount(): number {
     if (!this.story) return 0;
-    return this.getOrderedScenes().filter(item => item.scene.content?.trim()).length + 1;
+    return this.getOrderedScenes().filter(item => this.extractSceneText(item.scene).trim()).length + 1;
   }
 
   private calculateEstimatedTokens(): number {
     if (!this.story) return 0;
-    const scenes = this.getOrderedScenes().filter(item => item.scene.content?.trim());
-    const estimate = scenes.reduce((total, item) => total + this.estimateTokens(item.scene.content || ''), 0);
+    const scenes = this.getOrderedScenes()
+      .map(item => this.extractSceneText(item.scene))
+      .filter(text => text.trim().length > 0);
+    const estimate = scenes.reduce((total, text) => total + this.estimateTokens(text), 0);
     return estimate;
   }
 
@@ -466,14 +476,15 @@ export class StoryResearchComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
-  private buildScenePrompt(chapter: Chapter, scene: Scene, task: string): string {
-    const sceneContent = scene.content?.trim() || '';
-    return `You are assisting with narrative research on a fiction project.\n\nResearch task: ${task}\n\nFocus scene:\nChapter: ${chapter.title}\nScene: ${scene.title}\n\nScene text:\n${sceneContent}\n\nInstructions:\n- Extract only the details that help address the research task.\n- Mention characters, locations, events, or world-building elements that matter.\n- Note unanswered questions or missing information.\n- Limit your answer to concise bullet points.`;
+  private buildScenePrompt(chapter: Chapter, scene: Scene, task: string, sceneContent: string): string {
+    const languageInstruction = this.getLanguageInstruction();
+    return `You are assisting with narrative research on a fiction project.\n\nResearch task: ${task}\n\nFocus scene:\nChapter: ${chapter.title}\nScene: ${scene.title}\n\nScene text:\n${sceneContent}\n\nInstructions:\n- Extract only the details that help address the research task.\n- Mention characters, locations, events, or world-building elements that matter.\n- Note unanswered questions or missing information.\n- Limit your answer to concise bullet points.\n- ${languageInstruction}`;
   }
 
   private buildSummaryPrompt(task: string, findings: StoryResearchSceneFinding[]): string {
+    const languageInstruction = this.getLanguageInstruction();
     const formattedFindings = findings.map((finding, index) => `Scene ${index + 1} (${finding.chapterTitle} → ${finding.sceneTitle}):\n${finding.response}`).join('\n\n');
-    return `You have reviewed multiple scenes of a story. Use the scene-level research notes to deliver the final research response.\n\nOriginal task: ${task}\n\nScene findings:\n${formattedFindings}\n\nInstructions:\n- Synthesize the findings into a cohesive answer for the research task.\n- Highlight overarching patterns, conflicts, or gaps to investigate.\n- Suggest next research steps if relevant.\n- Present the result as structured sections with short headings.`;
+    return `You have reviewed multiple scenes of a story. Use the scene-level research notes to deliver the final research response.\n\nOriginal task: ${task}\n\nScene findings:\n${formattedFindings}\n\nInstructions:\n- Synthesize the findings into a cohesive answer for the research task.\n- Highlight overarching patterns, conflicts, or gaps to investigate.\n- Suggest next research steps if relevant.\n- Present the result as structured sections with short headings.\n- ${languageInstruction}`;
   }
 
   private async confirmHighTokenUsage(): Promise<boolean> {
@@ -497,6 +508,48 @@ export class StoryResearchComponent implements OnInit {
       buttons: ['OK']
     });
     await alert.present();
+  }
+
+  private extractSceneText(scene: Scene): string {
+    const raw = scene.content ?? '';
+    if (!raw.trim()) return '';
+
+    const normalized = raw
+      .replace(/(<br\s*\/?>(\s|&nbsp;)*){2,}/gi, '\n\n')
+      .replace(/<br\s*\/?>(\s|&nbsp;)*/gi, '\n')
+      .replace(/<\/p>/gi, '</p>\n')
+      .replace(/<\/div>/gi, '</div>\n');
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(normalized, 'text/html');
+
+    const beatSelectors = '.beat-ai-wrapper, .beat-ai-node, .beat-ai-container, .beat-ai-suggestion, ' +
+      '.beat-ai-input, .ai-suggestion, .beat-suggestion, [data-beat-ai], [data-ai], ' +
+      '[class*="beat-ai"], [class*="ai-beat"], [data-type="beat-ai"]';
+    doc.querySelectorAll(beatSelectors).forEach(element => element.remove());
+
+    const text = doc.body.textContent || '';
+    return text
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  private getLanguageInstruction(): string {
+    const language = this.story?.settings?.language;
+    switch (language) {
+      case 'de':
+        return 'Antworten Sie auf Deutsch.';
+      case 'fr':
+        return 'Répondez en français.';
+      case 'es':
+        return 'Responda en español.';
+      case 'en':
+        return 'Respond in English.';
+      default:
+        return 'Respond in the same language as the research task and story context.';
+    }
   }
 
   private async callModel(prompt: string, options: { maxTokens: number; temperature?: number }): Promise<string> {
