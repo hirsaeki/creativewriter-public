@@ -376,7 +376,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   
   deleteContentAfterBeat(): void {
-    if (confirm('Do you really want to delete all text after this beat? This action cannot be undone.')) {
+    if (confirm('Delete writing after this beat until the next beat or the end of this scene? This cannot be undone.')) {
       this.promptSubmit.emit({
         beatId: this.beatData.id,
         action: 'deleteAfter',

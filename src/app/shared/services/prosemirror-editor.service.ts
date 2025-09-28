@@ -947,26 +947,48 @@ export class ProseMirrorEditorService {
     const beatNode = state.doc.nodeAt(beatPos);
     if (!beatNode) return;
     
-    // Position after the beat node
     const deleteStartPos = beatPos + beatNode.nodeSize;
+    const nextBeatPos = this.findNextBeatPosition(deleteStartPos);
+    const deleteEndPos = nextBeatPos ?? state.doc.content.size;
     
-    // Delete everything from after the beat to the end of the document
-    const tr = state.tr.delete(deleteStartPos, state.doc.content.size);
+    if (deleteEndPos <= deleteStartPos) {
+      return;
+    }
     
-    // Dispatch the transaction
+    const tr = state.tr.delete(deleteStartPos, deleteEndPos);
     this.editorView.dispatch(tr);
     
-    // Emit content update to trigger save
     const content = this.getHTMLContent();
     this.contentUpdate$.next(content);
     
-    // Refresh prompt manager to update scene context
-    // This ensures that the next beat prompt will use the correct context
+    // Refresh prompt manager after the deletion so context stays accurate
     setTimeout(() => {
       this.promptManager.refresh().catch(error => {
         console.error('Error refreshing prompt manager:', error);
       });
-    }, 500); // Small delay to ensure content is saved first
+    }, 500);
+  }
+
+  private findNextBeatPosition(startPos: number): number | null {
+    if (!this.editorView) return null;
+
+    const { state } = this.editorView;
+    let nextBeatPos: number | null = null;
+
+    state.doc.descendants((node, pos) => {
+      if (pos <= startPos) {
+        return true;
+      }
+
+      if (node.type.name === 'beatAI') {
+        nextBeatPos = pos;
+        return false;
+      }
+
+      return true;
+    });
+
+    return nextBeatPos;
   }
 
 
