@@ -831,7 +831,8 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.story.settings.favoriteModelLists) {
       this.story.settings.favoriteModelLists = {
         beatInput: [...this.story.settings.favoriteModels],
-        sceneSummary: []
+        sceneSummary: [],
+        rewrite: []
       };
     }
 
@@ -845,6 +846,12 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       this.story.settings.favoriteModelLists.sceneSummary = [];
     } else {
       this.story.settings.favoriteModelLists.sceneSummary = [...this.story.settings.favoriteModelLists.sceneSummary];
+    }
+
+    if (!Array.isArray(this.story.settings.favoriteModelLists.rewrite)) {
+      this.story.settings.favoriteModelLists.rewrite = [];
+    } else {
+      this.story.settings.favoriteModelLists.rewrite = [...this.story.settings.favoriteModelLists.rewrite];
     }
 
     return this.story.settings;

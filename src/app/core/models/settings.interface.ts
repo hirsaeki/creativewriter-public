@@ -1,6 +1,7 @@
 export interface FavoriteModelLists {
   beatInput: string[];
   sceneSummary: string[];
+  rewrite: string[];
 }
 
 export interface Settings {
@@ -187,7 +188,8 @@ export const DEFAULT_SETTINGS: Settings = {
   favoriteModels: [],
   favoriteModelLists: {
     beatInput: [],
-    sceneSummary: []
+    sceneSummary: [],
+    rewrite: []
   },
   updatedAt: new Date()
 };

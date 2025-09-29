@@ -8,16 +8,21 @@ import {
   IonItemDivider, IonSearchbar
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { closeOutline, sendOutline, refreshOutline, copyOutline, addOutline, readerOutline } from 'ionicons/icons';
+import { closeOutline, sendOutline, refreshOutline, copyOutline, addOutline, readerOutline, logoGoogle, globeOutline, sparklesOutline } from 'ionicons/icons';
 import { BeatAIService } from '../../shared/services/beat-ai.service';
 import { StoryService } from '../../stories/services/story.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { AIRequestLoggerService } from '../../core/services/ai-request-logger.service';
 import { ModelService } from '../../core/services/model.service';
 import { ModelSelectorComponent } from '../../shared/components/model-selector/model-selector.component';
-import { Story, Scene, Chapter } from '../../stories/models/story.interface';
+import { ModelOption } from '../../core/models/model.interface';
+import { Story, Scene, Chapter, StorySettings, DEFAULT_STORY_SETTINGS } from '../../stories/models/story.interface';
+import { OpenRouterIconComponent } from '../icons/openrouter-icon.component';
+import { ClaudeIconComponent } from '../icons/claude-icon.component';
+import { ReplicateIconComponent } from '../icons/replicate-icon.component';
+import { OllamaIconComponent } from '../icons/ollama-icon.component';
 import { Observable, of, from } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { switchMap, take } from 'rxjs/operators';
 
 export interface AIRewriteResult {
   originalText: string;
@@ -42,7 +47,7 @@ interface SceneContext {
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
     IonContent, IonItem, IonLabel, IonTextarea, IonIcon, IonChip, IonSpinner,
     IonModal, IonList, IonCheckbox, IonItemDivider, IonSearchbar,
-    ModelSelectorComponent
+    ModelSelectorComponent, OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent
   ],
   template: `
     <ion-header>
@@ -108,6 +113,24 @@ interface SceneContext {
         <ion-label position="stacked">AI Model</ion-label>
         <app-model-selector [(model)]="selectedModel" [placeholder]="'Select AI model'" [appendTo]="'body'"></app-model-selector>
       </ion-item>
+
+      <div class="favorite-models" *ngIf="favoriteModels.length > 0">
+        <ion-label class="favorite-label">Favorite Models</ion-label>
+        <div class="favorite-chip-row">
+          <ion-chip
+            *ngFor="let model of favoriteModels"
+            (click)="selectFavoriteModel(model)"
+            [color]="selectedModel === model.id ? 'primary' : 'medium'"
+            class="favorite-chip">
+            <app-openrouter-icon *ngIf="model.provider === 'openrouter'" size="14" color="#6467f2" class="favorite-provider-icon openrouter"></app-openrouter-icon>
+            <app-claude-icon *ngIf="model.provider === 'claude'" size="14" color="#C15F3C" class="favorite-provider-icon claude"></app-claude-icon>
+            <app-replicate-icon *ngIf="model.provider === 'replicate'" size="14" color="#9c27b0" class="favorite-provider-icon replicate"></app-replicate-icon>
+            <app-ollama-icon *ngIf="model.provider === 'ollama'" size="14" color="#ff9800" class="favorite-provider-icon ollama"></app-ollama-icon>
+            <ion-icon *ngIf="isGenericProvider(model.provider)" [name]="getProviderIcon(model.provider)" class="favorite-provider-icon" [class.gemini]="model.provider === 'gemini'"></ion-icon>
+            <span class="favorite-chip-label">{{ getShortModelName(model.label) }}</span>
+          </ion-chip>
+        </div>
+      </div>
 
       <!-- Original Text -->
       <ion-item class="original-text-item">
@@ -318,6 +341,42 @@ interface SceneContext {
       color: var(--ion-color-medium);
     }
 
+    .favorite-models {
+      margin: 1rem 0;
+    }
+
+    .favorite-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: var(--ion-color-medium);
+    }
+
+    .favorite-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .favorite-chip {
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .favorite-chip:hover {
+      transform: translateY(-1px);
+    }
+
+    .favorite-provider-icon {
+      margin-right: 0.25rem;
+      display: flex;
+      align-items: center;
+    }
+
+    .favorite-chip-label {
+      font-weight: 500;
+    }
+
     .prompt-chips {
       display: flex;
       flex-wrap: wrap;
@@ -405,6 +464,8 @@ export class AIRewriteModalComponent implements OnInit {
   rewrittenText = '';
   isRewriting = false;
   selectedModel = '';
+  favoriteModels: ModelOption[] = [];
+  availableModels: ModelOption[] = [];
   
   // Context management
   story: Story | null = null;
@@ -426,7 +487,7 @@ export class AIRewriteModalComponent implements OnInit {
   ];
 
   constructor() {
-    addIcons({ closeOutline, sendOutline, refreshOutline, copyOutline, addOutline, readerOutline });
+    addIcons({ closeOutline, sendOutline, refreshOutline, copyOutline, addOutline, readerOutline, logoGoogle, globeOutline, sparklesOutline });
   }
 
   async ngOnInit() {
@@ -434,9 +495,16 @@ export class AIRewriteModalComponent implements OnInit {
     if (this.storyId) {
       await this.loadStoryAndSetupContext();
     }
-    // Initialize selected model from global settings if available
+
+    this.loadAvailableModels();
+
     const settings = this.settingsService.getSettings();
-    this.selectedModel = settings.selectedModel || this.selectedModel;
+    const favoriteIds = this.resolveFavoriteIds();
+    if (favoriteIds.length > 0) {
+      this.selectedModel = favoriteIds[0];
+    } else if (settings.selectedModel) {
+      this.selectedModel = settings.selectedModel;
+    }
     
     // Focus the custom prompt textarea after a short delay
     setTimeout(() => {
@@ -449,6 +517,10 @@ export class AIRewriteModalComponent implements OnInit {
 
   selectQuickPrompt(prompt: string) {
     this.customPrompt = this.customPrompt === prompt ? '' : prompt;
+  }
+
+  selectFavoriteModel(model: ModelOption): void {
+    this.selectedModel = model.id;
   }
 
   async rewriteText() {
@@ -551,6 +623,9 @@ export class AIRewriteModalComponent implements OnInit {
   private async loadStoryAndSetupContext(): Promise<void> {
     try {
       this.story = await this.storyService.getStory(this.storyId);
+      if (this.story) {
+        this.ensureStoryFavoriteStructure();
+      }
       if (this.story && this.currentChapterId && this.currentSceneId) {
         // Load current scene as default context
         const chapter = this.story.chapters.find(c => c.id === this.currentChapterId);
@@ -567,6 +642,7 @@ export class AIRewriteModalComponent implements OnInit {
           });
         }
       }
+      this.updateFavoriteModels();
     } catch (error) {
       console.error('Error loading story for context:', error);
     }
@@ -605,6 +681,86 @@ export class AIRewriteModalComponent implements OnInit {
     }
   }
 
+  private loadAvailableModels(): void {
+    const cachedModels = this.modelService.getCurrentCombinedModels();
+    if (cachedModels.length > 0) {
+      this.availableModels = cachedModels;
+      this.updateFavoriteModels();
+      return;
+    }
+
+    this.modelService.getCombinedModels().pipe(take(1)).subscribe({
+      next: models => {
+        this.availableModels = models;
+        this.updateFavoriteModels();
+      },
+      error: error => {
+        console.error('Failed to load models for rewrite favorites:', error);
+        this.availableModels = [];
+        this.updateFavoriteModels();
+      }
+    });
+  }
+
+  private updateFavoriteModels(): void {
+    const favoriteIds = this.resolveFavoriteIds();
+    this.favoriteModels = favoriteIds
+      .map(id => this.availableModels.find(model => model.id === id))
+      .filter((model): model is ModelOption => !!model);
+
+    if (!this.selectedModel && this.favoriteModels.length > 0) {
+      this.selectedModel = this.favoriteModels[0].id;
+    }
+  }
+
+  private resolveFavoriteIds(): string[] {
+    this.ensureStoryFavoriteStructure();
+    const storyFavorites = this.story?.settings?.favoriteModelLists?.rewrite;
+    if (Array.isArray(storyFavorites) && storyFavorites.length) {
+      return [...storyFavorites];
+    }
+
+    const globalSettings = this.settingsService.getSettings();
+    const globalFavorites = globalSettings.favoriteModelLists?.rewrite ?? [];
+    return Array.isArray(globalFavorites) ? [...globalFavorites] : [];
+  }
+
+  isGenericProvider(provider: string): boolean {
+    return !['openrouter', 'claude', 'replicate', 'ollama'].includes(provider);
+  }
+
+  getProviderIcon(provider: string): string {
+    switch (provider) {
+      case 'gemini':
+        return 'logo-google';
+      case 'grok':
+        return 'sparkles-outline';
+      default:
+        return 'globe-outline';
+    }
+  }
+
+  getShortModelName(label: string): string {
+    if (label.includes('Claude 3.7 Sonnet') || label.includes('Claude 3.5 Sonnet v2')) {
+      return 'Claude 3.7';
+    }
+    if (label.includes('Claude Sonnet 4')) {
+      return 'Sonnet 4';
+    }
+    if (label.includes('Gemini 2.5 Pro')) {
+      return 'Gemini 2.5';
+    }
+    if (label.includes('Grok-3') || label.includes('Grok3')) {
+      return 'Grok3';
+    }
+
+    const parts = label.split(' ');
+    if (parts.length > 2) {
+      return `${parts[0]} ${parts[1]}`;
+    }
+    return label;
+  }
+
   getFilteredScenes(chapter: Chapter): Scene[] {
     if (!this.sceneSearchTerm) return chapter.scenes;
     
@@ -618,6 +774,42 @@ export class AIRewriteModalComponent implements OnInit {
   getScenePreview(scene: Scene): string {
     const cleanText = this.extractFullTextFromScene(scene);
     return cleanText.substring(0, 100) + (cleanText.length > 100 ? '...' : '');
+  }
+
+  private ensureStoryFavoriteStructure(): StorySettings | null {
+    if (!this.story) {
+      return null;
+    }
+
+    if (!this.story.settings) {
+      this.story.settings = { ...DEFAULT_STORY_SETTINGS };
+    }
+
+    if (!Array.isArray(this.story.settings.favoriteModels)) {
+      this.story.settings.favoriteModels = [];
+    }
+
+    if (!this.story.settings.favoriteModelLists) {
+      this.story.settings.favoriteModelLists = {
+        beatInput: [...this.story.settings.favoriteModels],
+        sceneSummary: [],
+        rewrite: []
+      };
+    }
+
+    if (!Array.isArray(this.story.settings.favoriteModelLists.beatInput)) {
+      this.story.settings.favoriteModelLists.beatInput = [...this.story.settings.favoriteModels];
+    }
+
+    if (!Array.isArray(this.story.settings.favoriteModelLists.sceneSummary)) {
+      this.story.settings.favoriteModelLists.sceneSummary = [];
+    }
+
+    if (!Array.isArray(this.story.settings.favoriteModelLists.rewrite)) {
+      this.story.settings.favoriteModelLists.rewrite = [];
+    }
+
+    return this.story.settings;
   }
 
   private extractFullTextFromScene(scene: Scene): string {

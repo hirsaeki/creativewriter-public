@@ -32,11 +32,16 @@ export class SettingsService {
           ? parsed.favoriteModelLists.sceneSummary
           : DEFAULT_SETTINGS.favoriteModelLists.sceneSummary;
 
+        const rewriteFavorites = Array.isArray(parsed.favoriteModelLists?.rewrite)
+          ? parsed.favoriteModelLists.rewrite
+          : DEFAULT_SETTINGS.favoriteModelLists.rewrite;
+
         const favoriteModelLists = {
           ...DEFAULT_SETTINGS.favoriteModelLists,
           ...(parsed.favoriteModelLists ?? {}),
           beatInput: [...beatInputFavorites],
-          sceneSummary: [...sceneSummaryFavorites]
+          sceneSummary: [...sceneSummaryFavorites],
+          rewrite: [...rewriteFavorites]
         };
 
         return {
@@ -108,7 +113,7 @@ export class SettingsService {
       ...(settings.favoriteModelLists ?? {})
     } as Settings['favoriteModelLists'];
 
-    const favoriteListsKeys: (keyof Settings['favoriteModelLists'])[] = ['beatInput', 'sceneSummary'];
+    const favoriteListsKeys: (keyof Settings['favoriteModelLists'])[] = ['beatInput', 'sceneSummary', 'rewrite'];
     for (const key of favoriteListsKeys) {
       if (settings.favoriteModelLists?.[key]) {
         mergedFavoriteLists[key] = [...settings.favoriteModelLists[key]];
@@ -194,12 +199,14 @@ export class SettingsService {
     localStorage.removeItem(this.STORAGE_KEY);
     const resetBeatFavorites = [...DEFAULT_SETTINGS.favoriteModelLists.beatInput];
     const resetSummaryFavorites = [...DEFAULT_SETTINGS.favoriteModelLists.sceneSummary];
+    const resetRewriteFavorites = [...DEFAULT_SETTINGS.favoriteModelLists.rewrite];
     this.settingsSubject.next({
       ...DEFAULT_SETTINGS,
       favoriteModelLists: {
         ...DEFAULT_SETTINGS.favoriteModelLists,
         beatInput: resetBeatFavorites,
-        sceneSummary: resetSummaryFavorites
+        sceneSummary: resetSummaryFavorites,
+        rewrite: resetRewriteFavorites
       },
       favoriteModels: [...resetBeatFavorites],
       updatedAt: new Date()

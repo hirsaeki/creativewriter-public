@@ -21,6 +21,7 @@ import { ApiSettingsComponent } from '../ui/settings/api-settings.component';
 import { UiSettingsComponent } from '../ui/settings/ui-settings.component';
 import { PromptsSettingsComponent } from '../ui/settings/prompts-settings.component';
 import { SceneGenerationSettingsComponent } from '../ui/settings/scene-generation-settings.component';
+import { ModelFavoritesSettingsComponent } from '../ui/settings/model-favorites-settings/model-favorites-settings.component';
 
 @Component({
   selector: 'app-settings',
@@ -30,7 +31,7 @@ import { SceneGenerationSettingsComponent } from '../ui/settings/scene-generatio
     IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonChip, IonLabel,
     SettingsTabsComponent, SettingsContentComponent, DatabaseBackupComponent,
-    ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent, SceneGenerationSettingsComponent
+    ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent, SceneGenerationSettingsComponent, ModelFavoritesSettingsComponent
   ],
   template: `
     <div class="ion-page">
@@ -77,6 +78,19 @@ import { SceneGenerationSettingsComponent } from '../ui/settings/scene-generatio
               (settingsChange)="onSettingsChange()"
               (modelsLoaded)="onModelsLoaded($event)">
             </app-api-settings>
+            <app-model-favorites-settings
+              [favoriteIds]="settings.favoriteModelLists?.rewrite || []"
+              [combinedModels]="combinedModels"
+              [loadingModels]="loadingModels"
+              [modelLoadError]="modelLoadError"
+              cardTitle="Rewrite Model Favorites"
+              heading="Rewrite Quick Picks"
+              subheading="Choose up to 6 models to surface as quick actions in the rewrite dialog."
+              description="Configure which models appear as quick-select favorites when rewriting text."
+              emptyState="No rewrite favorites selected yet. Load models to add quick access options."
+              infoNote="Enable at least one AI provider and load models to populate this list."
+              (favoriteIdsChange)="onFavoriteModelsChange('rewrite', $event)">
+            </app-model-favorites-settings>
           </div>
           
           <!-- Appearance Tab -->
@@ -908,7 +922,8 @@ export class SettingsComponent implements OnInit, OnDestroy {
         if (!this.settings.favoriteModelLists) {
           this.settings.favoriteModelLists = {
             beatInput: [...(this.settings.favoriteModels ?? [])],
-            sceneSummary: []
+            sceneSummary: [],
+            rewrite: []
           };
         }
 
@@ -918,6 +933,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
         if (!Array.isArray(this.settings.favoriteModelLists.sceneSummary)) {
           this.settings.favoriteModelLists.sceneSummary = [];
+        }
+
+        if (!Array.isArray(this.settings.favoriteModelLists.rewrite)) {
+          this.settings.favoriteModelLists.rewrite = [];
         }
       })
     );
@@ -949,6 +968,30 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   onSettingsChange(): void {
     this.hasUnsavedChanges = JSON.stringify(this.settings) !== JSON.stringify(this.originalSettings);
+  }
+
+  onFavoriteModelsChange(list: keyof Settings['favoriteModelLists'], favoriteIds: string[]): void {
+    const currentLists = this.settings.favoriteModelLists ?? {
+      beatInput: [...(this.settings.favoriteModels ?? [])],
+      sceneSummary: [],
+      rewrite: []
+    };
+
+    const normalizedLists: Settings['favoriteModelLists'] = {
+      beatInput: Array.isArray(currentLists.beatInput) ? [...currentLists.beatInput] : [...(this.settings.favoriteModels ?? [])],
+      sceneSummary: Array.isArray(currentLists.sceneSummary) ? [...currentLists.sceneSummary] : [],
+      rewrite: Array.isArray(currentLists.rewrite) ? [...currentLists.rewrite] : []
+    };
+
+    normalizedLists[list] = [...favoriteIds];
+
+    this.settings.favoriteModelLists = normalizedLists;
+
+    if (list === 'beatInput') {
+      this.settings.favoriteModels = [...favoriteIds];
+    }
+
+    this.onSettingsChange();
   }
 
   saveSettings(): void {

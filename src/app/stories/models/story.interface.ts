@@ -83,6 +83,7 @@ Continue the story now with {wordCount} words:</message>
   favoriteModels: [],
   favoriteModelLists: {
     beatInput: [],
-    sceneSummary: []
+    sceneSummary: [],
+    rewrite: []
   }
 };

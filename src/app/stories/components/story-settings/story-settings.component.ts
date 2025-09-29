@@ -202,7 +202,8 @@ export class StorySettingsComponent implements OnInit {
     if (!this.settings.favoriteModelLists) {
       this.settings.favoriteModelLists = {
         beatInput: [...this.settings.favoriteModels],
-        sceneSummary: []
+        sceneSummary: [],
+        rewrite: []
       };
     }
 
@@ -216,6 +217,12 @@ export class StorySettingsComponent implements OnInit {
       this.settings.favoriteModelLists.sceneSummary = [];
     } else {
       this.settings.favoriteModelLists.sceneSummary = [...this.settings.favoriteModelLists.sceneSummary];
+    }
+
+    if (!Array.isArray(this.settings.favoriteModelLists.rewrite)) {
+      this.settings.favoriteModelLists.rewrite = [];
+    } else {
+      this.settings.favoriteModelLists.rewrite = [...this.settings.favoriteModelLists.rewrite];
     }
   }
 

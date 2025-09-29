@@ -231,6 +231,19 @@
           infoNote="Favorites are available for any provider you have enabled in the story."
           (favoriteIdsChange)="onFavoriteModelsChange('sceneSummary', $event)">
         </app-model-favorites-settings>
+        <app-model-favorites-settings
+          [favoriteIds]="settings.favoriteModelLists?.rewrite || []"
+          [combinedModels]="combinedModels"
+          [loadingModels]="loadingModels"
+          [modelLoadError]="modelLoadError"
+          cardTitle="Rewrite Favorites"
+          heading="Rewrite Model Favorites"
+          subheading="Choose up to 6 models to keep at hand for AI rewrites in this story."
+          description="Favorites show up as quick-select options in the rewrite dialog for this story."
+          emptyState="No rewrite favorites yet. Add models to speed up rewriting."
+          infoNote="Favorites are limited to the models available for this story."
+          (favoriteIdsChange)="onFavoriteModelsChange('rewrite', $event)">
+        </app-model-favorites-settings>
       </div>
 
       <!-- DB Maintenance Tab -->

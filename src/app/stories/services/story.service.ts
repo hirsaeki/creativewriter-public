@@ -258,10 +258,14 @@ export class StoryService {
       const sceneSummaryList = Array.isArray(existingLists.sceneSummary)
         ? existingLists.sceneSummary
         : [];
+      const rewriteList = Array.isArray(existingLists.rewrite)
+        ? existingLists.rewrite
+        : [];
 
       migrated.settings.favoriteModelLists = {
         beatInput: [...(beatInputList ?? [])],
-        sceneSummary: [...sceneSummaryList]
+        sceneSummary: [...sceneSummaryList],
+        rewrite: [...rewriteList]
       };
     }
 
