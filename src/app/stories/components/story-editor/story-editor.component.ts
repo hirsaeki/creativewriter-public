@@ -1237,10 +1237,12 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       chapterId: this.activeChapterId || undefined,
       sceneId: this.activeSceneId || undefined
     };
-    
+
+    const finalEvent = this.refreshCustomContext(enhancedEvent);
+
     // Pass the enhanced event to the ProseMirror service
     if (this.proseMirrorService) {
-      this.proseMirrorService.handleBeatPromptSubmit(enhancedEvent);
+      this.proseMirrorService.handleBeatPromptSubmit(finalEvent);
     }
   }
 
@@ -1261,12 +1263,9 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const refreshedCustomContext = this.refreshCustomContextForRegenerate(event);
-
     const generateEvent: BeatAIPromptEvent = {
       ...event,
-      action: 'generate',
-      customContext: refreshedCustomContext
+      action: 'generate'
     };
 
     const enhancedEvent: BeatAIPromptEvent = {
@@ -1276,12 +1275,14 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       sceneId: this.activeSceneId || undefined
     };
 
-    this.proseMirrorService.handleBeatPromptSubmit(enhancedEvent);
+    const finalEvent = this.refreshCustomContext(enhancedEvent);
+
+    this.proseMirrorService.handleBeatPromptSubmit(finalEvent);
   }
 
-  private refreshCustomContextForRegenerate(event: BeatAIPromptEvent): BeatAIPromptEvent['customContext'] | undefined {
+  private refreshCustomContext(event: BeatAIPromptEvent): BeatAIPromptEvent {
     if (!event.customContext) {
-      return event.customContext;
+      return event;
     }
 
     const { selectedSceneContexts, includeStoryOutline } = event.customContext;
@@ -1298,9 +1299,12 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     });
 
     return {
-      includeStoryOutline,
-      selectedSceneContexts: updatedContexts,
-      selectedScenes: updatedContexts.map(ctx => ctx.content)
+      ...event,
+      customContext: {
+        includeStoryOutline,
+        selectedSceneContexts: updatedContexts,
+        selectedScenes: updatedContexts.map(ctx => ctx.content)
+      }
     };
   }
 
