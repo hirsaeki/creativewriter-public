@@ -8,7 +8,7 @@ import {
   IonChip, IonLabel
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline } from 'ionicons/icons';
+import { arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, sparklesOutline } from 'ionicons/icons';
 import { SettingsService } from '../core/services/settings.service';
 import { ModelService } from '../core/services/model.service';
 import { Settings } from '../core/models/settings.interface';
@@ -20,6 +20,8 @@ import { DatabaseBackupComponent } from '../ui/components/database-backup.compon
 import { ApiSettingsComponent } from '../ui/settings/api-settings.component';
 import { UiSettingsComponent } from '../ui/settings/ui-settings.component';
 import { PromptsSettingsComponent } from '../ui/settings/prompts-settings.component';
+import { SceneGenerationSettingsComponent } from '../ui/settings/scene-generation-settings.component';
+import { ModelFavoritesSettingsComponent } from '../ui/settings/model-favorites-settings/model-favorites-settings.component';
 
 @Component({
   selector: 'app-settings',
@@ -29,7 +31,7 @@ import { PromptsSettingsComponent } from '../ui/settings/prompts-settings.compon
     IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonChip, IonLabel,
     SettingsTabsComponent, SettingsContentComponent, DatabaseBackupComponent,
-    ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent
+    ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent, SceneGenerationSettingsComponent, ModelFavoritesSettingsComponent
   ],
   template: `
     <div class="ion-page">
@@ -76,6 +78,19 @@ import { PromptsSettingsComponent } from '../ui/settings/prompts-settings.compon
               (settingsChange)="onSettingsChange()"
               (modelsLoaded)="onModelsLoaded($event)">
             </app-api-settings>
+            <app-model-favorites-settings
+              [favoriteIds]="settings.favoriteModelLists?.rewrite || []"
+              [combinedModels]="combinedModels"
+              [loadingModels]="loadingModels"
+              [modelLoadError]="modelLoadError"
+              cardTitle="Rewrite Model Favorites"
+              heading="Rewrite Quick Picks"
+              subheading="Choose up to 6 models to surface as quick actions in the rewrite dialog."
+              description="Configure which models appear as quick-select favorites when rewriting text."
+              emptyState="No rewrite favorites selected yet. Load models to add quick access options."
+              infoNote="Enable at least one AI provider and load models to populate this list."
+              (favoriteIdsChange)="onFavoriteModelsChange('rewrite', $event)">
+            </app-model-favorites-settings>
           </div>
           
           <!-- Appearance Tab -->
@@ -107,6 +122,17 @@ import { PromptsSettingsComponent } from '../ui/settings/prompts-settings.compon
               [modelsDisabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey)"
               (settingsChange)="onSettingsChange()">
             </app-prompts-settings>
+          </div>
+
+          <!-- Scene Generation Tab -->
+          <div *ngSwitchCase="'scene-generation'">
+            <app-scene-generation-settings
+              [settings]="settings"
+              [combinedModels]="combinedModels"
+              [loadingModels]="loadingModels"
+              [modelsDisabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey)"
+              (settingsChange)="onSettingsChange()">
+            </app-scene-generation-settings>
           </div>
 
           <!-- Backup & Restore Tab -->
@@ -866,13 +892,14 @@ export class SettingsComponent implements OnInit, OnDestroy {
     { value: 'appearance', icon: 'color-palette-outline', label: 'Appearance' },
     { value: 'scene-title', icon: 'document-text-outline', label: 'Scene Titles' },
     { value: 'scene-summary', icon: 'list-outline', label: 'Scene Summary' },
+    { value: 'scene-generation', icon: 'sparkles-outline', label: 'Scene Generation' },
     { value: 'backup', icon: 'archive-outline', label: 'Backup & Restore' }
   ];
 
   constructor() {
     this.settings = this.settingsService.getSettings();
     // Register Ionic icons
-    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline });
+    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, sparklesOutline });
   }
 
   ngOnInit(): void {
@@ -890,6 +917,26 @@ export class SettingsComponent implements OnInit, OnDestroy {
             textColor: '#e0e0e0',
             backgroundImage: 'none'
           };
+        }
+
+        if (!this.settings.favoriteModelLists) {
+          this.settings.favoriteModelLists = {
+            beatInput: [...(this.settings.favoriteModels ?? [])],
+            sceneSummary: [],
+            rewrite: []
+          };
+        }
+
+        if (!Array.isArray(this.settings.favoriteModelLists.beatInput)) {
+          this.settings.favoriteModelLists.beatInput = [...(this.settings.favoriteModels ?? [])];
+        }
+
+        if (!Array.isArray(this.settings.favoriteModelLists.sceneSummary)) {
+          this.settings.favoriteModelLists.sceneSummary = [];
+        }
+
+        if (!Array.isArray(this.settings.favoriteModelLists.rewrite)) {
+          this.settings.favoriteModelLists.rewrite = [];
         }
       })
     );
@@ -921,6 +968,30 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   onSettingsChange(): void {
     this.hasUnsavedChanges = JSON.stringify(this.settings) !== JSON.stringify(this.originalSettings);
+  }
+
+  onFavoriteModelsChange(list: keyof Settings['favoriteModelLists'], favoriteIds: string[]): void {
+    const currentLists = this.settings.favoriteModelLists ?? {
+      beatInput: [...(this.settings.favoriteModels ?? [])],
+      sceneSummary: [],
+      rewrite: []
+    };
+
+    const normalizedLists: Settings['favoriteModelLists'] = {
+      beatInput: Array.isArray(currentLists.beatInput) ? [...currentLists.beatInput] : [...(this.settings.favoriteModels ?? [])],
+      sceneSummary: Array.isArray(currentLists.sceneSummary) ? [...currentLists.sceneSummary] : [],
+      rewrite: Array.isArray(currentLists.rewrite) ? [...currentLists.rewrite] : []
+    };
+
+    normalizedLists[list] = [...favoriteIds];
+
+    this.settings.favoriteModelLists = normalizedLists;
+
+    if (list === 'beatInput') {
+      this.settings.favoriteModels = [...favoriteIds];
+    }
+
+    this.onSettingsChange();
   }
 
   saveSettings(): void {

@@ -9,7 +9,7 @@ import {
 } from '@ionic/angular/standalone';
 import { IonSpinner, IonProgressBar } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, search, addOutline, closeOutline, openOutline, documentTextOutline } from 'ionicons/icons';
+import { arrowBack, search, addOutline, closeOutline, openOutline, documentTextOutline, swapHorizontal } from 'ionicons/icons';
 import { AppHeaderComponent, BurgerMenuItem, HeaderAction } from '../../../../app/ui/components/app-header.component';
 import { HeaderNavigationService } from '../../../../app/shared/services/header-navigation.service';
 import { StoryService } from '../../../stories/services/story.service';
@@ -65,10 +65,18 @@ export class ClicheAnalyzerComponent implements OnInit {
   rightActions: HeaderAction[] = [];
 
   constructor() {
-    addIcons({ arrowBack, search, addOutline, closeOutline, openOutline, documentTextOutline });
+    addIcons({ arrowBack, search, addOutline, closeOutline, openOutline, documentTextOutline, swapHorizontal });
     // Reuse common items so navigation stays consistent
     this.burgerMenuItems = this.headerNav.getCommonBurgerMenuItems();
     this.rightActions = [
+      {
+        icon: 'swap-horizontal',
+        label: 'Characters',
+        action: () => this.goToCharacters(),
+        showOnMobile: true,
+        showOnDesktop: true,
+        tooltip: 'Switch to Character Consistency Analyzer'
+      },
       {
         icon: 'add-outline',
         label: 'Scenes',
@@ -124,6 +132,11 @@ export class ClicheAnalyzerComponent implements OnInit {
     } else {
       this.headerNav.goToStoryList();
     }
+  }
+
+  goToCharacters(): void {
+    if (!this.storyId) return;
+    this.router.navigate(['/stories/inspector', this.storyId, 'characters']);
   }
 
   async analyze(): Promise<void> {

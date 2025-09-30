@@ -36,7 +36,7 @@ export interface BurgerMenuItem {
       <ion-toolbar>
         <!-- Left Actions -->
         <ion-buttons slot="start">
-          <ion-button *ngIf="showBackButton" (click)="handleBackAction()">
+          <ion-button *ngIf="showBackButton" (click)="handleBackAction()" title="Back" aria-label="Back">
             <ion-icon name="arrow-back" slot="icon-only"></ion-icon>
           </ion-button>
           
@@ -46,6 +46,8 @@ export interface BurgerMenuItem {
               [class.mobile-only]="!action.showOnDesktop"
               [disabled]="action.disabled"
               [color]="action.color"
+              [title]="action.tooltip || action.label"
+              [attr.aria-label]="action.tooltip || action.label || action.icon"
               (click)="action.action()">
               <ion-icon [name]="action.icon" slot="icon-only"></ion-icon>
             </ion-button>
@@ -76,12 +78,14 @@ export interface BurgerMenuItem {
           <!-- Action Buttons -->
           <ng-container *ngFor="let action of rightActions">
             <ion-button 
+              *ngIf="!action.chipContent"
               [class.desktop-only]="!action.showOnMobile"
               [class.mobile-only]="!action.showOnDesktop"
               [class]="action.cssClass"
               [disabled]="action.disabled"
               [color]="action.color"
-              [title]="action.tooltip"
+              [title]="action.tooltip || action.label"
+              [attr.aria-label]="action.tooltip || action.label || action.icon"
               (click)="action.action()">
               <ion-icon [name]="action.icon" slot="start" *ngIf="action.label"></ion-icon>
               <ion-icon [name]="action.icon" slot="icon-only" *ngIf="!action.label && action.icon"></ion-icon>
@@ -96,6 +100,8 @@ export interface BurgerMenuItem {
                 [color]="action.chipColor || 'medium'"
                 [class.desktop-only]="!action.showOnMobile"
                 [class.mobile-only]="!action.showOnDesktop"
+                [title]="action.tooltip || action.chipContent"
+                [attr.aria-label]="action.tooltip || action.chipContent || action.label || action.icon"
                 (click)="action.action()"
                 class="clickable-chip">
                 <ion-icon [name]="action.icon" *ngIf="action.icon"></ion-icon>
@@ -108,6 +114,8 @@ export interface BurgerMenuItem {
               [color]="action.chipColor || 'medium'"
               [class.desktop-only]="!action.showOnMobile"
               [class.mobile-only]="!action.showOnDesktop"
+              [title]="action.tooltip || action.chipContent"
+              [attr.aria-label]="action.tooltip || action.chipContent || action.label || action.icon"
               (click)="action.action()"
               class="clickable-chip">
               <ion-icon [name]="action.icon" *ngIf="action.icon"></ion-icon>
@@ -121,6 +129,7 @@ export interface BurgerMenuItem {
             id="burger-menu-trigger"
             aria-label="Open navigation menu"
             aria-haspopup="menu"
+            [title]="burgerMenuTitle || 'Navigation menu'"
             [attr.aria-expanded]="isBurgerMenuOpen">
             <ion-icon name="menu" slot="icon-only" aria-hidden="true"></ion-icon>
           </ion-button>

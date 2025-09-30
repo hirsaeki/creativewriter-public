@@ -20,7 +20,7 @@ import { BeatAIService } from '../../../shared/services/beat-ai.service';
 import { ProseMirrorEditorService, SimpleEditorConfig } from '../../../shared/services/prosemirror-editor.service';
 import { EditorView } from 'prosemirror-view';
 import { StoryService } from '../../services/story.service';
-import { Story, Scene, Chapter } from '../../models/story.interface';
+import { Story, Scene, Chapter, StorySettings, DEFAULT_STORY_SETTINGS } from '../../models/story.interface';
 import { DatabaseService, SyncStatus } from '../../../core/services/database.service';
 import { OpenRouterIconComponent } from '../../../ui/icons/openrouter-icon.component';
 import { ClaudeIconComponent } from '../../../ui/icons/claude-icon.component';
@@ -362,7 +362,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     this.promptSubmit.emit({
       beatId: this.beatData.id,
       prompt: this.beatData.prompt,
-      action: 'generate',
+      action: 'regenerate',
       wordCount: this.getActualWordCount(),
       model: this.selectedModel,
       storyId: this.storyId,
@@ -376,7 +376,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   
   deleteContentAfterBeat(): void {
-    if (confirm('Do you really want to delete all text after this beat? This action cannot be undone.')) {
+    if (confirm('Delete writing after this beat until the next beat or the end of this scene? This cannot be undone.')) {
       this.promptSubmit.emit({
         beatId: this.beatData.id,
         action: 'deleteAfter',
@@ -725,12 +725,11 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   
   private updateFavoriteModels(): void {
-    const settings = this.settingsService.getSettings();
-    const favoriteIds = settings.favoriteModels || [];
-    
-    this.favoriteModels = this.availableModels.filter(model => 
-      favoriteIds.includes(model.id)
-    );
+    const favoriteIds = this.resolveFavoriteIds();
+
+    this.favoriteModels = favoriteIds
+      .map(id => this.availableModels.find(model => model.id === id))
+      .filter((model): model is ModelOption => !!model);
   }
   
   selectFavoriteModel(model: ModelOption): void {
@@ -753,13 +752,12 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     return label;
   }
   
-  toggleFavorite(event: Event, model: ModelOption): void {
+  async toggleFavorite(event: Event, model: ModelOption): Promise<void> {
     event.stopPropagation();
     event.preventDefault();
     
-    const settings = this.settingsService.getSettings();
-    const favoriteIds = settings.favoriteModels || [];
-    
+    const favoriteIds = this.resolveFavoriteIds();
+
     const index = favoriteIds.indexOf(model.id);
     if (index > -1) {
       // Remove from favorites
@@ -776,15 +774,87 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     
     // Save updated favorites
-    this.settingsService.updateSettings({
-      ...settings,
-      favoriteModels: favoriteIds
-    });
+    if (this.story) {
+      const storySettings = this.ensureStoryFavoriteStructure();
+      if (storySettings) {
+        storySettings.favoriteModelLists.beatInput = [...favoriteIds];
+        storySettings.favoriteModels = [...favoriteIds];
+        try {
+          await this.storyService.updateStory(this.story);
+        } catch (error) {
+          console.error('Failed to persist story favorites:', error);
+        }
+      }
+    } else {
+      const globalSettings = this.settingsService.getSettings();
+      this.settingsService.updateSettings({
+        favoriteModels: favoriteIds,
+        favoriteModelLists: {
+          ...globalSettings.favoriteModelLists,
+          beatInput: favoriteIds
+        }
+      });
+    }
+
+    this.updateFavoriteModels();
+    this.cdr.markForCheck();
   }
   
   isFavorite(modelId: string): boolean {
+    return this.resolveFavoriteIds().includes(modelId);
+  }
+
+  private resolveFavoriteIds(): string[] {
+    const storySettings = this.ensureStoryFavoriteStructure();
+    if (storySettings) {
+      return [...storySettings.favoriteModelLists.beatInput];
+    }
+
     const settings = this.settingsService.getSettings();
-    return (settings.favoriteModels || []).includes(modelId);
+    const favorites = settings.favoriteModelLists?.beatInput ?? settings.favoriteModels ?? [];
+    return [...favorites];
+  }
+
+  private ensureStoryFavoriteStructure(): StorySettings | null {
+    if (!this.story) {
+      return null;
+    }
+
+    if (!this.story.settings) {
+      this.story.settings = { ...DEFAULT_STORY_SETTINGS };
+    }
+
+    if (!Array.isArray(this.story.settings.favoriteModels)) {
+      this.story.settings.favoriteModels = [];
+    }
+
+    if (!this.story.settings.favoriteModelLists) {
+      this.story.settings.favoriteModelLists = {
+        beatInput: [...this.story.settings.favoriteModels],
+        sceneSummary: [],
+        rewrite: []
+      };
+    }
+
+    if (!Array.isArray(this.story.settings.favoriteModelLists.beatInput)) {
+      this.story.settings.favoriteModelLists.beatInput = [...this.story.settings.favoriteModels];
+    } else {
+      this.story.settings.favoriteModelLists.beatInput = [...this.story.settings.favoriteModelLists.beatInput];
+    }
+
+    if (!Array.isArray(this.story.settings.favoriteModelLists.sceneSummary)) {
+      this.story.settings.favoriteModelLists.sceneSummary = [];
+    } else {
+      this.story.settings.favoriteModelLists.sceneSummary = [...this.story.settings.favoriteModelLists.sceneSummary];
+    }
+
+    if (!Array.isArray(this.story.settings.favoriteModelLists.rewrite)) {
+      this.story.settings.favoriteModelLists.rewrite = [];
+    } else {
+      this.story.settings.favoriteModelLists.rewrite = [...this.story.settings.favoriteModelLists.rewrite];
+    }
+
+    return this.story.settings;
   }
 
   // Context selection methods
@@ -794,6 +864,9 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     try {
       this.story = await this.storyService.getStory(this.storyId);
       if (this.story) {
+        this.ensureStoryFavoriteStructure();
+        this.updateFavoriteModels();
+        this.cdr.markForCheck();
         await this.setupDefaultContext();
       }
     } catch (error) {

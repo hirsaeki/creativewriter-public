@@ -8,13 +8,15 @@ import {
   IonChip, IonAvatar, IonSearchbar, IonModal, IonCheckbox, IonItemDivider,
   IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader
 } from '@ionic/angular/standalone';
+import { AlertController } from '@ionic/angular';
 import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
 import { addIcons } from 'ionicons';
 import { 
   arrowBack, sendOutline, peopleOutline, documentTextOutline, 
   addOutline, checkmarkOutline, closeOutline, sparklesOutline,
   personOutline, locationOutline, cubeOutline, readerOutline,
-  copyOutline, logoGoogle, globeOutline, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, hardwareChip
+  copyOutline, logoGoogle, globeOutline, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, hardwareChip,
+  refreshOutline, createOutline, timeOutline
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -23,6 +25,7 @@ import { PromptManagerService } from '../../../shared/services/prompt-manager.se
 import { CodexService } from '../../services/codex.service';
 import { AIRequestLoggerService } from '../../../core/services/ai-request-logger.service';
 import { ModelService } from '../../../core/services/model.service';
+import { ChatHistoryService } from '../../services/chat-history.service';
 import { OpenRouterIconComponent } from '../../../ui/icons/openrouter-icon.component';
 import { ClaudeIconComponent } from '../../../ui/icons/claude-icon.component';
 import { ReplicateIconComponent } from '../../../ui/icons/replicate-icon.component';
@@ -33,6 +36,7 @@ import { StoryRole } from '../../models/codex.interface';
 import { Subscription, Observable, of, from } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { NgSelectModule } from '@ng-select/ng-select';
+import { ChatHistoryDoc } from '../../models/chat-history.interface';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -86,6 +90,8 @@ export class SceneChatComponent implements OnInit, OnDestroy {
   private modelService = inject(ModelService);
   private sanitizer = inject(DomSanitizer);
   private cdr = inject(ChangeDetectorRef);
+  private readonly alertController = inject(AlertController);
+  private chatHistoryService = inject(ChatHistoryService);
 
   @ViewChild('scrollContainer') scrollContainer!: ElementRef;
   @ViewChild('messageInput') messageInput!: ElementRef;
@@ -115,17 +121,171 @@ export class SceneChatComponent implements OnInit, OnDestroy {
   private subscriptions = new Subscription();
   private abortController: AbortController | null = null;
   keyboardVisible = false;
+  private chatSessionId = Date.now();
+  
+  // Editing state
+  isEditing = false;
+  private editingIndex = -1;
+  private editingExtractionType?: 'characters' | 'locations' | 'objects';
+  
+  // Persistence state
+  private activeHistoryId: string | null = null;
+  showHistoryList = false;
+  histories: ChatHistoryDoc[] = [];
 
   constructor() {
     addIcons({ 
       arrowBack, sendOutline, peopleOutline, documentTextOutline, 
       addOutline, checkmarkOutline, closeOutline, sparklesOutline,
       personOutline, locationOutline, cubeOutline, readerOutline,
-      copyOutline, logoGoogle, globeOutline, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, hardwareChip
+      copyOutline, logoGoogle, globeOutline, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, hardwareChip,
+      refreshOutline, createOutline, timeOutline
     });
     
     this.initializePresetPrompts();
     this.initializeHeaderActions();
+  }
+
+  editMessage(message: ChatMessage): void {
+    if (this.isGenerating) return;
+    const index = this.messages.indexOf(message);
+    if (index === -1) return;
+
+    this.isEditing = true;
+    this.editingIndex = index;
+    this.editingExtractionType = message.extractionType;
+    this.currentMessage = message.content;
+    this.scrollToBottom();
+    setTimeout(() => {
+      try {
+        // IonTextarea exposes setFocus
+        (this.messageInput as unknown as { setFocus?: () => void })?.setFocus?.();
+      } catch {
+        void 0;
+      }
+    }, 50);
+    this.cdr.markForCheck();
+  }
+
+  cancelEdit(): void {
+    if (this.isGenerating) return;
+    this.isEditing = false;
+    this.editingIndex = -1;
+    this.editingExtractionType = undefined;
+    this.currentMessage = '';
+    this.cdr.markForCheck();
+  }
+
+  resendMessage(message: ChatMessage): void {
+    if (this.isGenerating) return;
+    const index = this.messages.indexOf(message);
+    if (index === -1) return;
+
+    // Remove all messages after the clicked one
+    if (index < this.messages.length - 1) {
+      this.messages.splice(index + 1);
+      this.cdr.markForCheck();
+    }
+
+    const userMessage = message.content;
+    const extractionType = message.extractionType;
+
+    this.isGenerating = true;
+    this.scrollToBottom();
+
+    try {
+      // Prepare scene context
+      const sceneContext = this.selectedScenes
+        .map(s => `<scene chapter="${s.chapterTitle}" title="${s.sceneTitle}">\n${s.content}\n</scene>`)
+        .join('\n\n');
+
+      // Prepare story outline if enabled
+      let storyOutline = '';
+      if (this.includeStoryOutline) {
+        storyOutline = this.buildStoryOutline();
+      }
+
+      // Generate a unique beat ID for this chat message
+      const beatId = 'chat-' + Date.now();
+
+      let prompt = '';
+
+      // Always use direct AI calls without system prompt or codex
+      let contextText = '';
+      if (storyOutline) {
+        contextText += `Story Overview:\n${storyOutline}\n\n`;
+      }
+      if (sceneContext) {
+        contextText += `Scene Text:\n${sceneContext}\n\n`;
+      }
+
+      // Add chat history context (exclude initial system message and preset prompts)
+      const chatHistory = this.buildChatHistory();
+      if (chatHistory) {
+        contextText += `Previous chat history:\n${chatHistory}\n\n`;
+      }
+
+      // Build prompt based on type
+      if (extractionType) {
+        // Use the extraction prompt directly
+        prompt = `${contextText}${userMessage}`;
+      } else {
+        // For normal chat, just add the user's question
+        prompt = `${contextText}User Question: ${userMessage}\n\nPlease answer helpfully and creatively based on the given context and previous conversation.`;
+      }
+
+      // Call AI directly without the beat generation template
+      const sessionIdSnapshot = this.chatSessionId;
+      let accumulatedResponse = '';
+      const subscription = this.callAIDirectly(
+        prompt,
+        beatId,
+        { wordCount: 400 }
+      ).subscribe({
+        next: (chunk) => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
+          accumulatedResponse = chunk;
+          this.cdr.markForCheck();
+        },
+        complete: () => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
+          this.messages.push({
+            role: 'assistant',
+            content: accumulatedResponse,
+            timestamp: new Date(),
+            extractionType
+          });
+          this.isGenerating = false;
+          this.scrollToBottom();
+          // Persist snapshot of conversation
+          this.saveHistorySnapshot().catch(() => void 0);
+          this.cdr.markForCheck();
+        },
+        error: (error) => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
+          console.error('Error generating response:', error);
+          this.messages.push({
+            role: 'assistant',
+            content: 'Sorry, an error occurred. Please try again.',
+            timestamp: new Date()
+          });
+          this.isGenerating = false;
+          this.scrollToBottom();
+        }
+      });
+
+      this.subscriptions.add(subscription);
+
+    } catch (error) {
+      console.error('Error generating response:', error);
+      this.messages.push({
+        role: 'assistant',
+        content: 'Entschuldigung, es ist ein Fehler aufgetreten. Bitte versuche es erneut.',
+        timestamp: new Date()
+      });
+      this.isGenerating = false;
+      this.scrollToBottom();
+    }
   }
 
   ngOnInit() {
@@ -134,7 +294,12 @@ export class SceneChatComponent implements OnInit, OnDestroy {
     const sceneId = this.route.snapshot.paramMap.get('sceneId');
 
     if (storyId && chapterId && sceneId) {
-      this.loadStory(storyId, chapterId, sceneId).catch(error => {
+      this.loadStory(storyId, chapterId, sceneId).then(() => {
+        // Try restoring latest chat history after story is loaded
+        if (storyId) {
+          this.restoreLatestHistory(storyId).catch(() => void 0);
+        }
+      }).catch(error => {
         console.error('Error loading story:', error);
         this.goBack();
       });
@@ -172,12 +337,14 @@ export class SceneChatComponent implements OnInit, OnDestroy {
         });
       }
       
-      // Add initial system message
-      this.messages.push({
-        role: 'assistant',
-        content: 'Hello! I am your AI assistant for this scene. I work exclusively with the context of selected scenes. You can ask me questions to extract characters, analyze details, or develop ideas.',
-        timestamp: new Date()
-      });
+      // Add initial system message if empty
+      if (this.messages.length === 0) {
+        this.messages.push({
+          role: 'assistant',
+          content: 'Hello! I am your AI assistant for this scene. I work exclusively with the context of selected scenes. You can ask me questions to extract characters, analyze details, or develop ideas.',
+          timestamp: new Date()
+        });
+      }
     }
   }
 
@@ -193,13 +360,30 @@ export class SceneChatComponent implements OnInit, OnDestroy {
     const userMessage = this.currentMessage;
     this.currentMessage = '';
     
+    // If editing, revert history to just before the edited message
+    let effectiveExtractionType: 'characters' | 'locations' | 'objects' | undefined = extractionType;
+    if (this.isEditing) {
+      if (this.editingIndex >= 0) {
+        // Remove the edited message and everything after it
+        this.messages.splice(this.editingIndex);
+      }
+      // Preserve original extraction type if not explicitly overwritten
+      if (!effectiveExtractionType) {
+        effectiveExtractionType = this.editingExtractionType;
+      }
+      // Clear editing state
+      this.isEditing = false;
+      this.editingIndex = -1;
+      this.editingExtractionType = undefined;
+    }
+    
     // Add user message
     this.messages.push({
       role: 'user',
       content: userMessage,
       timestamp: new Date(),
-      isPresetPrompt: !!extractionType,
-      extractionType
+      isPresetPrompt: !!effectiveExtractionType,
+      extractionType: effectiveExtractionType
     });
 
     this.isGenerating = true;
@@ -248,6 +432,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
       }
       
       // Call AI directly without the beat generation template
+      const sessionIdSnapshot = this.chatSessionId;
       let accumulatedResponse = '';
       const subscription = this.callAIDirectly(
         prompt,
@@ -255,10 +440,12 @@ export class SceneChatComponent implements OnInit, OnDestroy {
         { wordCount: 400 }
       ).subscribe({
         next: (chunk) => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
           accumulatedResponse = chunk;
           this.cdr.markForCheck();
         },
         complete: () => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
           this.messages.push({
             role: 'assistant',
             content: accumulatedResponse,
@@ -267,9 +454,12 @@ export class SceneChatComponent implements OnInit, OnDestroy {
           });
           this.isGenerating = false;
           this.scrollToBottom();
+          // Persist snapshot of conversation
+          this.saveHistorySnapshot().catch(() => void 0);
           this.cdr.markForCheck();
         },
         error: (error) => {
+          if (this.chatSessionId !== sessionIdSnapshot) return;
           console.error('Error generating response:', error);
           this.messages.push({
             role: 'assistant',
@@ -680,6 +870,7 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
     const settings = this.settingsService.getSettings();
     const apiKey = settings.googleGemini.apiKey;
     const model = options.model || settings.googleGemini.model || 'gemini-1.5-flash';
+    const maxTokens = this.getChatMaxTokens(options.wordCount);
     
     const requestBody = {
       contents: [{
@@ -688,7 +879,7 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
       }],
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: Math.ceil(options.wordCount * 2.5),
+        maxOutputTokens: maxTokens,
         topP: 0.95,
         topK: 40
       }
@@ -714,6 +905,7 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
     const settings = this.settingsService.getSettings();
     const apiKey = settings.openRouter.apiKey;
     const model = options.model || settings.openRouter.model || 'anthropic/claude-3-haiku';
+    const maxTokens = this.getChatMaxTokens(options.wordCount);
     
     const requestBody = {
       model: model,
@@ -722,7 +914,7 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
         content: prompt
       }],
       stream: true,
-      max_tokens: Math.ceil(options.wordCount * 2.5),
+      max_tokens: maxTokens,
       temperature: 0.7
     };
     
@@ -749,66 +941,74 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
     return new Observable<string>(observer => {
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      
-      const processChunk = async () => {
+      let buffer = '';
+
+      const processBufferLine = (line: string) => {
+        if (!line) return;
+        if (!line.startsWith('data: ')) return;
+        const jsonStr = line.slice(6);
+        if (jsonStr === '[DONE]') return;
+        try {
+          const json = JSON.parse(jsonStr);
+          let text = '';
+          // Gemini streaming
+          if (json.candidates?.[0]?.content?.parts?.[0]?.text) {
+            text = json.candidates[0].content.parts[0].text;
+          }
+          // OpenRouter/OpenAI streaming
+          else if (json.choices?.[0]?.delta?.content) {
+            text = json.choices[0].delta.content;
+          }
+          if (text) observer.next(text);
+        } catch {
+          // ignore partial JSON until complete line arrives
+        }
+      };
+
+      const read = async (): Promise<void> => {
         try {
           const { done, value } = await reader!.read();
-          
           if (done) {
+            // flush remaining buffer
+            const remaining = buffer.trim();
+            if (remaining) processBufferLine(remaining);
             observer.complete();
             return;
           }
-          
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const jsonStr = line.slice(6);
-              if (jsonStr === '[DONE]') continue;
-              
-              try {
-                const json = JSON.parse(jsonStr);
-                let text = '';
-                
-                // Handle different response formats
-                if (json.candidates?.[0]?.content?.parts?.[0]?.text) {
-                  // Gemini format
-                  text = json.candidates[0].content.parts[0].text;
-                } else if (json.choices?.[0]?.delta?.content) {
-                  // OpenRouter format
-                  text = json.choices[0].delta.content;
-                }
-                
-                if (text) {
-                  observer.next(text);
-                }
-              } catch {
-                // Ignore JSON parse errors
-              }
-            }
+          buffer += decoder.decode(value, { stream: true });
+          let newlineIndex = buffer.indexOf('\n');
+          while (newlineIndex !== -1) {
+            const line = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+            processBufferLine(line);
+            newlineIndex = buffer.indexOf('\n');
           }
-          
-          processChunk();
+          read();
         } catch (error) {
           observer.error(error);
         }
       };
-      
-      processChunk();
+
+      read();
     });
+  }
+
+  private getChatMaxTokens(wordCount: number): number {
+    const estimated = Math.ceil(wordCount * 2.5);
+    return Math.max(estimated, 3000);
   }
 
   private logGeminiRequest(prompt: string, options: { wordCount: number; model?: string | null }): string {
     const settings = this.settingsService.getSettings();
     const model = options.model || settings.googleGemini.model || 'gemini-1.5-flash';
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent`;
+    const maxTokens = this.getChatMaxTokens(options.wordCount);
     
     return this.aiLogger.logRequest({
       endpoint: endpoint,
       model: model,
       wordCount: options.wordCount,
-      maxTokens: Math.ceil(options.wordCount * 2.5),
+      maxTokens: maxTokens,
       prompt: prompt,
       apiProvider: 'gemini',
       streamingMode: true,
@@ -825,12 +1025,13 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
     const settings = this.settingsService.getSettings();
     const model = options.model || settings.openRouter.model || 'anthropic/claude-3-haiku';
     const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+    const maxTokens = this.getChatMaxTokens(options.wordCount);
     
     return this.aiLogger.logRequest({
       endpoint: endpoint,
       model: model,
       wordCount: options.wordCount,
-      maxTokens: Math.ceil(options.wordCount * 2.5),
+      maxTokens: maxTokens,
       prompt: prompt,
       apiProvider: 'openrouter',
       streamingMode: true,
@@ -1023,6 +1224,12 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
   private initializeHeaderActions(): void {
     this.headerActions = [
       {
+        icon: 'time-outline',
+        action: () => this.openHistoryList(),
+        showOnMobile: true,
+        showOnDesktop: true
+      },
+      {
         icon: 'sparkles-outline',
         action: () => this.showPresetPrompts = true,
         showOnMobile: true,
@@ -1040,7 +1247,156 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
         action: () => this.showSceneSelector = true,
         showOnMobile: true,
         showOnDesktop: true
+      },
+      {
+        icon: 'chatbubble-outline',
+        action: () => this.confirmNewChat(),
+        showOnMobile: true,
+        showOnDesktop: true
       }
     ];
+  }
+
+  private async confirmNewChat(): Promise<void> {
+    if (this.isGenerating) {
+      // To avoid mixing streams, ask for explicit confirmation
+      const alert = await this.alertController.create({
+        header: 'Start New Chat?',
+        message: 'This will clear the current conversation. Ongoing generation will be ignored.',
+        buttons: [
+          { text: 'Cancel', role: 'cancel' },
+          { text: 'Start New Chat', role: 'destructive', handler: () => this.startNewChat() }
+        ]
+      });
+      await alert.present();
+      return;
+    }
+
+    const alert = await this.alertController.create({
+      header: 'Start New Chat?',
+      message: 'This will clear the current conversation history.',
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        { text: 'Start New Chat', role: 'destructive', handler: () => this.startNewChat() }
+      ]
+    });
+    await alert.present();
+  }
+
+  private startNewChat(): void {
+    // Bump session id so any in-flight responses are ignored
+    this.chatSessionId = Date.now();
+    this.isGenerating = false;
+    this.currentMessage = '';
+
+    // Clear chat messages and push greeting
+    this.messages = [];
+    this.messages.push({
+      role: 'assistant',
+      content: 'Hello! I am your AI assistant for this scene. I work exclusively with the context of selected scenes. You can ask me questions to extract characters, analyze details, or develop ideas.',
+      timestamp: new Date()
+    });
+
+    // Reset active history; next save creates a new one
+    this.activeHistoryId = null;
+
+    this.scrollToBottom();
+    this.cdr.markForCheck();
+  }
+
+  private async restoreLatestHistory(storyId: string): Promise<void> {
+    const latest = await this.chatHistoryService.getLatest(storyId);
+    if (!latest) return;
+    this.applyHistory(latest);
+  }
+
+  private async saveHistorySnapshot(): Promise<void> {
+    if (!this.story) return;
+    // Skip if only greeting
+    const hasRealMessages = this.messages.some(m => m.role === 'user' || (m.role === 'assistant' && !m.content.includes('Hello! I am your AI assistant')));
+    if (!hasRealMessages) return;
+    const selectedScenesRefs = this.selectedScenes.map(s => ({
+      chapterId: s.chapterId,
+      sceneId: s.sceneId,
+      chapterTitle: s.chapterTitle,
+      sceneTitle: s.sceneTitle
+    }));
+    const saved = await this.chatHistoryService.saveSnapshot({
+      storyId: this.story.id,
+      messages: this.messages,
+      selectedScenes: selectedScenesRefs,
+      includeStoryOutline: this.includeStoryOutline,
+      selectedModel: this.selectedModel || undefined,
+      historyId: this.activeHistoryId
+    });
+    this.activeHistoryId = saved.historyId;
+  }
+
+  async openHistoryList(): Promise<void> {
+    if (!this.story) return;
+    try {
+      this.histories = await this.chatHistoryService.listHistories(this.story.id);
+      this.showHistoryList = true;
+      this.cdr.markForCheck();
+    } catch (e) {
+      console.error('Failed to load histories', e);
+    }
+  }
+
+  async selectHistory(history: ChatHistoryDoc): Promise<void> {
+    if (!this.story) return;
+    this.applyHistory(history);
+    this.showHistoryList = false;
+    this.cdr.markForCheck();
+  }
+
+  getHistoryTitle(h: ChatHistoryDoc): string {
+    if (h.title && h.title.trim()) return h.title;
+    const firstUser = (h.messages || []).find(m => m.role === 'user');
+    const base = firstUser ? firstUser.content.trim().slice(0, 60) : '';
+    return base ? `${base}${(firstUser!.content.length > 60 ? '…' : '')}` : `Chat ${new Date(h.updatedAt).toLocaleString()}`;
+  }
+
+  getHistoryMeta(h: ChatHistoryDoc): string {
+    const count = (h.messages || []).length;
+    const when = new Date(h.updatedAt).toLocaleString();
+    return `${count} messages · ${when}`;
+  }
+
+  private applyHistory(history: ChatHistoryDoc): void {
+    // Bump session id to stop any in-flight streaming
+    this.chatSessionId = Date.now();
+    this.isGenerating = false;
+    // Replace current chat with stored one
+    this.messages = (history.messages || []).map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
+    if (this.messages.length === 0) {
+      this.messages.push({
+        role: 'assistant',
+        content: 'Hello! I am your AI assistant for this scene. I work exclusively with the context of selected scenes. You can ask me questions to extract characters, analyze details, or develop ideas.',
+        timestamp: new Date()
+      });
+    }
+    this.includeStoryOutline = !!history.includeStoryOutline;
+    if (history.selectedModel) this.selectedModel = history.selectedModel;
+    if (history.selectedScenes && this.story) {
+      const restored: SceneContext[] = [];
+      for (const ref of history.selectedScenes) {
+        const chapter = this.story.chapters.find(c => c.id === ref.chapterId);
+        const scene = chapter?.scenes.find(s => s.id === ref.sceneId);
+        if (chapter && scene) {
+          restored.push({
+            chapterId: chapter.id,
+            sceneId: scene.id,
+            chapterTitle: ref.chapterTitle || `C${chapter.chapterNumber || chapter.order}:${chapter.title}`,
+            sceneTitle: ref.sceneTitle || `C${chapter.chapterNumber || chapter.order}S${scene.sceneNumber || scene.order}:${scene.title}`,
+            content: this.extractFullTextFromScene(scene),
+            selected: true
+          });
+        }
+      }
+      if (restored.length) this.selectedScenes = restored;
+    }
+    this.activeHistoryId = history.historyId;
+    this.scrollToBottom();
   }
 }

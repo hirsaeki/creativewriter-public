@@ -1,3 +1,9 @@
+export interface FavoriteModelLists {
+  beatInput: string[];
+  sceneSummary: string[];
+  rewrite: string[];
+}
+
 export interface Settings {
   openRouter: OpenRouterSettings;
   replicate: ReplicateSettings;
@@ -6,8 +12,10 @@ export interface Settings {
   claude: ClaudeSettings;
   sceneTitleGeneration: SceneTitleGenerationSettings;
   sceneSummaryGeneration: SceneSummaryGenerationSettings;
+  sceneGenerationFromOutline: SceneGenerationFromOutlineSettings;
   selectedModel: string; // Global selected model (format: "provider:model_id")
-  favoriteModels: string[]; // List of favorite model IDs for quick access
+  favoriteModels: string[]; // Legacy list of favorite model IDs for quick access (mirrors favoriteModelLists.beatInput)
+  favoriteModelLists: FavoriteModelLists; // Structured favorite model lists by feature
   appearance: AppearanceSettings;
   updatedAt: Date;
 }
@@ -78,11 +86,24 @@ export interface SceneTitleGenerationSettings {
 }
 
 export interface SceneSummaryGenerationSettings {
+  wordCount: number;
   temperature: number;
   customInstruction: string;
   customPrompt: string;
   useCustomPrompt: boolean;
   selectedModel: string;
+}
+
+export interface SceneGenerationFromOutlineSettings {
+  wordCount: number; // default target length
+  temperature: number;
+  includeStoryOutline: boolean; // include story context by default
+  useFullStoryContext: boolean; // when true, full text; false => summaries
+  includeCodex: boolean; // include codex items
+  customInstruction: string; // appended to prompt
+  useCustomPrompt: boolean; // use custom template
+  customPrompt: string; // template with placeholders
+  selectedModel: string; // optional specific model override (provider:id)
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -141,10 +162,22 @@ export const DEFAULT_SETTINGS: Settings = {
     selectedModel: ''
   },
   sceneSummaryGeneration: {
+    wordCount: 120,
     temperature: 0.7,
     customInstruction: '',
-    customPrompt: 'Create a summary of the following scene:\n\nTitle: {sceneTitle}\n\nContent:\n{sceneContent}\n\nThe summary should capture the most important plot points and character developments. Write a complete and comprehensive summary with at least 3-5 sentences.',
+    customPrompt: 'Create a summary of the following scene:\n\nTitle: {sceneTitle}\n\nContent:\n{sceneContent}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments. Aim for about {summaryWordCount} words.\n\n{languageInstruction}',
     useCustomPrompt: false,
+    selectedModel: ''
+  },
+  sceneGenerationFromOutline: {
+    wordCount: 600,
+    temperature: 0.7,
+    includeStoryOutline: true,
+    useFullStoryContext: false,
+    includeCodex: true,
+    customInstruction: '',
+    useCustomPrompt: false,
+    customPrompt: '<messages>\n<message role="system">{systemMessage}</message>\n<message role="user">You are writing a complete scene for a story.\n\n<story_title>{storyTitle}</story_title>\n\n<glossary>\n{codexEntries}\n</glossary>\n\n<story_context>\n{storySoFar}\n</story_context>\n\n<scene_outline>\n{sceneOutline}\n</scene_outline>\n\n<instructions>\nWrite a complete, coherent scene based strictly on the outline. Aim for about {wordCount} words.\n{languageInstruction}{customInstruction}\nDo not include meta comments or headings. Output only the scene prose.\n</instructions>\n</message>\n</messages>',
     selectedModel: ''
   },
   appearance: {
@@ -153,5 +186,10 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   selectedModel: '',
   favoriteModels: [],
+  favoriteModelLists: {
+    beatInput: [],
+    sceneSummary: [],
+    rewrite: []
+  },
   updatedAt: new Date()
 };

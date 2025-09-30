@@ -55,6 +55,7 @@ export class OpenRouterApiService {
     topP?: number;
     wordCount?: number;
     requestId?: string;
+    messages?: {role: 'system' | 'user' | 'assistant', content: string}[];
     stream?: boolean;
   } = {}): Observable<OpenRouterResponse> {
     const settings = this.settingsService.getSettings();
@@ -90,12 +91,9 @@ export class OpenRouterApiService {
 
     const request: OpenRouterRequest = {
       model: model,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
+      messages: options.messages && options.messages.length > 0
+        ? options.messages
+        : [{ role: 'user', content: prompt }],
       max_tokens: maxTokens,
       temperature: options.temperature !== undefined ? options.temperature : settings.openRouter.temperature,
       top_p: options.topP !== undefined ? options.topP : settings.openRouter.topP
@@ -188,6 +186,7 @@ export class OpenRouterApiService {
     topP?: number;
     wordCount?: number;
     requestId?: string;
+    messages?: {role: 'system' | 'user' | 'assistant', content: string}[];
   } = {}): Observable<string> {
     const settings = this.settingsService.getSettings();
     const startTime = Date.now();
@@ -215,12 +214,9 @@ export class OpenRouterApiService {
 
     const request: OpenRouterRequest = {
       model: model,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
+      messages: options.messages && options.messages.length > 0
+        ? options.messages
+        : [{ role: 'user', content: prompt }],
       max_tokens: maxTokens,
       temperature: options.temperature !== undefined ? options.temperature : settings.openRouter.temperature,
       top_p: options.topP !== undefined ? options.topP : settings.openRouter.topP,

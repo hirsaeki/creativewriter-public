@@ -1,11 +1,16 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { ClicheAnalyzerComponent } from './components/cliche-analyzer/cliche-analyzer.component';
+import { CharacterConsistencyAnalyzerComponent } from './components/character-consistency-analyzer/character-consistency-analyzer.component';
 
 const routes: Routes = [
   {
     path: ':id',
-    component: ClicheAnalyzerComponent
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'cliche' },
+      { path: 'cliche', component: ClicheAnalyzerComponent },
+      { path: 'characters', component: CharacterConsistencyAnalyzerComponent }
+    ]
   }
 ];
 

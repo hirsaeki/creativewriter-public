@@ -39,7 +39,7 @@
             <button 
               class="action-btn delete-btn"
               (click)="deleteContentAfterBeat(); $event.stopPropagation()"
-              title="Delete text after this beat">
+              title="Delete text until next beat or scene end">
               <ion-icon name="trash-outline"></ion-icon>
             </button>
           </div>
@@ -72,6 +72,25 @@
           <!-- Generation Options -->
           <div class="generation-options" *ngIf="beatData.isEditing || !beatData.prompt">
             <div class="options-row">
+              <!-- Favorite Models Quick Access -->
+              <div class="favorite-models" *ngIf="favoriteModels.length > 0">
+                <ion-icon name="star-outline" class="favorite-icon" aria-hidden="true"></ion-icon>
+                <div class="favorite-buttons" role="list">
+                  <button *ngFor="let model of favoriteModels"
+                          type="button"
+                          class="favorite-btn"
+                          role="listitem"
+                          [class.active]="selectedModel === model.id"
+                          (click)="selectFavoriteModel(model)"
+                          [title]="model.label">
+                    <span class="favorite-btn-content">
+                      <app-openrouter-icon *ngIf="model.provider === 'openrouter'" size="14" color="#6467f2" class="provider-icon-inline openrouter"></app-openrouter-icon>
+                      <ion-icon *ngIf="model.provider !== 'openrouter'" [name]="getProviderIcon(model.provider)" class="provider-icon-inline" [class.gemini]="model.provider === 'gemini'"></ion-icon>
+                      <span class="model-short-name">{{ getShortModelName(model.label) }}</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
               <div class="option-group">
                 <ng-select [(ngModel)]="selectedBeatType"
                            [items]="beatTypeOptions"
@@ -114,21 +133,6 @@
                   (blur)="validateCustomWordCount()">
               </div>
               <div class="option-group model-selection-group">
-                <!-- Favorite Models Quick Access -->
-                <div class="favorite-models" *ngIf="favoriteModels.length > 0">
-                  <div class="favorite-label">Favoriten:</div>
-                  <div class="favorite-buttons">
-                    <button *ngFor="let model of favoriteModels"
-                            class="favorite-btn"
-                            [class.active]="selectedModel === model.id"
-                            (click)="selectFavoriteModel(model)"
-                            [title]="model.label">
-                      <app-openrouter-icon *ngIf="model.provider === 'openrouter'" size="16" color="#6467f2" class="provider-icon-inline openrouter"></app-openrouter-icon>
-                      <ion-icon *ngIf="model.provider !== 'openrouter'" [name]="getProviderIcon(model.provider)" class="provider-icon-inline" [class.gemini]="model.provider === 'gemini'"></ion-icon>
-                      <span class="model-short-name">{{ getShortModelName(model.label) }}</span>
-                    </button>
-                  </div>
-                </div>
                 <ng-select [(ngModel)]="selectedModel"
                            [items]="availableModels"
                            bindLabel="label"

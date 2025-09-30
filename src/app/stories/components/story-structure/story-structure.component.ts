@@ -2,14 +2,15 @@ import { Component, Input, Output, EventEmitter, AfterViewInit, OnInit, OnChange
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import {
+import { 
   IonContent, IonList, IonItem, IonLabel, IonButton, IonIcon, IonInput,
-  IonChip, IonTextarea, IonSelect, IonSelectOption, IonBadge
+  IonChip, IonTextarea, IonSelect, IonSelectOption, IonBadge, ActionSheetController, ModalController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
   chevronForward, chevronDown, add, trash, createOutline,
-  flashOutline, documentTextOutline, timeOutline, sparklesOutline, close
+  flashOutline, documentTextOutline, timeOutline, sparklesOutline, close,
+  logoGoogle, gitNetworkOutline, cloudOutline, hardwareChip
 } from 'ionicons/icons';
 import { Story, Chapter, Scene } from '../../models/story.interface';
 import { StoryService } from '../../services/story.service';
@@ -19,7 +20,12 @@ import { ModelService } from '../../../core/services/model.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { PromptManagerService } from '../../../shared/services/prompt-manager.service';
 import { ModelOption } from '../../../core/models/model.interface';
+import { OpenRouterIconComponent } from '../../../ui/icons/openrouter-icon.component';
+import { ClaudeIconComponent } from '../../../ui/icons/claude-icon.component';
+import { ReplicateIconComponent } from '../../../ui/icons/replicate-icon.component';
+import { OllamaIconComponent } from '../../../ui/icons/ollama-icon.component';
 import { Subscription } from 'rxjs';
+import { SceneCreateFromOutlineComponent } from '../scene-create-from-outline/scene-create-from-outline.component';
 
 @Component({
   selector: 'app-story-structure',
@@ -27,7 +33,8 @@ import { Subscription } from 'rxjs';
   imports: [
     CommonModule, FormsModule,
     IonContent, IonList, IonItem, IonLabel, IonButton, IonIcon, IonInput,
-    IonChip, IonTextarea, IonSelect, IonSelectOption, IonBadge
+    IonChip, IonTextarea, IonSelect, IonSelectOption, IonBadge,
+    OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent
   ],
   templateUrl: './story-structure.component.html',
   styleUrls: ['./story-structure.component.scss'],
@@ -42,6 +49,8 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
   private cdr = inject(ChangeDetectorRef);
   private promptManager = inject(PromptManagerService);
   private router = inject(Router);
+  private actionSheetCtrl = inject(ActionSheetController);
+  private modalCtrl = inject(ModalController);
 
   @Input() story!: Story;
   @Input() activeChapterId: string | null = null;
@@ -57,12 +66,14 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
   private originalTitles = new Map<string, string>();
   selectedModel = '';
   availableModels: ModelOption[] = [];
+  summaryFavoriteModels: ModelOption[] = [];
   private subscription = new Subscription();
 
   constructor() {
     addIcons({ 
       chevronForward, chevronDown, add, trash, createOutline,
-      flashOutline, documentTextOutline, timeOutline, sparklesOutline, close
+      flashOutline, documentTextOutline, timeOutline, sparklesOutline, close,
+      logoGoogle, gitNetworkOutline, cloudOutline, hardwareChip
     });
   }
 
@@ -73,6 +84,7 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
     // Load available models and set default
     this.loadAvailableModels();
     this.setDefaultModel();
+    this.updateSummaryFavoriteModels();
   }
   
   ngOnChanges(changes: SimpleChanges) {
@@ -81,6 +93,10 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
       this.expandActiveChapter();
       // Auto-scroll to active scene when active scene changes
       setTimeout(() => this.scrollToActiveScene(), 100);
+    }
+
+    if (changes['story']) {
+      this.updateSummaryFavoriteModels();
     }
   }
   
@@ -143,6 +159,7 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
     const updatedStory = await this.storyService.getStory(this.story.id);
     if (updatedStory) {
       this.story = updatedStory;
+      this.updateSummaryFavoriteModels();
       // Auto-expand new chapter
       const newChapter = this.story.chapters[this.story.chapters.length - 1];
       this.expandedChapters.add(newChapter.id);
@@ -166,22 +183,85 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
       await this.storyService.deleteChapter(this.story.id, chapterId);
       const updatedStory = await this.storyService.getStory(this.story.id);
       if (updatedStory) {
-        this.story = updatedStory;
-        this.expandedChapters.delete(chapterId);
+      const wasActive = this.activeChapterId === chapterId;
+      this.story = updatedStory;
+      this.updateSummaryFavoriteModels();
+      this.expandedChapters.delete(chapterId);
+        // If the deleted chapter was active, select a sensible fallback
+        if (wasActive && this.story.chapters.length > 0) {
+          const fallbackChapter = this.story.chapters[Math.min(0, this.story.chapters.length - 1)];
+          const fallbackScene = fallbackChapter.scenes?.[0];
+          if (fallbackScene) {
+            this.selectScene(fallbackChapter.id, fallbackScene.id);
+          }
+        }
+        // Refresh prompt manager and mark for check
+        this.promptManager.refresh();
+        this.cdr.markForCheck();
       }
     }
   }
 
   async addScene(chapterId: string): Promise<void> {
+    // Offer choice: empty or generate from outline
+    const sheet = await this.actionSheetCtrl.create({
+      header: 'Create Scene',
+      subHeader: 'Choose how to create the new scene',
+      buttons: [
+        {
+          text: 'Empty scene',
+          role: 'empty',
+          icon: 'add',
+          handler: async () => {
+            await this.createEmptyScene(chapterId);
+          }
+        },
+        {
+          text: 'Generate from outline (AI)',
+          role: 'ai',
+          icon: 'sparkles-outline',
+          handler: async () => {
+            await this.openCreateFromOutlineModal(chapterId);
+          }
+        },
+        { text: 'Cancel', role: 'cancel' }
+      ]
+    });
+    await sheet.present();
+  }
+
+  private async createEmptyScene(chapterId: string): Promise<void> {
     await this.storyService.addScene(this.story.id, chapterId);
     const updatedStory = await this.storyService.getStory(this.story.id);
     if (updatedStory) {
       this.story = updatedStory;
-      // Auto-select new scene
+      this.updateSummaryFavoriteModels();
       const chapter = this.story.chapters.find(c => c.id === chapterId);
       if (chapter) {
         const newScene = chapter.scenes[chapter.scenes.length - 1];
         this.selectScene(chapterId, newScene.id);
+      }
+    }
+  }
+
+  private async openCreateFromOutlineModal(chapterId: string): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: SceneCreateFromOutlineComponent,
+      componentProps: {
+        storyId: this.story.id,
+        chapterId
+      },
+      cssClass: 'scene-create-from-outline-modal'
+    });
+
+    await modal.present();
+    const result = await modal.onWillDismiss<{ createdSceneId?: string; chapterId?: string }>();
+    if (result.data?.createdSceneId && result.data?.chapterId) {
+      const updatedStory = await this.storyService.getStory(this.story.id);
+      if (updatedStory) {
+        this.story = updatedStory;
+        this.updateSummaryFavoriteModels();
+        this.selectScene(result.data.chapterId, result.data.createdSceneId);
       }
     }
   }
@@ -194,17 +274,69 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
 
   async deleteScene(chapterId: string, sceneId: string, event: Event): Promise<void> {
     event.stopPropagation();
-    const chapter = this.story.chapters.find(c => c.id === chapterId);
-    if (chapter && chapter.scenes.length <= 1) {
-      alert('A chapter must have at least one scene.');
-      return;
-    }
     
     if (confirm('Really delete scene?')) {
+      // Find current index before deletion
+      const chapterBefore = this.story.chapters.find(c => c.id === chapterId);
+      const idxBefore = chapterBefore?.scenes.findIndex(s => s.id === sceneId) ?? -1;
+
       await this.storyService.deleteScene(this.story.id, chapterId, sceneId);
       const updatedStory = await this.storyService.getStory(this.story.id);
       if (updatedStory) {
+        const wasActive = this.activeSceneId === sceneId;
         this.story = updatedStory;
+        this.updateSummaryFavoriteModels();
+        // If the deleted scene was active, choose a sensible fallback
+        if (wasActive) {
+          const ch = this.story.chapters.find(c => c.id === chapterId);
+          const scenes = ch?.scenes || [];
+          if (scenes.length > 0) {
+            // Same chapter neighbor (previous index if possible, otherwise first)
+            const fallbackIndex = Math.max(0, Math.min(idxBefore, scenes.length - 1));
+            const fallbackScene = scenes[fallbackIndex];
+            this.selectScene(chapterId, fallbackScene.id);
+          } else {
+            // Chapter is empty now. Try next chapters, then previous chapters, otherwise create a new empty scene
+            const chapters = this.story.chapters;
+            const currentIdx = chapters.findIndex(c => c.id === chapterId);
+            let selected = false;
+
+            // Search forward for the next chapter that has scenes
+            for (let i = currentIdx + 1; i < chapters.length; i++) {
+              const nextCh = chapters[i];
+              if (nextCh.scenes && nextCh.scenes.length > 0) {
+                this.selectScene(nextCh.id, nextCh.scenes[0].id);
+                selected = true;
+                break;
+              }
+            }
+            // If not found, search backward
+            if (!selected) {
+              for (let i = currentIdx - 1; i >= 0; i--) {
+                const prevCh = chapters[i];
+                if (prevCh.scenes && prevCh.scenes.length > 0) {
+                  const lastScene = prevCh.scenes[prevCh.scenes.length - 1];
+                  this.selectScene(prevCh.id, lastScene.id);
+                  selected = true;
+                  break;
+                }
+              }
+            }
+            // If the entire story has no scenes, create a new empty scene in the current (now empty) chapter
+            if (!selected) {
+              this.storyService.addScene(this.story.id, chapterId).then(async (newScene) => {
+                const refreshed = await this.storyService.getStory(this.story.id);
+                if (refreshed) {
+                  this.story = refreshed;
+                  this.selectScene(chapterId, newScene.id);
+                  this.cdr.markForCheck();
+                }
+              });
+            }
+          }
+        }
+        this.promptManager.refresh();
+        this.cdr.markForCheck();
       }
     }
   }
@@ -271,8 +403,9 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
       }
     }, 30000); // 30 second timeout
     
-    // Remove embedded images from content to reduce token count
+    // Remove embedded images and strip HTML/Beat AI nodes for clean prompt text
     let sceneContent = this.removeEmbeddedImages(scene.content);
+    sceneContent = this.promptManager.extractPlainTextFromHtml(sceneContent);
     
     // Limit content length to avoid token limit issues
     // Approximate: 1 token ≈ 4 characters, so for safety we limit to ~50k tokens ≈ 200k characters
@@ -284,28 +417,55 @@ export class StoryStructureComponent implements OnInit, OnChanges, AfterViewInit
       contentTruncated = true;
     }
     
+    // Determine language instruction for summary based on story language
+    const storyLanguage = this.story.settings?.language || 'en';
+    const languageInstruction = (() => {
+      switch (storyLanguage) {
+        case 'de':
+          return 'Antworte auf Deutsch.';
+        case 'fr':
+          return 'Réponds en français.';
+        case 'es':
+          return 'Responde en español.';
+        case 'en':
+          return 'Respond in English.';
+        case 'custom':
+        default:
+          return 'Write the summary in the same language as the scene content.';
+      }
+    })();
+
+    // Desired summary length in words (bounded for safety)
+    const desiredWordCount = Math.max(20, Math.min(1000, settings.sceneSummaryGeneration.wordCount || 120));
+    const wordCountInstruction = `Aim for about ${desiredWordCount} words.`;
+
     // Build prompt based on settings
     let prompt: string;
     if (settings.sceneSummaryGeneration.useCustomPrompt) {
       prompt = settings.sceneSummaryGeneration.customPrompt
         .replace(/{sceneTitle}/g, scene.title || 'Untitled')
         .replace(/{sceneContent}/g, sceneContent + (contentTruncated ? '\n\n[Note: Content was truncated as it was too long]' : ''))
-        .replace(/{customInstruction}/g, settings.sceneSummaryGeneration.customInstruction || '');
+        .replace(/{customInstruction}/g, settings.sceneSummaryGeneration.customInstruction || '')
+        .replace(/{languageInstruction}/g, languageInstruction)
+        .replace(/{summaryWordCount}/g, String(desiredWordCount));
+      // Ensure language instruction is present even if template doesn't include placeholder
+      if (!prompt.includes(languageInstruction)) {
+        prompt += `\n\n${languageInstruction}`;
+      }
+      // Ensure approximate word count guidance present if template omits it
+      if (!/\bword(s)?\b/i.test(prompt)) {
+        prompt += `\n\n${wordCountInstruction}`;
+      }
     } else {
       // Default prompt
-      prompt = `Create a summary of the following scene:
-
-Title: ${scene.title || 'Untitled'}
-
-Content:
-${sceneContent}${contentTruncated ? '\n\n[Note: Content was truncated as it was too long]' : ''}
-
-The summary should capture the most important plot points and character developments. Write a complete and comprehensive summary with at least 3-5 sentences.`;
+      prompt = `Create a summary of the following scene:\n\nTitle: ${scene.title || 'Untitled'}\n\nContent:\n${sceneContent}${contentTruncated ? '\n\n[Note: Content was truncated as it was too long]' : ''}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments. ${wordCountInstruction}`;
       
       // Add custom instruction if provided
       if (settings.sceneSummaryGeneration.customInstruction) {
         prompt += `\n\nZusätzliche Anweisungen: ${settings.sceneSummaryGeneration.customInstruction}`;
       }
+      // Add language instruction at the end
+      prompt += `\n\n${languageInstruction}`;
     }
 
     // Extract provider from model if available
@@ -373,6 +533,7 @@ The summary should capture the most important plot points and character developm
             const updatedStory = await this.storyService.getStory(this.story.id);
             if (updatedStory) {
               this.story = updatedStory;
+              this.updateSummaryFavoriteModels();
             }
           }
           clearTimeout(timeoutId); // Clear timeout on success
@@ -436,11 +597,12 @@ The summary should capture the most important plot points and character developm
           });
           
           // Refresh the story data to ensure consistency
-          const updatedStory = await this.storyService.getStory(this.story.id);
-          if (updatedStory) {
-            this.story = updatedStory;
-          }
+        const updatedStory = await this.storyService.getStory(this.story.id);
+        if (updatedStory) {
+          this.story = updatedStory;
+          this.updateSummaryFavoriteModels();
         }
+      }
         clearTimeout(timeoutId); // Clear timeout on success
         this.isGeneratingSummary.delete(sceneId);
         this.cdr.markForCheck(); // Force change detection
@@ -542,8 +704,9 @@ The summary should capture the most important plot points and character developm
       }
     }, 30000); // 30 second timeout
     
-    // Remove embedded images from content to reduce token count
+    // Remove embedded images and strip HTML/Beat AI nodes for clean prompt text
     let sceneContent = this.removeEmbeddedImages(scene.content);
+    sceneContent = this.promptManager.extractPlainTextFromHtml(sceneContent);
     
     // Limit content length for title generation - we need even less content for a title
     // For title generation, 50k characters should be more than enough
@@ -793,35 +956,127 @@ Respond only with the title, without further explanations or quotation marks.`;
   private loadAvailableModels(): void {
     // Subscribe to model changes
     this.subscription.add(
-      this.modelService.openRouterModels$.subscribe(models => {
+      this.modelService.getCombinedModels().subscribe(models => {
         this.availableModels = models;
         if (models.length > 0 && !this.selectedModel) {
           this.setDefaultModel();
         }
+        this.updateSummaryFavoriteModels();
         this.cdr.markForCheck();
       })
     );
-    
-    // Load models if not already loaded
-    const currentModels = this.modelService.getCurrentOpenRouterModels();
-    if (currentModels.length === 0) {
-      this.modelService.loadOpenRouterModels().subscribe();
-    } else {
-      this.availableModels = currentModels;
-    }
   }
   
   private setDefaultModel(): void {
     const settings = this.settingsService.getSettings();
-    if (settings.openRouter.enabled && settings.openRouter.model) {
-      this.selectedModel = settings.openRouter.model;
-    } else if (this.availableModels.length > 0) {
-      // Fallback to first available model
+    const preferredModelId = settings.sceneSummaryGeneration.selectedModel
+      || settings.selectedModel
+      || settings.openRouter.model;
+
+    if (preferredModelId) {
+      const matched = this.findModelForFavorite(preferredModelId);
+      if (matched) {
+        this.selectedModel = matched.id;
+        return;
+      }
+    }
+
+    if (this.availableModels.length > 0) {
       this.selectedModel = this.availableModels[0].id;
     }
   }
+
+  private updateSummaryFavoriteModels(): void {
+    if (!this.story) {
+      this.summaryFavoriteModels = [];
+      return;
+    }
+
+    const favoriteIds = this.story.settings?.favoriteModelLists?.sceneSummary ?? [];
+    const normalized = Array.isArray(favoriteIds) ? favoriteIds : [];
+
+    const resolved = normalized
+      .map(id => this.findModelForFavorite(id))
+      .filter((model): model is ModelOption => !!model);
+
+    this.summaryFavoriteModels = resolved;
+    this.cdr.markForCheck();
+  }
+
+  private findModelForFavorite(favoriteId: string): ModelOption | undefined {
+    if (!favoriteId) {
+      return undefined;
+    }
+
+    let model = this.availableModels.find(m => m.id === favoriteId);
+    if (model) {
+      return model;
+    }
+
+    const trimmedId = favoriteId.includes(':') ? favoriteId.split(':').slice(1).join(':') : favoriteId;
+    model = this.availableModels.find(m => m.id === trimmedId || m.id.endsWith(`:${trimmedId}`) || m.id.endsWith(`/${trimmedId}`));
+    return model;
+  }
+
+  selectSummaryFavorite(model: ModelOption): void {
+    this.selectedModel = model.id;
+    this.cdr.markForCheck();
+  }
+
+  getShortModelName(label: string): string {
+    if (!label) {
+      return '';
+    }
+    if (label.length <= 18) {
+      return label;
+    }
+    const segments = label.split(' ');
+    if (segments.length > 1) {
+      return `${segments[0]} ${segments[1].slice(0, 6)}`;
+    }
+    return label.slice(0, 18);
+  }
+
+  getProviderIcon(provider: string): string {
+    switch (provider) {
+      case 'gemini':
+        return 'logo-google';
+      case 'openrouter':
+        return 'git-network-outline';
+      case 'ollama':
+        return 'hardware-chip';
+      case 'replicate':
+        return 'cloud-outline';
+      case 'claude':
+      default:
+        return 'sparkles-outline';
+    }
+  }
   
+  private isEventFromTextInput(event: KeyboardEvent): boolean {
+    const isElement = (node: EventTarget | null | undefined): node is Element => {
+      return !!node && (node as Element).tagName !== undefined;
+    };
+    const isTextLike = (el: Element): boolean => {
+      const tag = el.tagName?.toLowerCase?.() || '';
+      if (tag === 'input' || tag === 'textarea' || tag === 'ion-input' || tag === 'ion-textarea') return true;
+      if (el instanceof HTMLElement) {
+        if (el.isContentEditable) return true;
+        const ce = el.getAttribute('contenteditable');
+        return ce === '' || ce === 'true';
+      }
+      return false;
+    };
+    const pathTargets = (event.composedPath ? event.composedPath() : [event.target]) as EventTarget[];
+    for (const t of pathTargets) {
+      if (isElement(t) && isTextLike(t)) return true;
+    }
+    return false;
+  }
+
   onChapterKeyDown(event: KeyboardEvent, chapterId: string): void {
+    // Do not handle keys when focus is inside a text input/textarea
+    if (this.isEventFromTextInput(event)) return;
     switch (event.key) {
       case 'Enter':
       case ' ':
@@ -845,6 +1100,8 @@ Respond only with the title, without further explanations or quotation marks.`;
   }
   
   onSceneKeyDown(event: KeyboardEvent, chapterId: string, sceneId: string): void {
+    // Do not handle keys when focus is inside a text input/textarea
+    if (this.isEventFromTextInput(event)) return;
     switch (event.key) {
       case 'Enter':
       case ' ':

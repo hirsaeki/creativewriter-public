@@ -1,6 +1,6 @@
 import { Injectable, Injector, ApplicationRef, EnvironmentInjector, inject } from '@angular/core';
 import { EditorState, Transaction, Plugin, PluginKey, TextSelection } from 'prosemirror-state';
-import { EditorView } from 'prosemirror-view';
+import { EditorView, Decoration, DecorationSet } from 'prosemirror-view';
 import { Schema, DOMParser, DOMSerializer, Node as ProseMirrorNode, Fragment, Slice } from 'prosemirror-model';
 import { schema } from 'prosemirror-schema-basic';
 import { addListNodes } from 'prosemirror-schema-list';
@@ -69,6 +69,8 @@ export class ProseMirrorEditorService {
   private beatNodeViews = new Set<BeatAINodeView>();
   private beatStreamingPositions = new Map<string, number>();
   private debugMode = false;
+  private flashHighlightKey = new PluginKey<DecorationSet>('flashHighlight');
+  private flashTimeoutId: ReturnType<typeof setTimeout> | null = null;
   
   public contentUpdate$ = new Subject<string>();
   public slashCommand$ = new Subject<number>();
@@ -237,7 +239,8 @@ export class ProseMirrorEditorService {
       keymap(baseKeymap),
       this.createBeatAIPlugin(),
       this.createCodexHighlightingPlugin(config),
-      this.createContextMenuPlugin()
+      this.createContextMenuPlugin(),
+      this.createFlashHighlightPlugin()
     ];
 
 
@@ -691,6 +694,74 @@ export class ProseMirrorEditorService {
     return false;
   }
 
+  /**
+   * Adds a temporary flash highlight decoration to the current selection.
+   */
+  flashSelection(durationMs = 1600): void {
+    if (!this.editorView) return;
+    const { state } = this.editorView;
+    const sel = state.selection as TextSelection;
+    if (!sel || sel.empty) return;
+    this.flashRange(sel.from, sel.to, durationMs);
+  }
+
+  /**
+   * Adds a temporary flash highlight decoration to the specified range.
+   */
+  flashRange(from: number, to: number, durationMs = 1600): void {
+    if (!this.editorView) return;
+    try {
+      // Clear any pending timeout
+      if (this.flashTimeoutId) {
+        clearTimeout(this.flashTimeoutId);
+        this.flashTimeoutId = null;
+      }
+
+      // Clear previous highlights and add new one
+      let tr = this.editorView.state.tr.setMeta(this.flashHighlightKey, { clear: true });
+      this.editorView.dispatch(tr);
+      tr = this.editorView.state.tr.setMeta(this.flashHighlightKey, { add: true, from, to });
+      this.editorView.dispatch(tr);
+
+      // Auto-clear after duration
+      this.flashTimeoutId = setTimeout(() => {
+        if (!this.editorView) return;
+        const clearTr = this.editorView.state.tr.setMeta(this.flashHighlightKey, { clear: true });
+        this.editorView.dispatch(clearTr);
+      }, Math.max(300, durationMs));
+    } catch (err) {
+      console.warn('Failed to flash highlight:', err);
+    }
+  }
+
+  private createFlashHighlightPlugin(): Plugin {
+    const key = this.flashHighlightKey;
+    return new Plugin({
+      key,
+      state: {
+        init: () => DecorationSet.empty,
+        apply: (tr, oldDecos: DecorationSet) => {
+          let decos = oldDecos.map(tr.mapping, tr.doc);
+          const meta = tr.getMeta(key);
+          if (meta?.clear) {
+            return DecorationSet.empty;
+          }
+          if (meta?.add && typeof meta.from === 'number' && typeof meta.to === 'number') {
+            // Replace existing with a single new decoration
+            const deco = Decoration.inline(meta.from, meta.to, { class: 'pm-flash-highlight' });
+            decos = DecorationSet.empty.add(tr.doc, [deco]);
+          }
+          return decos;
+        }
+      },
+      props: {
+        decorations(state) {
+          return key.getState(state);
+        }
+      }
+    });
+  }
+
   private setPlaceholder(placeholder: string): void {
     if (!this.editorView) return;
     
@@ -866,36 +937,60 @@ export class ProseMirrorEditorService {
   }
 
 
-  private deleteContentAfterBeat(beatId: string): void {
-    if (!this.editorView) return;
+  deleteContentAfterBeat(beatId: string): boolean {
+    if (!this.editorView) return false;
     
     const beatPos = this.findBeatNodePosition(beatId);
-    if (beatPos === null) return;
+    if (beatPos === null) return false;
     
     const { state } = this.editorView;
     const beatNode = state.doc.nodeAt(beatPos);
-    if (!beatNode) return;
+    if (!beatNode) return false;
     
-    // Position after the beat node
     const deleteStartPos = beatPos + beatNode.nodeSize;
+    const nextBeatPos = this.findNextBeatPosition(deleteStartPos);
+    const deleteEndPos = nextBeatPos ?? state.doc.content.size;
     
-    // Delete everything from after the beat to the end of the document
-    const tr = state.tr.delete(deleteStartPos, state.doc.content.size);
+    if (deleteEndPos <= deleteStartPos) {
+      return false;
+    }
     
-    // Dispatch the transaction
+    const tr = state.tr.delete(deleteStartPos, deleteEndPos);
     this.editorView.dispatch(tr);
     
-    // Emit content update to trigger save
     const content = this.getHTMLContent();
     this.contentUpdate$.next(content);
     
-    // Refresh prompt manager to update scene context
-    // This ensures that the next beat prompt will use the correct context
+    // Refresh prompt manager after the deletion so context stays accurate
     setTimeout(() => {
       this.promptManager.refresh().catch(error => {
         console.error('Error refreshing prompt manager:', error);
       });
-    }, 500); // Small delay to ensure content is saved first
+    }, 500);
+
+    return true;
+  }
+
+  private findNextBeatPosition(startPos: number): number | null {
+    if (!this.editorView) return null;
+
+    const { state } = this.editorView;
+    let nextBeatPos: number | null = null;
+
+    state.doc.descendants((node, pos) => {
+      if (pos <= startPos) {
+        return true;
+      }
+
+      if (node.type.name === 'beatAI') {
+        nextBeatPos = pos;
+        return false;
+      }
+
+      return true;
+    });
+
+    return nextBeatPos;
   }
 
 

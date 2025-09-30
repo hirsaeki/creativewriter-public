@@ -73,12 +73,22 @@
       --background: transparent !important;
     }
     
-    ion-card-title {
-      color: #f8f9fa !important;
-      --color: #f8f9fa !important;
-      font-size: 1rem !important;
-      font-weight: 600 !important;
-    }
+ion-card-title {
+  color: #f8f9fa !important;
+  --color: #f8f9fa !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+}
+
+/* Ensure outline buttons are transparent in Codex views */
+ion-button[fill="outline"] {
+  --background: transparent !important;
+  --background-hover: rgba(139, 180, 248, 0.08) !important;
+  --background-activated: rgba(139, 180, 248, 0.12) !important;
+  --color: #8bb4f8 !important;
+  --border-color: rgba(139, 180, 248, 0.35) !important;
+  --ripple-color: rgba(139, 180, 248, 0.2) !important;
+}
     
     ion-card:hover {
       background: linear-gradient(135deg, rgba(25, 25, 25, 0.4) 0%, rgba(20, 20, 20, 0.4) 100%);

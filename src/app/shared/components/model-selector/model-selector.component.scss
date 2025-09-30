@@ -10,3 +10,13 @@
   white-space: nowrap;
 }
 
+/* Ensure dropdown isn't too narrow across app */
+:host {
+  display: inline-block;
+  min-width: 280px; /* default comfortable width */
+}
+
+ng-select {
+  display: block;
+  width: 100%;
+}

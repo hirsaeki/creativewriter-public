@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef, ChangeDetectorRef, ChangeDetectionStrategy, TemplateRef, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, ChangeDetectorRef, ChangeDetectionStrategy, TemplateRef, HostListener, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -10,7 +10,8 @@ import { addIcons } from 'ionicons';
 import { 
   arrowBack, bookOutline, book, settingsOutline, statsChartOutline, statsChart,
   saveOutline, checkmarkCircleOutline, menuOutline, chevronBack, chevronForward,
-  chatbubblesOutline, bugOutline, menu, close, images, documentTextOutline, heart, search
+  chatbubblesOutline, bugOutline, menu, close, images, documentTextOutline, heart, search,
+  listOutline, list, flaskOutline
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { Story, Scene } from '../../models/story.interface';
@@ -117,6 +118,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   private isStreamingActive = false;
   private isSaving = false;
   private pendingSave = false;
+  private currentSavePromise: Promise<void> | null = null;
   
   // Touch/swipe gesture properties
   private touchStartX = 0;
@@ -135,7 +137,8 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     addIcons({ 
       arrowBack, bookOutline, book, settingsOutline, statsChartOutline, statsChart,
       saveOutline, checkmarkCircleOutline, menuOutline, chevronBack, chevronForward,
-      chatbubblesOutline, bugOutline, menu, close, images, documentTextOutline, heart, search
+      chatbubblesOutline, bugOutline, menu, close, images, documentTextOutline, heart, search,
+      listOutline, list, flaskOutline
     });
   }
 
@@ -212,7 +215,10 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
                 if (highlightPhrase) {
                   // Give the editor a moment to settle then highlight
                   setTimeout(() => {
-                    this.proseMirrorService.selectFirstMatchOf(highlightPhrase);
+                    const ok = this.proseMirrorService.selectFirstMatchOf(highlightPhrase);
+                    if (ok) {
+                      this.proseMirrorService.flashSelection();
+                    }
                   }, 150);
                 }
               }, 500);
@@ -342,72 +348,101 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async saveStory(): Promise<void> {
+  async saveStory(): Promise<void> {
     // Prevent concurrent saves
     if (this.isSaving) {
       this.pendingSave = true;
+      if (this.currentSavePromise) {
+        await this.currentSavePromise;
+      }
       return;
     }
     
     this.isSaving = true;
     
-    try {
-      // Only save if we have actual changes
-      if (!this.hasUnsavedChanges) {
-        this.isSaving = false;
-        return;
-      }
-      
-      // Save active scene changes only (not the entire story)
-      if (this.activeScene && this.activeChapterId) {
-        await this.storyService.updateScene(
-          this.story.id, 
-          this.activeChapterId, 
-          this.activeScene.id, 
-          {
-            title: this.activeScene.title,
-            content: this.activeScene.content
+    const saveOperation = (async () => {
+      try {
+        // Only save if we have actual changes
+        if (!this.hasUnsavedChanges) {
+          return;
+        }
+        
+        // Save active scene changes only (not the entire story)
+        if (this.activeScene && this.activeChapterId) {
+          await this.storyService.updateScene(
+            this.story.id, 
+            this.activeChapterId, 
+            this.activeScene.id, 
+            {
+              title: this.activeScene.title,
+              content: this.activeScene.content
+            }
+          );
+        }
+        
+        // Save story title if changed
+        if (this.story.title !== undefined) {
+          const currentStory = await this.storyService.getStory(this.story.id);
+          if (currentStory && currentStory.title !== this.story.title) {
+            await this.storyService.updateStory({
+              ...currentStory,
+              title: this.story.title,
+              updatedAt: new Date()
+            });
           }
-        );
-      }
-      
-      // Save story title if changed
-      if (this.story.title !== undefined) {
-        const currentStory = await this.storyService.getStory(this.story.id);
-        if (currentStory && currentStory.title !== this.story.title) {
-          await this.storyService.updateStory({
-            ...currentStory,
-            title: this.story.title,
-            updatedAt: new Date()
-          });
+        }
+        
+        this.hasUnsavedChanges = false;
+        this.updateHeaderActions(); // Update header to show saved status
+        
+        // Refresh prompt manager to get the latest scene content for Beat AI
+        // Force a complete reload by resetting and re-setting the story
+        await this.promptManager.setCurrentStory(null); // Clear current story
+        await new Promise(resolve => setTimeout(resolve, 50)); // Small delay
+        await this.promptManager.setCurrentStory(this.story.id); // Re-set story to force complete reload
+        
+      } catch (error) {
+        console.error('Error saving story:', error);
+        // Re-mark as unsaved so it can be retried
+        this.hasUnsavedChanges = true;
+      } finally {
+        this.isSaving = false;
+        
+        // If there was a pending save request during save, execute it
+        if (this.pendingSave) {
+          this.pendingSave = false;
+          setTimeout(() => this.saveStory(), 100);
         }
       }
-      
-      this.hasUnsavedChanges = false;
-      this.updateHeaderActions(); // Update header to show saved status
-      
-      // Refresh prompt manager to get the latest scene content for Beat AI
-      // Force a complete reload by resetting and re-setting the story
-      await this.promptManager.setCurrentStory(null); // Clear current story
-      await new Promise(resolve => setTimeout(resolve, 50)); // Small delay
-      await this.promptManager.setCurrentStory(this.story.id); // Re-set story to force complete reload
-      
-    } catch (error) {
-      console.error('Error saving story:', error);
-      // Re-mark as unsaved so it can be retried
-      this.hasUnsavedChanges = true;
+    })();
+
+    this.currentSavePromise = saveOperation;
+
+    try {
+      await saveOperation;
     } finally {
-      this.isSaving = false;
-      
-      // If there was a pending save request during save, execute it
-      if (this.pendingSave) {
-        this.pendingSave = false;
-        setTimeout(() => this.saveStory(), 100);
+      if (this.currentSavePromise === saveOperation) {
+        this.currentSavePromise = null;
       }
     }
   }
 
   async goBack(): Promise<void> {
+    // Delete-on-exit strategy for empty, untitled drafts
+    if (this.isDefaultEmptyDraft()) {
+      const shouldDelete = confirm('This draft has no title or content. Delete it?');
+      if (shouldDelete) {
+        try {
+          await this.storyService.deleteStory(this.story.id);
+        } catch (err) {
+          console.error('Failed to delete empty draft:', err);
+        }
+        this.router.navigate(['/']);
+        return;
+      }
+      // If user cancels deletion, continue with normal navigation (preserve draft)
+    }
+
     if (this.hasUnsavedChanges) {
       await this.saveStory();
     }
@@ -446,13 +481,15 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         icon: 'arrow-back',
         action: () => this.goBack(),
         showOnMobile: true,
-        showOnDesktop: true
+        showOnDesktop: true,
+        tooltip: 'Back'
       },
       {
-        icon: 'book-outline',
+        icon: 'list-outline',
         action: () => this.toggleSidebar(),
         showOnMobile: true,
-        showOnDesktop: true
+        showOnDesktop: true,
+        tooltip: 'Story structure'
       }
     ];
     
@@ -471,7 +508,8 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         chipColor: 'medium',
         action: () => this.showStoryStatsModal(),
         showOnMobile: false,
-        showOnDesktop: true
+        showOnDesktop: true,
+        tooltip: 'Show story stats'
       }
     ];
     
@@ -493,6 +531,11 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         icon: 'search',
         label: 'Story Inspector',
         action: () => this.goToInspector()
+      },
+      {
+        icon: 'flask-outline',
+        label: 'Story Research',
+        action: () => this.goToStoryResearch()
       },
       {
         icon: 'book-outline',
@@ -519,11 +562,22 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         label: 'Image Generation',
         action: () => this.headerNavService.goToImageGeneration()
       }
+      ,
+      {
+        icon: 'list-outline',
+        label: 'Outline Overview',
+        action: () => this.router.navigate(['/stories/outline', this.story.id])
+      }
     ];
   }
 
   goToInspector(): void {
     this.router.navigate(['/stories/inspector', this.story.id]);
+  }
+
+  goToStoryResearch(): void {
+    if (!this.story?.id) return;
+    this.router.navigate(['/stories/research', this.story.id]);
   }
 
   private updateHeaderActions(): void {
@@ -533,6 +587,58 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       // Update word count chip (second button)
       this.rightActions[1].chipContent = `${this.wordCount}w`;
       this.rightActions[1].action = () => this.showStoryStatsModal();
+    }
+  }
+
+  // Consider a story an "empty draft" only if it's in the default structure
+  // (1 chapter, 1 scene), has no title, and no scene text content.
+  isDefaultEmptyDraft(): boolean {
+    const titleEmpty = !this.story.title || this.story.title.trim() === '';
+    if (!titleEmpty) return false;
+
+    const hasSingleChapter = Array.isArray(this.story.chapters) && this.story.chapters.length === 1;
+    if (!hasSingleChapter) return false;
+
+    const firstChapter = this.story.chapters[0];
+    const hasSingleScene = Array.isArray(firstChapter.scenes) && firstChapter.scenes.length === 1;
+    if (!hasSingleScene) return false;
+
+    // Use StoryStatsService to compute total word count safely
+    try {
+      const totalWords = this.storyStatsService.calculateTotalStoryWordCount(this.story);
+      return totalWords === 0;
+    } catch {
+      // Fallback: if stats service fails, perform a minimal check on the first scene
+      const sceneContent = firstChapter.scenes[0]?.content || '';
+      const textOnly = this.stripContentToText(sceneContent);
+      return textOnly.length === 0;
+    }
+  }
+
+  // Minimal HTML-to-text stripper used only as a fallback.
+  private stripContentToText(html: string): string {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html || '', 'text/html');
+      // Remove Beat AI elements if present
+      const beatNodes = doc.querySelectorAll('[class*="beat-ai"], .beat-ai-node, .beat-ai-wrapper');
+      beatNodes.forEach(el => el.remove());
+      return (doc.body.textContent || '').trim();
+    } catch {
+      return (html || '').replace(/<[^>]+>/g, '').trim();
+    }
+  }
+
+  // Prompt on browser refresh/close if this is an empty draft
+  @HostListener('window:beforeunload', ['$event'])
+  handleBeforeUnload(event: BeforeUnloadEvent): void {
+    try {
+      if (this.isDefaultEmptyDraft() || this.hasUnsavedChanges) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    } catch {
+      // ignore
     }
   }
 
@@ -578,7 +684,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     // Update the sidebar icon in left actions
     const isOpen = await this.menuController.isOpen('story-menu');
     if (this.leftActions.length > 1) {
-      this.leftActions[1].icon = isOpen ? 'book' : 'book-outline';
+      this.leftActions[1].icon = isOpen ? 'list' : 'list-outline';
     }
   }
 
@@ -868,7 +974,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
           this.showSlashDropdownAtCursor();
         },
         onBeatPromptSubmit: (event: BeatAIPromptEvent) => {
-          this.handleBeatPromptSubmit(event);
+          void this.handleBeatPromptSubmit(event);
         },
         onBeatContentUpdate: () => {
           this.handleBeatContentUpdate();
@@ -1107,9 +1213,22 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     }
   }
 
-  private handleBeatPromptSubmit(event: BeatAIPromptEvent): void {
+  private async handleBeatPromptSubmit(event: BeatAIPromptEvent): Promise<void> {
     // Make sure dropdown is hidden when working with beat AI
     this.hideSlashDropdown();
+
+    if (event.action === 'regenerate') {
+      await this.handleBeatRegenerate(event);
+      return;
+    }
+
+    if (event.action !== 'deleteAfter') {
+      const persistenceSucceeded = await this.persistSceneBeforeBeatAction();
+      if (!persistenceSucceeded) {
+        console.error('Beat generation aborted: Failed to persist latest scene content.');
+        return;
+      }
+    }
     
     // Add story context to the beat AI prompt
     const enhancedEvent: BeatAIPromptEvent = {
@@ -1118,11 +1237,105 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       chapterId: this.activeChapterId || undefined,
       sceneId: this.activeSceneId || undefined
     };
-    
+
+    const finalEvent = this.refreshCustomContext(enhancedEvent);
+
     // Pass the enhanced event to the ProseMirror service
     if (this.proseMirrorService) {
-      this.proseMirrorService.handleBeatPromptSubmit(enhancedEvent);
+      this.proseMirrorService.handleBeatPromptSubmit(finalEvent);
     }
+  }
+
+  private async handleBeatRegenerate(event: BeatAIPromptEvent): Promise<void> {
+    if (!this.proseMirrorService) {
+      return;
+    }
+
+    const deleted = this.proseMirrorService.deleteContentAfterBeat(event.beatId);
+    if (!deleted) {
+      console.warn('Beat regeneration skipped: could not remove existing generated content.');
+      return;
+    }
+
+    const persisted = await this.persistSceneBeforeBeatAction();
+    if (!persisted) {
+      console.error('Beat regeneration aborted: Failed to persist scene after clearing previous content.');
+      return;
+    }
+
+    const generateEvent: BeatAIPromptEvent = {
+      ...event,
+      action: 'generate'
+    };
+
+    const enhancedEvent: BeatAIPromptEvent = {
+      ...generateEvent,
+      storyId: this.story.id,
+      chapterId: this.activeChapterId || undefined,
+      sceneId: this.activeSceneId || undefined
+    };
+
+    const finalEvent = this.refreshCustomContext(enhancedEvent);
+
+    this.proseMirrorService.handleBeatPromptSubmit(finalEvent);
+  }
+
+  private refreshCustomContext(event: BeatAIPromptEvent): BeatAIPromptEvent {
+    if (!event.customContext) {
+      return event;
+    }
+
+    const { selectedSceneContexts, includeStoryOutline } = event.customContext;
+
+    const updatedContexts = selectedSceneContexts.map(context => {
+      if (this.activeScene && context.sceneId === this.activeScene.id) {
+        const sanitizedContent = this.promptManager.extractPlainTextFromHtml(this.activeScene.content || '');
+        return {
+          ...context,
+          content: sanitizedContent
+        };
+      }
+      return context;
+    });
+
+    return {
+      ...event,
+      customContext: {
+        includeStoryOutline,
+        selectedSceneContexts: updatedContexts,
+        selectedScenes: updatedContexts.map(ctx => ctx.content)
+      }
+    };
+  }
+
+  private async persistSceneBeforeBeatAction(): Promise<boolean> {
+    if (!this.editorView || !this.activeScene || !this.activeChapterId) {
+      return true;
+    }
+
+    const latestContent = this.proseMirrorService.getHTMLContent();
+
+    if (this.activeScene.content !== latestContent) {
+      this.activeScene.content = latestContent;
+      this.updateWordCount();
+      this.hasUnsavedChanges = true;
+    }
+
+    if (this.currentSavePromise) {
+      await this.currentSavePromise;
+    }
+
+    if (!this.hasUnsavedChanges) {
+      return true;
+    }
+
+    await this.saveStory();
+
+    if (this.currentSavePromise) {
+      await this.currentSavePromise;
+    }
+
+    return !this.hasUnsavedChanges;
   }
 
   private handleBeatContentUpdate(): void {

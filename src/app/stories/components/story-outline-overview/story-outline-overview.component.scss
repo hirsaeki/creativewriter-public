@@ -1,0 +1,232 @@
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 12px 0 12px;
+}
+
+.chapter-title {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.chapter-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.chapter-actions ion-button {
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+  --height: 32px;
+  min-width: 110px; /* reduce layout shift */
+}
+
+.chapter-edit-input {
+  --background: rgba(0, 0, 0, 0.2);
+  --color: var(--ion-text-color);
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --padding-top: 4px;
+  --padding-bottom: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  min-width: 180px;
+}
+
+.chapter-edit-input::part(native) {
+  background: transparent !important;
+}
+
+.idx {
+  opacity: 0.7;
+}
+
+.chapter-content {
+  padding: 12px;
+}
+
+.scene-card {
+  margin-bottom: 12px;
+  /* Glassy transparent card styling */
+  background: linear-gradient(135deg, rgba(20, 20, 20, 0.3) 0%, rgba(15, 15, 15, 0.3) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 14px !important;
+  backdrop-filter: blur(8px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(120%) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.25s ease;
+  --background: transparent !important;
+}
+
+.scene-card::part(native) {
+  background: transparent !important;
+}
+
+.scene-card ion-card-header::part(native),
+.scene-card ion-card-content::part(native) {
+  background: transparent !important;
+}
+
+.scene-card ion-card-header,
+.scene-card ion-card-content {
+  background: transparent !important;
+  --background: transparent !important;
+}
+
+.scene-card ion-card-title {
+  color: #f8f9fa !important;
+  --color: #f8f9fa !important;
+  font-size: 0.98rem !important;
+  font-weight: 600 !important;
+}
+
+.scene-card:hover {
+  background: linear-gradient(135deg, rgba(25, 25, 25, 0.4) 0%, rgba(20, 20, 20, 0.4) 100%) !important;
+  border-color: rgba(71, 118, 230, 0.3) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3) !important;
+  transform: translateY(-2px);
+}
+
+.summary.placeholder {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.summary-edit ion-textarea {
+  --background: rgba(0, 0, 0, 0.2);
+  --color: var(--ion-text-color);
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --padding-top: 12px;
+  --padding-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  --min-height: 100px;
+  --max-height: 240px;
+}
+
+.summary-edit ion-textarea::part(native) {
+  max-height: 240px;
+  overflow: auto;
+}
+
+/* Title edit styling */
+.title-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.title-input {
+  --background: rgba(0, 0, 0, 0.2);
+  --color: var(--ion-text-color);
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --padding-top: 4px;
+  --padding-bottom: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  flex: 1 1 auto;
+}
+
+.title-input::part(native) {
+  background: transparent !important;
+}
+
+/* Ensure list container inside accordion content is transparent */
+.chapter-content ion-list {
+  background: transparent !important;
+  --background: transparent !important;
+}
+
+/* Keep scene action button subtle on glassy background */
+.actions ion-button[color="medium"] {
+  --background: rgba(255, 255, 255, 0.08);
+  --background-hover: rgba(255, 255, 255, 0.15);
+  --border-radius: 8px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* Give scene action buttons comfortable inner spacing */
+.actions ion-button {
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+  min-width: 120px; /* reduce layout shift for varying labels */
+}
+
+.loading, .empty {
+  padding: 16px;
+}
+
+.story-meta {
+  padding: 8px 16px 0 16px;
+  .title {
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .meta {
+    opacity: 0.8;
+    font-size: 0.9em;
+  }
+}
+.host, :host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100vh;
+}
+
+ion-content {
+  flex: 1 1 auto;
+  --background: transparent !important;
+}
+
+/* Transparent accordion styling for outline overview */
+ion-accordion-group {
+  background: transparent !important;
+}
+
+ion-accordion {
+  background: transparent !important;
+}
+
+/* Header row */
+ion-accordion ion-item[slot="header"] {
+  --background: transparent !important;
+  --color: var(--ion-text-color);
+  --inner-border-width: 0 0 1px 0;
+  --border-color: rgba(255, 255, 255, 0.08);
+  backdrop-filter: none;
+}
+
+/* Content wrapper */
+ion-accordion [slot="content"],
+.chapter-content {
+  background: transparent !important;
+}
+
+/* Fix mobile height: avoid double offsets and ensure full-height scroll area */
+@media (max-width: 768px) {
+  ion-content {
+    --offset-top: 0px !important;
+    --offset-bottom: 0px !important;
+  }
+  ion-content::part(scroll) {
+    padding-top: 56px; /* header height compensation */
+    padding-bottom: var(--ion-safe-area-bottom, 0px);
+  }
+}

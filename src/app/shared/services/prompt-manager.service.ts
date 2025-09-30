@@ -503,6 +503,14 @@ export class PromptManagerService {
   }
 
   /**
+   * Public helper: Extract plain text from arbitrary HTML content, removing Beat AI nodes and metadata
+   * Preserves basic paragraph breaks. Safe to use for building prompts.
+   */
+  public extractPlainTextFromHtml(htmlContent: string): string {
+    return this.extractFullTextFromContent(htmlContent);
+  }
+
+  /**
    * Get statistics about current story
    */
   getStoryStats(): {

@@ -22,6 +22,28 @@ export class SettingsService {
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
         // Merge with defaults to ensure all properties exist
+        const beatInputFavorites = Array.isArray(parsed.favoriteModelLists?.beatInput)
+          ? parsed.favoriteModelLists.beatInput
+          : Array.isArray(parsed.favoriteModels)
+            ? parsed.favoriteModels
+            : DEFAULT_SETTINGS.favoriteModelLists.beatInput;
+
+        const sceneSummaryFavorites = Array.isArray(parsed.favoriteModelLists?.sceneSummary)
+          ? parsed.favoriteModelLists.sceneSummary
+          : DEFAULT_SETTINGS.favoriteModelLists.sceneSummary;
+
+        const rewriteFavorites = Array.isArray(parsed.favoriteModelLists?.rewrite)
+          ? parsed.favoriteModelLists.rewrite
+          : DEFAULT_SETTINGS.favoriteModelLists.rewrite;
+
+        const favoriteModelLists = {
+          ...DEFAULT_SETTINGS.favoriteModelLists,
+          ...(parsed.favoriteModelLists ?? {}),
+          beatInput: [...beatInputFavorites],
+          sceneSummary: [...sceneSummaryFavorites],
+          rewrite: [...rewriteFavorites]
+        };
+
         return {
           ...DEFAULT_SETTINGS,
           ...parsed,
@@ -49,11 +71,20 @@ export class SettingsService {
             ...DEFAULT_SETTINGS.sceneTitleGeneration,
             ...parsed.sceneTitleGeneration
           },
+          sceneSummaryGeneration: {
+            ...DEFAULT_SETTINGS.sceneSummaryGeneration,
+            ...parsed.sceneSummaryGeneration
+          },
+          sceneGenerationFromOutline: {
+            ...DEFAULT_SETTINGS.sceneGenerationFromOutline,
+            ...parsed.sceneGenerationFromOutline
+          },
           appearance: {
             ...DEFAULT_SETTINGS.appearance,
             ...parsed.appearance
           },
-          favoriteModels: parsed.favoriteModels || DEFAULT_SETTINGS.favoriteModels,
+          favoriteModelLists,
+          favoriteModels: [...favoriteModelLists.beatInput],
           updatedAt: new Date(parsed.updatedAt || new Date())
         };
       }
@@ -76,12 +107,40 @@ export class SettingsService {
   }
 
   updateSettings(settings: Partial<Settings>): void {
-    const updatedSettings = {
-      ...this.settingsSubject.value,
+    const currentSettings = this.settingsSubject.value;
+    const mergedFavoriteLists = {
+      ...currentSettings.favoriteModelLists,
+      ...(settings.favoriteModelLists ?? {})
+    } as Settings['favoriteModelLists'];
+
+    const favoriteListsKeys: (keyof Settings['favoriteModelLists'])[] = ['beatInput', 'sceneSummary', 'rewrite'];
+    for (const key of favoriteListsKeys) {
+      if (settings.favoriteModelLists?.[key]) {
+        mergedFavoriteLists[key] = [...settings.favoriteModelLists[key]];
+      } else {
+        mergedFavoriteLists[key] = [...(mergedFavoriteLists[key] ?? [])];
+      }
+    }
+
+    const updatedSettings: Settings = {
+      ...currentSettings,
       ...settings,
+      favoriteModelLists: mergedFavoriteLists,
       updatedAt: new Date()
     };
-    
+
+    if (settings.favoriteModelLists?.beatInput) {
+      updatedSettings.favoriteModels = [...settings.favoriteModelLists.beatInput];
+    } else if (settings.favoriteModels) {
+      updatedSettings.favoriteModels = [...settings.favoriteModels];
+      updatedSettings.favoriteModelLists = {
+        ...updatedSettings.favoriteModelLists,
+        beatInput: [...settings.favoriteModels]
+      };
+    } else {
+      updatedSettings.favoriteModels = [...updatedSettings.favoriteModelLists.beatInput];
+    }
+
     this.saveSettings(updatedSettings);
     this.settingsSubject.next(updatedSettings);
   }
@@ -138,7 +197,20 @@ export class SettingsService {
 
   clearSettings(): void {
     localStorage.removeItem(this.STORAGE_KEY);
-    this.settingsSubject.next({ ...DEFAULT_SETTINGS });
+    const resetBeatFavorites = [...DEFAULT_SETTINGS.favoriteModelLists.beatInput];
+    const resetSummaryFavorites = [...DEFAULT_SETTINGS.favoriteModelLists.sceneSummary];
+    const resetRewriteFavorites = [...DEFAULT_SETTINGS.favoriteModelLists.rewrite];
+    this.settingsSubject.next({
+      ...DEFAULT_SETTINGS,
+      favoriteModelLists: {
+        ...DEFAULT_SETTINGS.favoriteModelLists,
+        beatInput: resetBeatFavorites,
+        sceneSummary: resetSummaryFavorites,
+        rewrite: resetRewriteFavorites
+      },
+      favoriteModels: [...resetBeatFavorites],
+      updatedAt: new Date()
+    });
   }
 
   // Utility methods for checking API availability

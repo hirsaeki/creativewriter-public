@@ -81,7 +81,28 @@
           <ion-card-content>
             <ion-text color="medium">
               <p>This message defines the context and personality of the AI assistant for this story.</p>
-              <p><small><strong>Language:</strong> {{ settings.language || 'en' | uppercase }}</small></p>
+            </ion-text>
+
+            <ion-item>
+              <ion-label position="stacked">Story Language</ion-label>
+              <ion-select
+                [(ngModel)]="settings.language"
+                (ionChange)="onSettingsChange()"
+                interface="popover"
+                aria-label="Select story language">
+                <ion-select-option value="en">English</ion-select-option>
+                <ion-select-option value="de">Deutsch</ion-select-option>
+                <ion-select-option value="fr">Français</ion-select-option>
+                <ion-select-option value="es">Español</ion-select-option>
+                <ion-select-option value="custom">Custom (use scene language)</ion-select-option>
+              </ion-select>
+            </ion-item>
+            <ion-note>
+              <small>Changing the language affects AI outputs (titles, summaries, beats). Use “Reload templates” to load language-specific templates.</small>
+            </ion-note>
+
+            <ion-text color="medium">
+              <p><small><strong>Current:</strong> {{ (settings.language || 'en') | uppercase }}</small></p>
             </ion-text>
             <ion-textarea
               [(ngModel)]="settings.systemMessage"
@@ -182,6 +203,47 @@
             </ion-radio-group>
           </ion-card-content>
         </ion-card>
+
+        <app-model-favorites-settings
+          [favoriteIds]="settings.favoriteModelLists?.beatInput || []"
+          [combinedModels]="combinedModels"
+          [loadingModels]="loadingModels"
+          [modelLoadError]="modelLoadError"
+          cardTitle="Beat Model Favorites"
+          heading="Beat Input Favorites"
+          subheading="Choose up to 6 models to surface as quick shortcuts for Beat AI."
+          description="Favorites are stored with this story and power the quick-select buttons in Beat AI."
+          emptyState="No favorites defined for this story yet. Use the selector above to add models."
+          infoNote="Connect at least one AI provider in the global API settings to populate the list."
+          (favoriteIdsChange)="onFavoriteModelsChange('beatInput', $event)">
+        </app-model-favorites-settings>
+
+        <app-model-favorites-settings
+          [favoriteIds]="settings.favoriteModelLists?.sceneSummary || []"
+          [combinedModels]="combinedModels"
+          [loadingModels]="loadingModels"
+          [modelLoadError]="modelLoadError"
+          cardTitle="Scene Summary Favorites"
+          heading="Summary Model Favorites"
+          subheading="Pick up to 6 models that should be one tap away when creating scene summaries."
+          description="These favorites appear in the scene summary panel inside the story editor."
+          emptyState="No favorites defined for scene summaries yet. Add models to speed up your workflow."
+          infoNote="Favorites are available for any provider you have enabled in the story."
+          (favoriteIdsChange)="onFavoriteModelsChange('sceneSummary', $event)">
+        </app-model-favorites-settings>
+        <app-model-favorites-settings
+          [favoriteIds]="settings.favoriteModelLists?.rewrite || []"
+          [combinedModels]="combinedModels"
+          [loadingModels]="loadingModels"
+          [modelLoadError]="modelLoadError"
+          cardTitle="Rewrite Favorites"
+          heading="Rewrite Model Favorites"
+          subheading="Choose up to 6 models to keep at hand for AI rewrites in this story."
+          description="Favorites show up as quick-select options in the rewrite dialog for this story."
+          emptyState="No rewrite favorites yet. Add models to speed up rewriting."
+          infoNote="Favorites are limited to the models available for this story."
+          (favoriteIdsChange)="onFavoriteModelsChange('rewrite', $event)">
+        </app-model-favorites-settings>
       </div>
 
       <!-- DB Maintenance Tab -->

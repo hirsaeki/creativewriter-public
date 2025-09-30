@@ -11,6 +11,10 @@ export interface GoogleGeminiRequest {
     }[];
     role?: 'user' | 'model';
   }[];
+  // Prefer true system instruction channel when present
+  systemInstruction?: {
+    parts: { text: string }[];
+  };
   generationConfig?: {
     temperature?: number;
     topP?: number;
@@ -96,11 +100,12 @@ export class GoogleGeminiApiService {
       'X-API-Key': settings.googleGemini.apiKey // Pass API key to proxy
     });
 
-    // Convert messages format to Gemini format
-    const contents = this.convertMessagesToContents(options.messages, prompt);
+    // Convert messages format to Gemini format (with systemInstruction when provided)
+    const { contents, systemInstruction } = this.convertMessagesToContents(options.messages, prompt);
 
     const request: GoogleGeminiRequest = {
       contents: contents,
+      systemInstruction: systemInstruction,
       generationConfig: {
         temperature: options.temperature !== undefined ? options.temperature : settings.googleGemini.temperature,
         topP: options.topP !== undefined ? options.topP : settings.googleGemini.topP,
@@ -150,6 +155,7 @@ export class GoogleGeminiApiService {
         temperature: request.generationConfig?.temperature,
         topP: request.generationConfig?.topP,
         contentsLength: contents.length,
+        hasSystemInstruction: !!systemInstruction,
         safetySettings: request.safetySettings?.length ? `${request.safetySettings.length} settings` : undefined,
         requestId: requestId,
         messagesFormat: options.messages ? 'structured' : 'simple',
@@ -290,37 +296,33 @@ export class GoogleGeminiApiService {
   private convertMessagesToContents(
     messages?: {role: 'system' | 'user' | 'assistant', content: string}[],
     fallbackPrompt?: string
-  ): {parts: {text: string}[], role?: 'user' | 'model'}[] {
+  ): { contents: {parts: {text: string}[], role?: 'user' | 'model'}[]; systemInstruction?: { parts: { text: string }[] } } {
     if (!messages || messages.length === 0) {
-      return [{
-        parts: [{ text: fallbackPrompt || '' }],
-        role: 'user'
-      }];
+      return {
+        contents: [{ parts: [{ text: fallbackPrompt || '' }], role: 'user' }]
+      };
     }
 
     const contents: {parts: {text: string}[], role?: 'user' | 'model'}[] = [];
-    
+    let systemInstruction: { parts: { text: string }[] } | undefined;
+
     for (const message of messages) {
-      // Convert system messages to user messages with context
       if (message.role === 'system') {
-        contents.push({
-          parts: [{ text: `System: ${message.content}` }],
-          role: 'user'
-        });
+        // Use Gemini's dedicated systemInstruction channel
+        if (!systemInstruction) {
+          systemInstruction = { parts: [{ text: message.content }] };
+        } else {
+          // If multiple system messages exist, append as additional user context to preserve order
+          contents.push({ parts: [{ text: `System: ${message.content}` }], role: 'user' });
+        }
       } else if (message.role === 'user') {
-        contents.push({
-          parts: [{ text: message.content }],
-          role: 'user'
-        });
+        contents.push({ parts: [{ text: message.content }], role: 'user' });
       } else if (message.role === 'assistant') {
-        contents.push({
-          parts: [{ text: message.content }],
-          role: 'model'
-        });
+        contents.push({ parts: [{ text: message.content }], role: 'model' });
       }
     }
 
-    return contents;
+    return { contents, systemInstruction };
   }
 
   abortRequest(requestId: string): void {
@@ -371,11 +373,12 @@ export class GoogleGeminiApiService {
     const maxTokens = options.maxTokens || 500;
     const wordCount = options.wordCount || Math.floor(maxTokens / 1.3);
 
-    // Convert messages format to Gemini format
-    const contents = this.convertMessagesToContents(options.messages, prompt);
+    // Convert messages format to Gemini format (with systemInstruction when provided)
+    const { contents, systemInstruction } = this.convertMessagesToContents(options.messages, prompt);
 
     const request: GoogleGeminiRequest = {
       contents: contents,
+      systemInstruction: systemInstruction,
       generationConfig: {
         temperature: options.temperature !== undefined ? options.temperature : settings.googleGemini.temperature,
         topP: options.topP !== undefined ? options.topP : settings.googleGemini.topP,

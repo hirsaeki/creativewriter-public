@@ -220,6 +220,12 @@ ion-content::part(scroll) {
   margin: 0;
 }
 
+.cancel-edit-button {
+  --padding-start: 6px;
+  --padding-end: 6px;
+  margin: 0 0 2px 0;
+}
+
 ion-searchbar {
   --background: rgba(20, 20, 20, 0.4);
   --color: #f8f9fa;

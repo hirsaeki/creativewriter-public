@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { AuthService, User } from './auth.service';
+import { SyncLoggerService } from './sync-logger.service';
 
 // Minimal static type for the PouchDB constructor when loaded via ESM
 interface PouchDBStatic {
@@ -27,6 +28,7 @@ export interface SyncStatus {
 })
 export class DatabaseService {
   private readonly authService = inject(AuthService);
+  private readonly syncLogger = inject(SyncLoggerService);
   
   private db: PouchDB.Database | null = null;
   private remoteDb: PouchDB.Database | null = null;
@@ -181,23 +183,9 @@ export class DatabaseService {
       
     } catch (error) {
       console.warn('Could not setup sync:', error);
+      this.remoteDb = null;
       
-      // Provide user-friendly error messages
-      let errorMessage = 'Sync setup failed';
-      if (error instanceof Error) {
-        if (error.message.includes('CouchDB connection failed')) {
-          errorMessage = 'Database server unreachable';
-        } else if (error.message.includes('unauthorized') || error.message.includes('auth')) {
-          errorMessage = 'Database authentication failed';
-        } else if (error.message.includes('timeout')) {
-          errorMessage = 'Database connection timeout';
-        } else if (error.message.includes('SyntaxError') && error.message.includes('JSON')) {
-          errorMessage = 'Database server returned invalid response';
-        } else {
-          errorMessage = `Sync setup failed: ${error.message}`;
-        }
-      }
-      
+      const errorMessage = this.getFriendlySyncError(error, 'Sync setup failed');
       this.updateSyncStatus({ error: errorMessage });
     }
   }
@@ -288,25 +276,11 @@ export class DatabaseService {
   }
 
   async forcePush(): Promise<void> {
-    if (!this.remoteDb || !this.db) return;
-    
-    try {
-      await this.db.replicate.to(this.remoteDb);
-    } catch (error) {
-      console.error('Force push failed:', error);
-      throw error;
-    }
+    await this.runManualReplication('push');
   }
 
   async forcePull(): Promise<void> {
-    if (!this.remoteDb || !this.db) return;
-    
-    try {
-      await this.db.replicate.from(this.remoteDb);
-    } catch (error) {
-      console.error('Force pull failed:', error);
-      throw error;
-    }
+    await this.runManualReplication('pull');
   }
 
   async compact(): Promise<void> {
@@ -318,5 +292,98 @@ export class DatabaseService {
     await this.stopSync();
     if (!this.db) return;
     await this.db.destroy();
+  }
+
+  private async runManualReplication(direction: 'push' | 'pull'): Promise<void> {
+    const user = this.authService.getCurrentUser();
+    const userId = user?.username ?? 'anonymous';
+
+    if (!this.remoteDb || !this.db) {
+      const message = 'Remote database not connected';
+      this.updateSyncStatus({ error: message });
+      this.syncLogger.logError(
+        direction === 'push' ? 'Manual push failed: remote database not connected' : 'Manual pull failed: remote database not connected',
+        userId
+      );
+      throw new Error(message);
+    }
+
+    const logId = this.syncLogger.logInfo(
+      direction === 'push' ? 'Manual push started' : 'Manual pull started',
+      undefined,
+      userId
+    );
+
+    this.updateSyncStatus({ isSync: true, error: undefined });
+    const startTime = Date.now();
+
+    try {
+      const result = direction === 'push'
+        ? await this.db.replicate.to(this.remoteDb)
+        : await this.db.replicate.from(this.remoteDb);
+
+      const duration = Date.now() - startTime;
+      const itemCount = direction === 'push' ? result.docs_written : result.docs_read;
+
+      this.updateSyncStatus({ lastSync: new Date(), error: undefined });
+
+      this.syncLogger.updateLog(logId, {
+        type: direction === 'push' ? 'upload' : 'download',
+        status: 'success',
+        action: direction === 'push'
+          ? `Manual push completed (${itemCount} ${itemCount === 1 ? 'doc' : 'docs'})`
+          : `Manual pull completed (${itemCount} ${itemCount === 1 ? 'doc' : 'docs'})`,
+        itemCount,
+        duration,
+        timestamp: new Date()
+      });
+    } catch (error) {
+      console.error(direction === 'push' ? 'Force push failed:' : 'Force pull failed:', error);
+      const friendlyMessage = this.getFriendlySyncError(
+        error,
+        direction === 'push' ? 'Manual push failed' : 'Manual pull failed'
+      );
+
+      this.updateSyncStatus({ error: friendlyMessage });
+      this.syncLogger.updateLog(logId, {
+        type: 'error',
+        status: 'error',
+        action: direction === 'push' ? 'Manual push failed' : 'Manual pull failed',
+        details: friendlyMessage,
+        timestamp: new Date()
+      });
+
+      throw error;
+    } finally {
+      this.updateSyncStatus({ isSync: false });
+    }
+  }
+
+  private getFriendlySyncError(error: unknown, fallback: string): string {
+    if (error instanceof Error) {
+      const message = error.message;
+      const normalized = message.toLowerCase();
+
+      if (normalized.includes('couchdb connection failed') || normalized.includes('failed to fetch') || normalized.includes('network')) {
+        return 'Database server unreachable';
+      }
+      if (normalized.includes('unauthorized') || normalized.includes('auth')) {
+        return 'Database authentication failed';
+      }
+      if (normalized.includes('timeout')) {
+        return 'Database connection timeout';
+      }
+      if (normalized.includes('syntaxerror') && normalized.includes('json')) {
+        return 'Database server returned invalid response';
+      }
+
+      return `${fallback}: ${message}`;
+    }
+
+    if (typeof error === 'string') {
+      return error;
+    }
+
+    return fallback;
   }
 }

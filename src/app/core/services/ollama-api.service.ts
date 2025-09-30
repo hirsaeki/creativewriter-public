@@ -86,6 +86,18 @@ export class OllamaApiService {
 
   private abortSubjects = new Map<string, Subject<void>>();
   private requestMetadata = new Map<string, { logId: string; startTime: number }>();
+  
+  abortRequest(requestId: string): void {
+    const abortSubject = this.abortSubjects.get(requestId);
+    const metadata = this.requestMetadata.get(requestId);
+    if (abortSubject && metadata) {
+      const duration = Date.now() - metadata.startTime;
+      this.aiLogger.logAborted(metadata.logId, duration);
+      abortSubject.next();
+      this.abortSubjects.delete(requestId);
+      this.requestMetadata.delete(requestId);
+    }
+  }
 
   generateText(prompt: string, options: {
     model?: string;

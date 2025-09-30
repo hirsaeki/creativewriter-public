@@ -56,6 +56,8 @@
               [(ngModel)]="chapter.title" 
               (ionBlur)="updateChapter(chapter)"
               (click)="$event.stopPropagation()"
+              (keydown.space)="$event.stopPropagation()"
+              (keydown.enter)="$event.stopPropagation()"
               class="chapter-title-input"
               placeholder="Chapter Title"
               [attr.aria-label]="'Edit chapter title'"
@@ -105,8 +107,9 @@
                         *ngIf="isEditingTitle.has(scene.id)"
                         [(ngModel)]="scene.title" 
                         (ionBlur)="stopEditingTitle(chapter.id, scene)"
-                        (keydown.enter)="stopEditingTitle(chapter.id, scene)"
-                        (keydown.escape)="cancelEditingTitle(scene)"
+                        (keydown.enter)="stopEditingTitle(chapter.id, scene); $event.stopPropagation()"
+                        (keydown.escape)="cancelEditingTitle(scene); $event.stopPropagation()"
+                        (keydown.space)="$event.stopPropagation()"
                         (click)="$event.stopPropagation()"
                         class="scene-title-input-edit"
                         placeholder="Scene Title"
@@ -212,6 +215,25 @@
                     </div>
                   </div>
                   
+                  <div class="summary-favorites" *ngIf="summaryFavoriteModels.length > 0">
+                    <ion-icon name="star-outline" class="favorite-icon" aria-hidden="true"></ion-icon>
+                    <div class="favorite-buttons" role="list">
+                      <button *ngFor="let model of summaryFavoriteModels"
+                              type="button"
+                              class="favorite-btn"
+                              role="listitem"
+                              [class.active]="selectedModel === model.id"
+                              (click)="selectSummaryFavorite(model)"
+                              [title]="model.label">
+                        <span class="favorite-btn-content">
+                          <app-openrouter-icon *ngIf="model.provider === 'openrouter'" size="14" color="#6467f2" class="provider-icon-inline openrouter"></app-openrouter-icon>
+                          <ion-icon *ngIf="model.provider !== 'openrouter'" [name]="getProviderIcon(model.provider)" class="provider-icon-inline"></ion-icon>
+                          <span class="model-short-name">{{ getShortModelName(model.label) }}</span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
                   <ion-select 
                     [(ngModel)]="selectedModel"
                     placeholder="Choose AI model..."

@@ -1,3 +1,5 @@
+import { FavoriteModelLists } from '../../core/models/settings.interface';
+
 export interface Scene {
   id: string;
   title: string;
@@ -26,6 +28,8 @@ export interface StorySettings {
   useFullStoryContext: boolean; // true = full story, false = summaries only
   beatInstruction: 'continue' | 'stay'; // continue = "Continue the story", stay = "Stay in the moment"
   language?: 'en' | 'de' | 'fr' | 'es' | 'custom'; // Story language setting
+  favoriteModels: string[]; // Legacy quick access
+  favoriteModelLists: FavoriteModelLists; // Structured favorites per story feature
 }
 
 export interface Story {
@@ -75,5 +79,11 @@ Task: {prompt}
 Continue the story now with {wordCount} words:</message>
 </messages>`,
   useFullStoryContext: false,
-  beatInstruction: 'continue'
+  beatInstruction: 'continue',
+  favoriteModels: [],
+  favoriteModelLists: {
+    beatInput: [],
+    sceneSummary: [],
+    rewrite: []
+  }
 };
