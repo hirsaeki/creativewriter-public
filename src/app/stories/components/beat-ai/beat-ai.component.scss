@@ -1010,15 +1010,22 @@
       .favorite-models {
         padding: 0.2rem 0.45rem;
         gap: 0.3rem;
+        overflow: hidden;
       }
 
       .favorite-buttons {
-        width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
       }
 
       .favorite-btn {
         padding: 0.25rem 0.5rem;
         font-size: 0.68rem;
+        flex-shrink: 0;
       }
       
       .model-selection-group {
