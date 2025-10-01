@@ -161,16 +161,19 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         this.onImageClicked(event);
       })
     );
-    
-    const storyId = this.route.snapshot.paramMap.get('id');
-    const qp = this.route.snapshot.queryParamMap;
-    const preferredChapterId = qp.get('chapterId');
-    const preferredSceneId = qp.get('sceneId');
-    const highlightPhrase = qp.get('phrase');
-    if (storyId) {
-      const existingStory = await this.storyService.getStory(storyId);
-      if (existingStory) {
-        this.story = { ...existingStory };
+
+    // Subscribe to route params to handle story switching
+    this.subscription.add(
+      this.route.paramMap.subscribe(async params => {
+        const storyId = params.get('id');
+        const qp = this.route.snapshot.queryParamMap;
+        const preferredChapterId = qp.get('chapterId');
+        const preferredSceneId = qp.get('sceneId');
+        const highlightPhrase = qp.get('phrase');
+        if (storyId) {
+          const existingStory = await this.storyService.getStory(storyId);
+          if (existingStory) {
+            this.story = { ...existingStory };
         
         // Initialize prompt manager with current story
         await this.promptManager.setCurrentStory(this.story.id);
@@ -229,7 +232,9 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         // Wenn Story nicht gefunden wird, zur Übersicht zurück
         this.router.navigate(['/']);
       }
-    }
+        }
+      })
+    );
 
     // Auto-save mit optimiertem Debounce
     this.subscription.add(
