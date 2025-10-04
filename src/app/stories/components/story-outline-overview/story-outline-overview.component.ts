@@ -87,11 +87,13 @@ export class StoryOutlineOverviewComponent implements OnInit {
       this.router.navigate(['/']);
       return;
     }
-    await this.loadStory(storyId);
+    const chapterId = this.route.snapshot.queryParamMap.get('chapterId');
+    const sceneId = this.route.snapshot.queryParamMap.get('sceneId');
+    await this.loadStory(storyId, chapterId, sceneId);
     this.setupHeader(storyId);
   }
 
-  private async loadStory(id: string) {
+  private async loadStory(id: string, chapterId: string | null = null, sceneId: string | null = null) {
     this.loading.set(true);
     try {
       const s = await this.storyService.getStory(id);
@@ -100,9 +102,18 @@ export class StoryOutlineOverviewComponent implements OnInit {
         return;
       }
       this.story.set(s);
-      // Expand all chapters by default for quick overview
-      const all = new Set<string>(s.chapters.map(c => c.id));
-      this.expanded.set(all);
+      // If we have a chapterId, only expand that chapter. Otherwise expand all chapters
+      if (chapterId) {
+        this.expanded.set(new Set([chapterId]));
+        // Schedule scroll to scene after view is ready
+        if (sceneId) {
+          setTimeout(() => this.scrollToScene(sceneId), 300);
+        }
+      } else {
+        // Expand all chapters by default for quick overview
+        const all = new Set<string>(s.chapters.map(c => c.id));
+        this.expanded.set(all);
+      }
     } finally {
       this.loading.set(false);
     }
@@ -637,5 +648,15 @@ export class StoryOutlineOverviewComponent implements OnInit {
 
   trackSceneById(index: number, scene: { id: string }): string {
     return scene.id;
+  }
+
+  private scrollToScene(sceneId: string): void {
+    const element = document.getElementById(`scene-${sceneId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Add a highlight effect
+      element.classList.add('highlight');
+      setTimeout(() => element.classList.remove('highlight'), 2000);
+    }
   }
 }

@@ -143,6 +143,21 @@
   transform: translateY(-2px);
 }
 
+.scene-card.highlight {
+  animation: highlightPulse 2s ease-in-out;
+}
+
+@keyframes highlightPulse {
+  0%, 100% {
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  }
+  50% {
+    border-color: rgba(71, 118, 230, 0.8);
+    box-shadow: 0 0 20px rgba(71, 118, 230, 0.5);
+  }
+}
+
 .summary.placeholder {
   opacity: 0.7;
   font-style: italic;

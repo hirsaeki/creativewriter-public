@@ -74,7 +74,7 @@
       </ion-item>
       <div class="chapter-content" slot="content">
         <ion-list lines="none">
-          <ion-card *ngFor="let scene of chapter.scenes; trackBy: trackSceneById" class="scene-card">
+          <ion-card *ngFor="let scene of chapter.scenes; trackBy: trackSceneById" class="scene-card" [id]="'scene-' + scene.id">
             <ion-card-header>
               <ion-card-title>
                 <ng-container *ngIf="!isEditingTitle(scene.id); else editTitleTpl">

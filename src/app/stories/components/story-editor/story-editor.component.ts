@@ -571,7 +571,12 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       {
         icon: 'list-outline',
         label: 'Outline Overview',
-        action: () => this.router.navigate(['/stories/outline', this.story.id])
+        action: () => this.router.navigate(['/stories/outline', this.story.id], {
+          queryParams: {
+            chapterId: this.activeChapterId,
+            sceneId: this.activeSceneId
+          }
+        })
       }
     ];
   }
