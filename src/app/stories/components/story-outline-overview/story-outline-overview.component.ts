@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   IonContent, IonSearchbar, IonAccordion, IonAccordionGroup, IonItem, IonLabel,
-  IonButton, IonIcon, IonChip, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
+  IonButton, IonIcon, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonTextarea, IonInput,
   IonBadge, IonSkeletonText, IonNote, IonSpinner, IonFab, IonFabButton
 } from '@ionic/angular/standalone';
@@ -26,7 +26,7 @@ import { PromptManagerService } from '../../../shared/services/prompt-manager.se
     CommonModule, FormsModule,
     AppHeaderComponent, ModelSelectorComponent,
     IonContent, IonSearchbar, IonAccordion, IonAccordionGroup, IonItem, IonLabel,
-    IonButton, IonIcon, IonChip, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
+    IonButton, IonIcon, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
     IonTextarea, IonInput,
     IonBadge, IonSkeletonText, IonNote, IonSpinner, IonFab, IonFabButton
   ],
@@ -53,7 +53,6 @@ export class StoryOutlineOverviewComponent implements OnInit {
   // Data
   story = signal<Story | null>(null);
   query = signal('');
-  onlyWithSummary = signal<boolean>(false);
   selectedModel = '';
 
   // UI state
@@ -66,12 +65,10 @@ export class StoryOutlineOverviewComponent implements OnInit {
     const s = this.story();
     if (!s) return [] as Chapter[];
     const q = this.query().toLowerCase().trim();
-    const onlySumm = this.onlyWithSummary();
     const chapters = Array.isArray(s.chapters) ? s.chapters : [];
     return chapters.map((ch) => ({
       ...ch,
       scenes: ch.scenes.filter(sc => {
-        if (onlySumm && !sc.summary) return false;
         if (!q) return true;
         const hay = `${ch.title}\n${sc.title}\n${sc.summary || ''}`.toLowerCase();
         return hay.includes(q);
@@ -182,7 +179,6 @@ export class StoryOutlineOverviewComponent implements OnInit {
     for (const ch of s.chapters) {
       lines.push(`\n## ${ch.chapterNumber}. ${ch.title || 'Untitled Chapter'}`);
       for (const sc of ch.scenes) {
-        if (!sc.summary && this.onlyWithSummary()) continue;
         const title = `${sc.sceneNumber}. ${sc.title || 'Untitled Scene'}`;
         const summary = (sc.summary || '').trim();
         lines.push(`\n### ${title}`);

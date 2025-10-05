@@ -6,10 +6,10 @@
 ></app-header>
 
 <ion-content [fullscreen]="true">
-  <!-- Floating Action Button to toggle toolbar -->
-  <ion-fab class="filters-fab" vertical="top" horizontal="end" slot="fixed">
+  <!-- Floating Action Button to toggle model selection -->
+  <ion-fab class="model-fab" vertical="top" horizontal="end" slot="fixed">
     <ion-fab-button
-      aria-label="Toggle outline filters"
+      aria-label="Toggle model selection"
       (click)="toggleToolbar()"
       [color]="toolbarVisible() ? 'primary' : 'medium'"
       size="small">
@@ -19,13 +19,13 @@
 
   <button
     type="button"
-    class="mobile-filter-fab"
+    class="mobile-model-fab"
     [class.is-open]="toolbarVisible()"
     (click)="toggleToolbar()"
     [attr.aria-expanded]="toolbarVisible()"
-    aria-controls="outline-toolbar-panel">
+    aria-controls="model-selection-panel">
     <ion-icon [name]="toolbarVisible() ? 'close-outline' : 'funnel-outline'"></ion-icon>
-    <span>{{ toolbarVisible() ? 'Close filters' : 'Filters' }}</span>
+    <span>{{ toolbarVisible() ? 'Close model selection' : 'Model selection' }}</span>
   </button>
 
   <button
@@ -35,18 +35,18 @@
     (click)="closeToolbar()"
     (keydown.enter)="closeToolbar()"
     (keydown.space)="closeToolbar()"
-    aria-label="Close filters">
+    aria-label="Close model selection">
   </button>
 
   <!-- Collapsible Toolbar -->
   <div
-    id="outline-toolbar-panel"
+    id="model-selection-panel"
     class="toolbar"
     [class.visible]="toolbarVisible()"
     role="region"
-    aria-label="Outline filters">
+    aria-label="Model selection">
     <div class="toolbar-mobile-header">
-      <h2>Outline filters</h2>
+      <h2>Model selection</h2>
       <ion-button
         size="small"
         fill="clear"
@@ -61,9 +61,6 @@
       (ionInput)="query.set($any($event.target).value || '')">
     </ion-searchbar>
     <app-model-selector [(model)]="selectedModel" [placeholder]="'Select AI model'" [appendTo]="'body'"></app-model-selector>
-    <ion-chip [color]="onlyWithSummary() ? 'primary' : 'medium'" (click)="onlyWithSummary.set(!onlyWithSummary())">
-      <ion-label>Only with summary</ion-label>
-    </ion-chip>
   </div>
 
   <div class="story-meta" *ngIf="story() as s">
