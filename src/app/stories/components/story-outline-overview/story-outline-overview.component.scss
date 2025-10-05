@@ -11,6 +11,16 @@
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transform: translateY(-100%);
+  opacity: 0;
+  transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+  pointer-events: none;
+
+  &.visible {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
 
   @media (max-width: 768px) {
     flex-direction: column;
@@ -26,6 +36,14 @@
     ion-chip {
       justify-content: center;
     }
+  }
+}
+
+ion-fab {
+  z-index: 11;
+
+  @media (max-width: 768px) {
+    margin-top: 56px;
   }
 }
 

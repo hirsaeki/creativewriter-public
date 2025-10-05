@@ -6,10 +6,10 @@ import {
   IonContent, IonSearchbar, IonAccordion, IonAccordionGroup, IonItem, IonLabel,
   IonButton, IonIcon, IonChip, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonTextarea, IonInput,
-  IonBadge, IonSkeletonText, IonNote, IonSpinner
+  IonBadge, IonSkeletonText, IonNote, IonSpinner, IonFab, IonFabButton
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline } from 'ionicons/icons';
+import { arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline, funnel, funnelOutline } from 'ionicons/icons';
 import { Story, Chapter } from '../../models/story.interface';
 import { StoryService } from '../../services/story.service';
 import { AppHeaderComponent, HeaderAction, BurgerMenuItem } from '../../../ui/components/app-header.component';
@@ -28,7 +28,7 @@ import { PromptManagerService } from '../../../shared/services/prompt-manager.se
     IonContent, IonSearchbar, IonAccordion, IonAccordionGroup, IonItem, IonLabel,
     IonButton, IonIcon, IonChip, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
     IonTextarea, IonInput,
-    IonBadge, IonSkeletonText, IonNote, IonSpinner
+    IonBadge, IonSkeletonText, IonNote, IonSpinner, IonFab, IonFabButton
   ],
   templateUrl: './story-outline-overview.component.html',
   styleUrls: ['./story-outline-overview.component.scss'],
@@ -79,8 +79,15 @@ export class StoryOutlineOverviewComponent implements OnInit {
     })).filter(ch => ch.scenes.length > 0);
   });
 
+  // UI state
+  toolbarVisible = signal<boolean>(false);
+
   constructor() {
-    addIcons({ arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline });
+    addIcons({ arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline, funnel, funnelOutline });
+  }
+
+  toggleToolbar(): void {
+    this.toolbarVisible.update(v => !v);
   }
 
   async ngOnInit(): Promise<void> {

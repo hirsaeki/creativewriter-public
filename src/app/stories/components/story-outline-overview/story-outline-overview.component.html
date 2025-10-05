@@ -6,7 +6,15 @@
 ></app-header>
 
 <ion-content [fullscreen]="true">
-  <div class="toolbar">
+  <!-- Floating Action Button to toggle toolbar -->
+  <ion-fab vertical="top" horizontal="end" slot="fixed">
+    <ion-fab-button (click)="toggleToolbar()" [color]="toolbarVisible() ? 'primary' : 'medium'" size="small">
+      <ion-icon [name]="toolbarVisible() ? 'funnel' : 'funnel-outline'"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+
+  <!-- Collapsible Toolbar -->
+  <div class="toolbar" [class.visible]="toolbarVisible()">
     <ion-searchbar
       placeholder="Search titles and summaries"
       [debounce]="150"
