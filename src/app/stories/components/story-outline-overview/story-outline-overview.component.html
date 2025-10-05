@@ -10,33 +10,14 @@
   <ion-fab class="model-fab" vertical="top" horizontal="end" slot="fixed">
     <ion-fab-button
       aria-label="Toggle model selection"
+      [attr.aria-expanded]="toolbarVisible()"
+      aria-controls="model-selection-panel"
       (click)="toggleToolbar()"
       [color]="toolbarVisible() ? 'primary' : 'medium'"
       size="small">
       <ion-icon [name]="toolbarVisible() ? 'close-outline' : 'sparkles-outline'"></ion-icon>
     </ion-fab-button>
   </ion-fab>
-
-  <button
-    type="button"
-    class="mobile-model-fab"
-    [class.is-open]="toolbarVisible()"
-    (click)="toggleToolbar()"
-    [attr.aria-expanded]="toolbarVisible()"
-    aria-controls="model-selection-panel">
-    <ion-icon [name]="toolbarVisible() ? 'close-outline' : 'sparkles-outline'"></ion-icon>
-    <span>{{ toolbarVisible() ? 'Close model selection' : 'Model selection' }}</span>
-  </button>
-
-  <button
-    type="button"
-    class="mobile-toolbar-backdrop"
-    *ngIf="toolbarVisible()"
-    (click)="closeToolbar()"
-    (keydown.enter)="closeToolbar()"
-    (keydown.space)="closeToolbar()"
-    aria-label="Close model selection">
-  </button>
 
   <!-- Collapsible Toolbar -->
   <div
@@ -45,16 +26,6 @@
     [class.visible]="toolbarVisible()"
     role="region"
     aria-label="Model selection">
-    <div class="toolbar-mobile-header">
-      <h2>Model selection</h2>
-      <ion-button
-        size="small"
-        fill="clear"
-        color="light"
-        (click)="closeToolbar()">
-        <ion-icon slot="icon-only" name="close-outline"></ion-icon>
-      </ion-button>
-    </div>
     <ion-searchbar
       placeholder="Search titles and summaries"
       [debounce]="150"

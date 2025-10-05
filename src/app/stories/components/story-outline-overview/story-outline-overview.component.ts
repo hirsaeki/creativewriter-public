@@ -87,10 +87,6 @@ export class StoryOutlineOverviewComponent implements OnInit {
     this.toolbarVisible.update(v => !v);
   }
 
-  closeToolbar(): void {
-    this.toolbarVisible.set(false);
-  }
-
   async ngOnInit(): Promise<void> {
     const storyId = this.route.snapshot.paramMap.get('id');
     if (!storyId) {
