@@ -7,14 +7,54 @@
 
 <ion-content [fullscreen]="true">
   <!-- Floating Action Button to toggle toolbar -->
-  <ion-fab vertical="top" horizontal="end" slot="fixed">
-    <ion-fab-button (click)="toggleToolbar()" [color]="toolbarVisible() ? 'primary' : 'medium'" size="small">
+  <ion-fab class="filters-fab" vertical="top" horizontal="end" slot="fixed">
+    <ion-fab-button
+      aria-label="Toggle outline filters"
+      (click)="toggleToolbar()"
+      [color]="toolbarVisible() ? 'primary' : 'medium'"
+      size="small">
       <ion-icon [name]="toolbarVisible() ? 'funnel' : 'funnel-outline'"></ion-icon>
     </ion-fab-button>
   </ion-fab>
 
+  <button
+    type="button"
+    class="mobile-filter-fab"
+    [class.is-open]="toolbarVisible()"
+    (click)="toggleToolbar()"
+    [attr.aria-expanded]="toolbarVisible()"
+    aria-controls="outline-toolbar-panel">
+    <ion-icon [name]="toolbarVisible() ? 'close-outline' : 'funnel-outline'"></ion-icon>
+    <span>{{ toolbarVisible() ? 'Close filters' : 'Filters' }}</span>
+  </button>
+
+  <button
+    type="button"
+    class="mobile-toolbar-backdrop"
+    *ngIf="toolbarVisible()"
+    (click)="closeToolbar()"
+    (keydown.enter)="closeToolbar()"
+    (keydown.space)="closeToolbar()"
+    aria-label="Close filters">
+  </button>
+
   <!-- Collapsible Toolbar -->
-  <div class="toolbar" [class.visible]="toolbarVisible()">
+  <div
+    id="outline-toolbar-panel"
+    class="toolbar"
+    [class.visible]="toolbarVisible()"
+    role="region"
+    aria-label="Outline filters">
+    <div class="toolbar-mobile-header">
+      <h2>Outline filters</h2>
+      <ion-button
+        size="small"
+        fill="clear"
+        color="light"
+        (click)="closeToolbar()">
+        <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+      </ion-button>
+    </div>
     <ion-searchbar
       placeholder="Search titles and summaries"
       [debounce]="150"
