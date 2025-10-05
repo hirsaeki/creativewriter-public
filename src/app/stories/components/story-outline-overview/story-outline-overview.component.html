@@ -13,7 +13,7 @@
       (click)="toggleToolbar()"
       [color]="toolbarVisible() ? 'primary' : 'medium'"
       size="small">
-      <ion-icon [name]="toolbarVisible() ? 'funnel' : 'funnel-outline'"></ion-icon>
+      <ion-icon [name]="toolbarVisible() ? 'close-outline' : 'sparkles-outline'"></ion-icon>
     </ion-fab-button>
   </ion-fab>
 
@@ -24,7 +24,7 @@
     (click)="toggleToolbar()"
     [attr.aria-expanded]="toolbarVisible()"
     aria-controls="model-selection-panel">
-    <ion-icon [name]="toolbarVisible() ? 'close-outline' : 'funnel-outline'"></ion-icon>
+    <ion-icon [name]="toolbarVisible() ? 'close-outline' : 'sparkles-outline'"></ion-icon>
     <span>{{ toolbarVisible() ? 'Close model selection' : 'Model selection' }}</span>
   </button>
 

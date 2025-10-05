@@ -9,7 +9,7 @@ import {
   IonBadge, IonSkeletonText, IonNote, IonSpinner, IonFab, IonFabButton
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline, funnel, funnelOutline } from 'ionicons/icons';
+import { arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline } from 'ionicons/icons';
 import { Story, Chapter } from '../../models/story.interface';
 import { StoryService } from '../../services/story.service';
 import { AppHeaderComponent, HeaderAction, BurgerMenuItem } from '../../../ui/components/app-header.component';
@@ -80,7 +80,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
   toolbarVisible = signal<boolean>(false);
 
   constructor() {
-    addIcons({ arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline, funnel, funnelOutline });
+    addIcons({ arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline });
   }
 
   toggleToolbar(): void {
