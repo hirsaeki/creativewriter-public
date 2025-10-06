@@ -7,32 +7,58 @@
 
 <ion-content [fullscreen]="true">
   <!-- Floating Action Button to toggle model selection -->
-  <ion-fab class="model-fab" vertical="top" horizontal="end" slot="fixed">
+  <ion-fab class="model-fab" vertical="bottom" horizontal="end" slot="fixed" [class.expanded]="toolbarVisible()">
     <ion-fab-button
       aria-label="Toggle model selection"
       [attr.aria-expanded]="toolbarVisible()"
       aria-controls="model-selection-panel"
       (click)="toggleToolbar()"
-      [color]="toolbarVisible() ? 'primary' : 'medium'"
-      size="small">
+      [color]="toolbarVisible() ? 'primary' : 'tertiary'"
+      size="small"
+      class="model-fab-button">
       <ion-icon [name]="toolbarVisible() ? 'close-outline' : 'sparkles-outline'"></ion-icon>
+      <span>{{ toolbarVisible() ? 'Close' : 'Model tools' }}</span>
     </ion-fab-button>
   </ion-fab>
 
-  <!-- Collapsible Toolbar -->
-  <div
+  <button
+    *ngIf="toolbarVisible()"
+    type="button"
+    class="fab-menu-backdrop"
+    aria-label="Dismiss model tools"
+    (click)="toggleToolbar()"
+    (keydown.enter)="toggleToolbar()"
+    (keydown.space)="toggleToolbar()">
+  </button>
+
+  <!-- Floating menu content -->
+  <section
     id="model-selection-panel"
-    class="toolbar"
+    class="fab-menu"
     [class.visible]="toolbarVisible()"
-    role="region"
-    aria-label="Model selection">
-    <ion-searchbar
-      placeholder="Search titles and summaries"
-      [debounce]="150"
-      (ionInput)="query.set($any($event.target).value || '')">
-    </ion-searchbar>
-    <app-model-selector [(model)]="selectedModel" [placeholder]="'Select AI model'" [appendTo]="'body'"></app-model-selector>
-  </div>
+    role="dialog"
+    aria-modal="true"
+    aria-label="Model tools">
+    <header class="fab-menu__header">
+      <h2>Model tools</h2>
+      <ion-button size="small" fill="clear" color="light" (click)="toggleToolbar()">
+        <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+      </ion-button>
+    </header>
+    <div class="fab-menu__body">
+      <ion-searchbar
+        #searchbar
+        placeholder="Search titles and summaries"
+        [debounce]="150"
+        (ionInput)="query.set($any($event.target).value || '')">
+      </ion-searchbar>
+      <app-model-selector
+        [(model)]="selectedModel"
+        [placeholder]="'Select AI model'"
+        [appendTo]="'body'">
+      </app-model-selector>
+    </div>
+  </section>
 
   <div class="story-meta" *ngIf="story() as s">
     <div class="title">{{ s.title || 'Untitled Story' }}</div>

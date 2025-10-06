@@ -36,6 +36,7 @@ import { PromptManagerService } from '../../../shared/services/prompt-manager.se
 })
 export class StoryOutlineOverviewComponent implements OnInit {
   @ViewChild(IonContent) content!: IonContent;
+  @ViewChild('searchbar') querySearchbar?: IonSearchbar;
 
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -84,7 +85,11 @@ export class StoryOutlineOverviewComponent implements OnInit {
   }
 
   toggleToolbar(): void {
-    this.toolbarVisible.update(v => !v);
+    const next = !this.toolbarVisible();
+    this.toolbarVisible.set(next);
+    if (next) {
+      setTimeout(() => this.querySearchbar?.setFocus(), 200);
+    }
   }
 
   async ngOnInit(): Promise<void> {
