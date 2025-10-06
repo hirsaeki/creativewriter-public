@@ -17,25 +17,30 @@ export interface TabItem {
     IonSegment, IonSegmentButton, IonIcon, IonLabel
   ],
   template: `
-    <ion-segment 
-      [ngModel]="selectedTab" 
-      (ngModelChange)="onTabChange($event)"
-      mode="md" 
-      class="settings-tabs">
-      <ion-segment-button 
-        *ngFor="let tab of tabs" 
-        [value]="tab.value">
-        <ion-icon [name]="tab.icon"></ion-icon>
-        <ion-label>{{ tab.label }}</ion-label>
-      </ion-segment-button>
-    </ion-segment>
+    <div class="settings-tabs-container">
+      <ion-segment 
+        [ngModel]="selectedTab" 
+        (ngModelChange)="onTabChange($event)"
+        mode="md" 
+        [scrollable]="true"
+        class="settings-tabs">
+        <ion-segment-button 
+          *ngFor="let tab of tabs" 
+          [value]="tab.value">
+          <ion-icon [name]="tab.icon"></ion-icon>
+          <ion-label>{{ tab.label }}</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </div>
   `,
   styles: [`
     /* Tab Navigation Styles */
-    .settings-tabs {
+    .settings-tabs-container {
       position: sticky;
       top: 0;
       z-index: 10;
+      width: 100%;
+      overflow-x: auto;
       background: rgba(45, 45, 45, 0.3);
       backdrop-filter: blur(15px);
       -webkit-backdrop-filter: blur(15px);
@@ -43,12 +48,26 @@ export interface TabItem {
       box-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
       padding: 0.5rem;
       margin-bottom: 1rem;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
     }
-    
+
+    .settings-tabs-container::-webkit-scrollbar {
+      display: none;
+    }
+
+    .settings-tabs {
+      display: inline-flex;
+      gap: 0.5rem;
+      min-width: 100%;
+      width: max-content;
+      flex-wrap: nowrap;
+    }
+
     ion-segment {
       --background: transparent;
     }
-    
+
     ion-segment-button {
       --background: transparent;
       --background-checked: linear-gradient(135deg, rgba(71, 118, 230, 0.2) 0%, rgba(139, 180, 248, 0.2) 100%);
@@ -59,6 +78,7 @@ export interface TabItem {
       --border-radius: 8px;
       padding: 0.5rem;
       min-height: 48px;
+      flex: 0 0 auto;
       transition: all 0.3s ease;
       border: 1px solid transparent;
       opacity: 0.8;
@@ -96,15 +116,16 @@ export interface TabItem {
     }
 
     @media (max-width: 768px) {
-      .settings-tabs {
+      .settings-tabs-container {
         padding: 0.25rem;
       }
-      
+
       ion-segment-button {
         padding: 0.25rem;
         min-height: 40px;
+        min-width: 110px;
       }
-      
+
       ion-segment-button ion-icon {
         font-size: 1.1rem;
         margin-bottom: 0;
