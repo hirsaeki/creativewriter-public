@@ -1,6 +1,6 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { Observable, Subject, map, scan, catchError, of, switchMap, from, tap } from 'rxjs';
+import { Observable, ReplaySubject, Subject, Subscription, catchError, from, map, of, scan, switchMap, tap } from 'rxjs';
 import { BeatAI, BeatAIGenerationEvent } from '../../stories/models/beat-ai.interface';
 import { Story } from '../../stories/models/story.interface';
 import { OpenRouterApiService } from '../../core/services/openrouter-api.service';
@@ -14,10 +14,31 @@ import { PromptManagerService } from './prompt-manager.service';
 import { CodexRelevanceService, CodexEntry as CodexRelevanceEntry } from '../../core/services/codex-relevance.service';
 import { CodexEntry, CustomField } from '../../stories/models/codex.interface';
 
+type ProviderType = 'ollama' | 'claude' | 'gemini' | 'openrouter';
+
+interface GenerationContext {
+  beatId: string;
+  provider: ProviderType;
+  prompt: string;
+  options: {
+    model?: string;
+    temperature?: number;
+    topP?: number;
+  };
+  wordCount: number;
+  maxTokens: number;
+  requestId: string;
+  resultSubject: ReplaySubject<string>;
+  streamingSubscription?: Subscription;
+  fallbackSubscription?: Subscription;
+  fallbackStatus: 'idle' | 'prepared' | 'running' | 'completed';
+  latestContent?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
-export class BeatAIService {
+export class BeatAIService implements OnDestroy {
   private readonly openRouterApi = inject(OpenRouterApiService);
   private readonly googleGeminiApi = inject(GoogleGeminiApiService);
   private readonly ollamaApi = inject(OllamaApiService);
@@ -36,6 +57,263 @@ export class BeatAIService {
   public isStreaming$ = this.isStreamingSubject.asObservable();
   private htmlEntityDecoder: HTMLTextAreaElement | null = null;
   private entityDecodeBuffers = new Map<string, string>();
+  private generationContexts = new Map<string, GenerationContext>();
+  private pendingVisibilityFallbacks = new Set<string>();
+
+  constructor() {
+    const doc = this.document;
+    if (doc && typeof doc.addEventListener === 'function') {
+      doc.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+  }
+
+  ngOnDestroy(): void {
+    const doc = this.document;
+    if (doc && typeof doc.removeEventListener === 'function') {
+      doc.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+    this.cleanupAllContexts();
+  }
+
+  private handleVisibilityChange = (): void => {
+    const doc = this.document;
+    if (!doc) {
+      return;
+    }
+
+    if (doc.hidden) {
+      this.prepareVisibilityFallbacks();
+    } else {
+      this.resumeVisibilityFallbacks();
+    }
+  };
+
+  private cleanupAllContexts(): void {
+    this.generationContexts.forEach(context => {
+      context.streamingSubscription?.unsubscribe();
+      context.fallbackSubscription?.unsubscribe();
+    });
+    this.generationContexts.clear();
+    this.pendingVisibilityFallbacks.clear();
+    this.activeGenerations.clear();
+    this.entityDecodeBuffers.clear();
+  }
+
+  private prepareVisibilityFallbacks(): void {
+    if (this.activeGenerations.size === 0) {
+      return;
+    }
+
+    this.activeGenerations.forEach((requestId, beatId) => {
+      const context = this.generationContexts.get(beatId);
+      if (!context || context.fallbackStatus !== 'idle') {
+        return;
+      }
+
+      this.pendingVisibilityFallbacks.add(beatId);
+      context.fallbackStatus = 'prepared';
+
+      if (requestId) {
+        this.abortProviderRequest(context.provider, requestId);
+      }
+
+      this.entityDecodeBuffers.delete(beatId);
+      this.activeGenerations.delete(beatId);
+    });
+
+    this.resumeVisibilityFallbacks();
+  }
+
+  private resumeVisibilityFallbacks(): void {
+    if (this.pendingVisibilityFallbacks.size === 0) {
+      return;
+    }
+
+    Array.from(this.pendingVisibilityFallbacks).forEach(beatId => {
+      const context = this.generationContexts.get(beatId);
+      if (!context || context.fallbackStatus === 'running' || context.fallbackStatus === 'completed') {
+        return;
+      }
+
+      context.fallbackStatus = 'running';
+      const fallbackRequestId = this.createProviderRequestId(context.provider);
+      context.requestId = fallbackRequestId;
+      this.activeGenerations.set(beatId, fallbackRequestId);
+
+      const fallback$ = this.executeNonStreamingFallback(context).pipe(
+        tap(content => {
+          context.latestContent = content;
+        })
+      );
+
+      const subscription = fallback$.subscribe({
+        next: content => {
+          context.resultSubject.next(content);
+        },
+        error: error => {
+          this.generationSubject.next({ beatId, chunk: '', isComplete: true });
+          context.resultSubject.error(error);
+          this.handleFallbackCleanup(beatId);
+        },
+        complete: () => {
+          this.generationSubject.next({ beatId, chunk: '', isComplete: true });
+          context.resultSubject.complete();
+          this.handleFallbackCleanup(beatId);
+        }
+      });
+
+      context.fallbackSubscription = subscription;
+    });
+  }
+
+  private handleFallbackCleanup(beatId: string): void {
+    const context = this.generationContexts.get(beatId);
+    if (context) {
+      context.fallbackStatus = 'completed';
+    }
+    this.cleanupContext(beatId);
+  }
+
+  private createProviderRequestId(provider: ProviderType): string {
+    const suffix = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    switch (provider) {
+      case 'gemini':
+        return `gemini_visibility_${suffix}`;
+      case 'claude':
+        return `claude_visibility_${suffix}`;
+      case 'openrouter':
+        return `openrouter_visibility_${suffix}`;
+      case 'ollama':
+        return `ollama_visibility_${suffix}`;
+      default:
+        return `beat_visibility_${suffix}`;
+    }
+  }
+
+  private abortProviderRequest(provider: ProviderType, requestId: string): void {
+    if (!requestId) {
+      return;
+    }
+
+    switch (provider) {
+      case 'gemini':
+        this.googleGeminiApi.abortRequest(requestId);
+        break;
+      case 'claude':
+        this.claudeApi.abortRequest(requestId);
+        break;
+      case 'openrouter':
+        this.openRouterApi.abortRequest(requestId);
+        break;
+      case 'ollama':
+        this.ollamaApi.abortRequest(requestId);
+        break;
+    }
+  }
+
+  private executeNonStreamingFallback(context: GenerationContext): Observable<string> {
+    const { provider, prompt, options, maxTokens, wordCount, requestId, beatId } = context;
+    const messages = this.parseStructuredPrompt(prompt);
+
+    switch (provider) {
+      case 'gemini':
+        return this.googleGeminiApi.generateText(prompt, {
+          model: options.model,
+          maxTokens,
+          temperature: options.temperature,
+          topP: options.topP,
+          wordCount,
+          requestId,
+          messages
+        }).pipe(
+          map(response => {
+            const pending = this.flushEntityDecodeBuffer(beatId);
+            const rawContent = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const decodedContent = this.decodeHtmlEntities(rawContent);
+            const combined = pending ? pending + decodedContent : decodedContent;
+            return this.removeDuplicateCharacterAnalyses(combined);
+          })
+        );
+      case 'claude':
+        return this.claudeApi.generateText(prompt, {
+          model: options.model,
+          maxTokens,
+          temperature: options.temperature,
+          topP: options.topP,
+          wordCount,
+          requestId,
+          messages
+        }).pipe(
+          map(response => {
+            const pending = this.flushEntityDecodeBuffer(beatId);
+            const rawContent = response.content?.[0]?.text || '';
+            const decodedContent = this.decodeHtmlEntities(rawContent);
+            const combined = pending ? pending + decodedContent : decodedContent;
+            return this.removeDuplicateCharacterAnalyses(combined);
+          })
+        );
+      case 'openrouter':
+        return this.openRouterApi.generateText(prompt, {
+          model: options.model,
+          maxTokens,
+          temperature: options.temperature,
+          topP: options.topP,
+          wordCount,
+          requestId,
+          messages
+        }).pipe(
+          map(response => {
+            const pending = this.flushEntityDecodeBuffer(beatId);
+            const rawContent = response.choices?.[0]?.message?.content || '';
+            const decodedContent = this.decodeHtmlEntities(rawContent);
+            const combined = pending ? pending + decodedContent : decodedContent;
+            return this.removeDuplicateCharacterAnalyses(combined);
+          })
+        );
+      case 'ollama':
+        return this.ollamaApi.generateText(prompt, {
+          model: options.model,
+          maxTokens,
+          temperature: options.temperature,
+          topP: options.topP,
+          requestId,
+          messages,
+          stream: false
+        }).pipe(
+          map(response => {
+            const pending = this.flushEntityDecodeBuffer(beatId);
+            let rawContent = '';
+            if (response && 'response' in response && response.response) {
+              rawContent = response.response;
+            } else if (response && 'message' in response && response.message?.content) {
+              rawContent = response.message.content;
+            }
+            const decodedContent = this.decodeHtmlEntities(rawContent);
+            const combined = pending ? pending + decodedContent : decodedContent;
+            return this.removeDuplicateCharacterAnalyses(combined);
+          })
+        );
+      default:
+        return of('');
+    }
+  }
+
+  private cleanupContext(beatId: string): void {
+    const context = this.generationContexts.get(beatId);
+    if (context) {
+      context.streamingSubscription?.unsubscribe();
+      context.fallbackSubscription?.unsubscribe();
+    }
+
+    this.generationContexts.delete(beatId);
+    this.pendingVisibilityFallbacks.delete(beatId);
+    this.activeGenerations.delete(beatId);
+    this.entityDecodeBuffers.delete(beatId);
+
+    if (this.activeGenerations.size === 0) {
+      this.isStreamingSubject.next(false);
+    }
+  }
 
   private decodeHtmlEntities(text: string): string {
     if (!text || text.indexOf('&') === -1) {
@@ -103,6 +381,8 @@ export class BeatAIService {
   generateBeatContent(prompt: string, beatId: string, options: {
     wordCount?: number;
     model?: string;
+    temperature?: number;
+    topP?: number;
     storyId?: string;
     chapterId?: string;
     sceneId?: string;
@@ -115,29 +395,26 @@ export class BeatAIService {
     };
   } = {}): Observable<string> {
     const settings = this.settingsService.getSettings();
-    
-    // Extract provider and model ID from the combined format
-    let provider: string | null = null;
+
+    let provider: ProviderType | null = null;
     let actualModelId: string | null = null;
-    
+
     if (options.model) {
       const [modelProvider, ...modelIdParts] = options.model.split(':');
-      provider = modelProvider;
-      actualModelId = modelIdParts.join(':'); // Rejoin in case model ID contains colons
+      provider = modelProvider as ProviderType;
+      actualModelId = modelIdParts.join(':');
     }
-    
-    // Check which API to use based on the model's provider
+
     const useGoogleGemini = provider === 'gemini' && settings.googleGemini.enabled && settings.googleGemini.apiKey;
     const useOpenRouter = provider === 'openrouter' && settings.openRouter.enabled && settings.openRouter.apiKey;
     const useOllama = provider === 'ollama' && settings.ollama.enabled && settings.ollama.baseUrl;
     const useClaude = provider === 'claude' && settings.claude.enabled && settings.claude.apiKey;
-    
+
     if (!useGoogleGemini && !useOpenRouter && !useOllama && !useClaude) {
       console.warn('No AI API configured, using fallback content');
       return this.generateFallbackContent(prompt, beatId);
     }
 
-    // Emit generation start
     this.isStreamingSubject.next(true);
     this.generationSubject.next({
       beatId,
@@ -145,50 +422,44 @@ export class BeatAIService {
       isComplete: false
     });
 
-    // Create structured prompt using template
     const wordCount = options.wordCount || 400;
-    
-    
+
     return this.buildStructuredPromptFromTemplate(prompt, beatId, { ...options, wordCount }).pipe(
       switchMap(enhancedPrompt => {
-        // Calculate max tokens based on word count (roughly 2.5 tokens per German word for Gemini)
-        // Set a high minimum to avoid MAX_TOKENS cutoff
         const calculatedTokens = Math.ceil(wordCount * 2.5);
-        const maxTokens = Math.max(calculatedTokens, 3000); // Minimum 3000 tokens for any response
-        const requestId = this.generateRequestId();
-        
-        
-        // Store the active generation
+        const maxTokens = Math.max(calculatedTokens, 3000);
+        const resolvedProvider: ProviderType = useOllama
+          ? 'ollama'
+          : useClaude
+            ? 'claude'
+            : useGoogleGemini
+              ? 'gemini'
+              : 'openrouter';
+        const requestId = this.createProviderRequestId(resolvedProvider);
+
         this.activeGenerations.set(beatId, requestId);
 
-        // Update options with the actual model ID
         const updatedOptions = { ...options, model: actualModelId || undefined };
-        
-        // Choose API based on configuration (prioritize local Ollama, then Claude, then Gemini, then OpenRouter)
+
         let apiCall: Observable<string>;
-        if (useOllama) {
+        if (resolvedProvider === 'ollama') {
           apiCall = this.callOllamaAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
-        } else if (useClaude) {
+        } else if (resolvedProvider === 'claude') {
           apiCall = this.callClaudeStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
-        } else if (useGoogleGemini) {
+        } else if (resolvedProvider === 'gemini') {
           apiCall = this.callGoogleGeminiStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
         } else {
           apiCall = this.callOpenRouterStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
         }
 
-        return apiCall.pipe(
+        const guardedApiCall = apiCall.pipe(
           catchError(() => {
-            
-            // Clean up active generation
+            this.pendingVisibilityFallbacks.delete(beatId);
             this.activeGenerations.delete(beatId);
             this.entityDecodeBuffers.delete(beatId);
-            
-            // Signal streaming stopped if no more active generations
             if (this.activeGenerations.size === 0) {
               this.isStreamingSubject.next(false);
             }
-            
-            // Emit error and fall back to sample content
             this.generationSubject.next({
               beatId,
               chunk: '',
@@ -197,6 +468,55 @@ export class BeatAIService {
             return this.generateFallbackContent(prompt, beatId);
           })
         );
+
+        const resultSubject = new ReplaySubject<string>(1);
+        const context: GenerationContext = {
+          beatId,
+          provider: resolvedProvider,
+          prompt: enhancedPrompt,
+          options: {
+            model: updatedOptions.model,
+            temperature: updatedOptions.temperature,
+            topP: updatedOptions.topP
+          },
+          wordCount,
+          maxTokens,
+          requestId,
+          resultSubject,
+          fallbackStatus: 'idle'
+        };
+
+        this.generationContexts.set(beatId, context);
+
+        const subscription = guardedApiCall.subscribe({
+          next: value => {
+            context.latestContent = value;
+            resultSubject.next(value);
+          },
+          error: error => {
+            resultSubject.error(error);
+            this.cleanupContext(beatId);
+          },
+          complete: () => {
+            if (this.pendingVisibilityFallbacks.has(beatId) && context.fallbackStatus !== 'completed') {
+              return;
+            }
+            resultSubject.complete();
+            this.cleanupContext(beatId);
+          }
+        });
+
+        context.streamingSubscription = subscription;
+
+        return new Observable<string>(observer => {
+          const subjectSubscription = resultSubject.subscribe(observer);
+          return () => {
+            subjectSubscription.unsubscribe();
+            if (this.generationContexts.has(beatId)) {
+              this.stopGeneration(beatId);
+            }
+          };
+        });
       })
     );
   }
@@ -227,6 +547,9 @@ export class BeatAIService {
       scan((acc, decodedChunk) => acc + decodedChunk, ''), // Accumulate chunks
       tap({
         complete: () => {
+          if (this.pendingVisibilityFallbacks.has(beatId)) {
+            return;
+          }
           const remainder = this.flushEntityDecodeBuffer(beatId);
           if (remainder) {
             accumulatedContent += remainder;
@@ -344,6 +667,9 @@ export class BeatAIService {
       scan((acc, decodedChunk) => acc + decodedChunk, ''), // Accumulate chunks
       tap({
         complete: () => {
+          if (this.pendingVisibilityFallbacks.has(beatId)) {
+            return;
+          }
           const remainder = this.flushEntityDecodeBuffer(beatId);
           if (remainder) {
             accumulatedContent += remainder;
@@ -415,6 +741,9 @@ export class BeatAIService {
       scan((acc, decodedChunk) => acc + decodedChunk, ''), // Accumulate chunks
       tap({
         complete: () => {
+          if (this.pendingVisibilityFallbacks.has(beatId)) {
+            return;
+          }
           const remainder = this.flushEntityDecodeBuffer(beatId);
           if (remainder) {
             accumulatedContent += remainder;
@@ -486,6 +815,9 @@ export class BeatAIService {
       scan((acc, decodedChunk) => acc + decodedChunk, ''), // Accumulate chunks
       tap({
         complete: () => {
+          if (this.pendingVisibilityFallbacks.has(beatId)) {
+            return;
+          }
           const remainder = this.flushEntityDecodeBuffer(beatId);
           if (remainder) {
             accumulatedContent += remainder;
@@ -919,40 +1251,36 @@ export class BeatAIService {
   }
 
   stopGeneration(beatId: string): void {
-    const requestId = this.activeGenerations.get(beatId);
-    if (requestId) {
-      // Try to abort on all APIs (one will succeed based on request ID format)
+    const context = this.generationContexts.get(beatId);
+    const requestId = this.activeGenerations.get(beatId) || context?.requestId;
+
+    if (context && requestId) {
+      this.abortProviderRequest(context.provider, requestId);
+    } else if (requestId) {
       if (requestId.startsWith('gemini_')) {
         this.googleGeminiApi.abortRequest(requestId);
       } else if (requestId.startsWith('claude_')) {
         this.claudeApi.abortRequest(requestId);
+      } else if (requestId.startsWith('ollama_')) {
+        this.ollamaApi.abortRequest(requestId);
       } else {
         this.openRouterApi.abortRequest(requestId);
       }
-      
-      this.activeGenerations.delete(beatId);
-      this.entityDecodeBuffers.delete(beatId);
-      
-      // Emit generation stopped
-      this.generationSubject.next({
-        beatId,
-        chunk: '',
-        isComplete: true
-      });
-      
-      // Signal streaming stopped if no more active generations
-      if (this.activeGenerations.size === 0) {
-        this.isStreamingSubject.next(false);
-      }
     }
+
+    context?.resultSubject.complete();
+
+    this.cleanupContext(beatId);
+
+    this.generationSubject.next({
+      beatId,
+      chunk: '',
+      isComplete: true
+    });
   }
 
   isGenerating(beatId: string): boolean {
     return this.activeGenerations.has(beatId);
-  }
-
-  private generateRequestId(): string {
-    return 'beat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
   }
 
   private getCategoryXmlType(category: string): string {
