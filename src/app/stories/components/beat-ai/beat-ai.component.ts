@@ -7,7 +7,7 @@ import {
   IonButton, IonButtons, IonToolbar, IonTitle, IonHeader, IonContent, IonList, IonItem
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, createOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline } from 'ionicons/icons';
+import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp } from 'ionicons/icons';
 import { BeatAIModalService } from '../../../shared/services/beat-ai-modal.service';
 import { TokenInfoPopoverComponent } from '../../../ui/components/token-info-popover.component';
 import { TokenCounterService, SupportedModel } from '../../../shared/services/token-counter.service';
@@ -121,7 +121,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   constructor() {
     // Register icons
-    addIcons({ logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, createOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline });
+    addIcons({ logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp });
   }
   
   ngOnInit(): void {
@@ -160,22 +160,25 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.beatData.includeStoryOutline !== undefined) {
       this.includeStoryOutline = this.beatData.includeStoryOutline;
     }
-    
+
+    // Ensure collapsed state is defined (legacy beats might rely on isEditing)
+    if (this.beatData.isCollapsed === undefined || this.beatData.isCollapsed === null) {
+      this.beatData.isCollapsed = false;
+    }
+
     // Load available models and set default
     this.loadAvailableModels();
     this.setDefaultModel();
-    
+
     // Load story and setup default context
     this.loadStoryAndSetupContext();
-    
+
     // Auto-focus prompt input if it's a new beat
     if (!this.beatData.prompt) {
-      this.beatData.isEditing = true;
-      // Wait for DOM to update with editing state, then initialize editor
+      this.beatData.isCollapsed = false;
+      // Wait for DOM to update with expanded state, then initialize editor
       setTimeout(() => {
-        if (this.promptInput && !this.editorView) {
-          this.initializeProseMirrorEditor();
-        }
+        this.ensureEditorInitialized();
       }, 100);
     }
     
@@ -213,8 +216,8 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    // Initialize ProseMirror editor if in editing mode
-    if (this.beatData.isEditing && this.promptInput && !this.editorView) {
+    // Initialize ProseMirror editor if expanded
+    if (!this.beatData.isCollapsed && this.promptInput && !this.editorView) {
       this.initializeProseMirrorEditor();
     }
     
@@ -250,6 +253,23 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       // Ensure currentPrompt stays synchronized after setting content
       // (setSimpleContent doesn't trigger the onUpdate callback)
     }
+    this.applyTextColorDirectly();
+  }
+
+  private ensureEditorInitialized(): void {
+    if (this.beatData.isCollapsed) {
+      return;
+    }
+
+    if (this.promptInput && !this.editorView) {
+      this.initializeProseMirrorEditor();
+    }
+
+    if (this.editorView) {
+      setTimeout(() => {
+        this.focusPromptInput();
+      }, 50);
+    }
   }
 
   private insertTextDirectly(text: string): void {
@@ -261,43 +281,45 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     this.editorView.dispatch(tr);
   }
   
-  async startEditing(): Promise<void> {
-    this.beatData.isEditing = true;
+  async toggleCollapsed(event?: Event): Promise<void> {
+    event?.stopPropagation();
+    if (this.beatData.isCollapsed) {
+      await this.expandPrompt();
+    } else {
+      this.collapsePrompt();
+    }
+    this.contentUpdate.emit(this.beatData);
+    this.cdr.markForCheck();
+  }
+
+  private async expandPrompt(): Promise<void> {
+    if (!this.beatData.isCollapsed) {
+      this.ensureEditorInitialized();
+      return;
+    }
+
+    this.beatData.isCollapsed = false;
     this.currentPrompt = this.beatData.prompt;
     this.beatFocus.emit();
-    
-    // Restore all persisted settings when switching back to edit mode
+
     await this.restorePersistedSettings();
-    
-    // Destroy existing editor if it exists (DOM element will be recreated by *ngIf)
+
     if (this.editorView) {
       this.editorView.destroy();
       this.editorView = null;
     }
-    
-    // Initialize editor after DOM updates
+
     setTimeout(() => {
-      if (this.promptInput) {
-        this.initializeProseMirrorEditor();
-      }
-      
-      // Focus editor after initialization
-      setTimeout(() => {
-        if (this.editorView) {
-          this.editorView.focus();
-        }
-      }, 50);
+      this.ensureEditorInitialized();
     }, 100);
   }
-  
-  async cancelEditing(): Promise<void> {
-    this.beatData.isEditing = false;
-    this.currentPrompt = this.beatData.prompt;
-    
-    // Restore all persisted settings when canceling
-    await this.restorePersistedSettings();
-    
-    // Destroy editor when canceling
+
+  private collapsePrompt(): void {
+    if (this.beatData.isCollapsed) {
+      return;
+    }
+
+    this.beatData.isCollapsed = true;
     if (this.editorView) {
       this.editorView.destroy();
       this.editorView = null;
@@ -308,7 +330,6 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.currentPrompt.trim() || !this.selectedModel) return;
     
     this.beatData.prompt = this.currentPrompt.trim();
-    this.beatData.isEditing = false;
     this.beatData.isGenerating = true;
     this.beatData.updatedAt = new Date();
     this.beatData.wordCount = this.getActualWordCount();

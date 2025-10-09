@@ -1221,7 +1221,7 @@ export class BeatAIService implements OnDestroy {
       prompt: '',
       generatedContent: '',
       isGenerating: false,
-      isEditing: true,
+      isCollapsed: false,
       createdAt: new Date(),
       updatedAt: new Date(),
       wordCount: 400,

@@ -1,6 +1,6 @@
-    <div class="beat-ai-container" [class.editing]="beatData.isEditing" [class.generating]="beatData.isGenerating" [style.--beat-ai-text-color]="currentTextColor">
+    <div class="beat-ai-container" [class.expanded]="!beatData.isCollapsed" [class.collapsed]="beatData.isCollapsed" [class.generating]="beatData.isGenerating" [style.--beat-ai-text-color]="currentTextColor">
       <!-- Prompt Input Section -->
-      <div class="beat-prompt-section" [class.collapsed]="!beatData.isEditing && beatData.generatedContent">
+      <div class="beat-prompt-section" [class.collapsed]="beatData.isCollapsed">
         <div class="beat-header">
           <div class="beat-icon">
             <ion-icon name="color-wand-outline"></ion-icon>
@@ -8,26 +8,25 @@
           <div class="beat-title">Beat AI</div>
           <div class="beat-actions">
             <button 
-              *ngIf="beatData.isEditing || !beatData.prompt" 
+              class="action-btn collapse-btn"
+              (click)="toggleCollapsed($event)"
+              [attr.title]="beatData.isCollapsed ? 'Expand prompt' : 'Collapse prompt'">
+              <ion-icon [name]="beatData.isCollapsed ? 'chevron-down' : 'chevron-up'"></ion-icon>
+            </button>
+            <button 
+              *ngIf="!beatData.isCollapsed" 
               class="action-btn context-btn"
               (click)="showSceneSelector = true; $event.stopPropagation()"
               title="Select context">
               <ion-icon name="add-outline"></ion-icon>
             </button>
             <button 
-              *ngIf="beatData.isEditing || !beatData.prompt" 
+              *ngIf="!beatData.isCollapsed" 
               class="action-btn outline-btn"
               [class.active]="includeStoryOutline"
               (click)="toggleStoryOutline(); $event.stopPropagation()"
               title="Include/exclude story overview">
               <ion-icon name="reader-outline"></ion-icon>
-            </button>
-            <button 
-              *ngIf="!beatData.isEditing && beatData.prompt" 
-              class="action-btn edit-btn"
-              (click)="startEditing(); $event.stopPropagation()"
-              title="Edit prompt">
-              <ion-icon name="create-outline"></ion-icon>
             </button>
             <button 
               *ngIf="beatData.generatedContent && !beatData.isGenerating" 
@@ -46,7 +45,7 @@
         </div>
 
         <!-- Context Chips -->
-        <div class="context-chips" *ngIf="selectedScenes.length > 0 || includeStoryOutline">
+        <div class="context-chips" *ngIf="!beatData.isCollapsed && (selectedScenes.length > 0 || includeStoryOutline)">
           <ion-chip *ngIf="includeStoryOutline" color="success">
             <ion-label>Story Overview</ion-label>
             <ion-icon 
@@ -63,14 +62,14 @@
           </ion-chip>
         </div>
         
-        <div class="prompt-input-container" *ngIf="beatData.isEditing || !beatData.prompt">
+        <div class="prompt-input-container" *ngIf="!beatData.isCollapsed">
           <div
             #promptInput
             class="prompt-input prosemirror-container"
           ></div>
           
           <!-- Generation Options -->
-          <div class="generation-options" *ngIf="beatData.isEditing || !beatData.prompt">
+          <div class="generation-options" *ngIf="!beatData.isCollapsed">
             <div class="options-row">
               <!-- Favorite Models Quick Access -->
               <div class="favorite-models" *ngIf="favoriteModels.length > 0">
@@ -180,7 +179,7 @@
             </div>
           </div>
 
-          <div class="prompt-actions">
+          <div class="prompt-actions" *ngIf="!beatData.isCollapsed">
             <button 
               class="generate-btn primary"
               (click)="generateContent(); $event.stopPropagation()"
@@ -202,25 +201,6 @@
               title="Token-Analyse anzeigen">
               <ion-icon name="analytics-outline"></ion-icon>
             </button>
-            <button 
-              *ngIf="beatData.prompt && beatData.isEditing"
-              class="cancel-btn"
-              (click)="cancelEditing(); $event.stopPropagation()"
-              title="Cancel editing">
-              <ion-icon name="close-outline" style="color: #dc3545;"></ion-icon>
-            </button>
-          </div>
-        </div>
-        
-        <div class="prompt-display" *ngIf="!beatData.isEditing && beatData.prompt">
-          <div class="prompt-text">{{ beatData.prompt }}</div>
-          <div class="beat-info">
-            <span class="beat-type-badge" [class.story-beat]="(beatData.beatType || 'story') === 'story'" [class.scene-beat]="(beatData.beatType || 'story') === 'scene'">
-              {{ (beatData.beatType || 'story') === 'story' ? 'StoryBeat' : 'SceneBeat' }}
-            </span>
-            <span class="model-badge" *ngIf="beatData.model" title="Verwendetes AI-Modell">
-              {{ getModelDisplayName(beatData.model) }}
-            </span>
           </div>
         </div>
       </div>

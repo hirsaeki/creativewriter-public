@@ -147,7 +147,7 @@ export class ProseMirrorEditorService {
           prompt: { default: '' },
           generatedContent: { default: '' },
           isGenerating: { default: false },
-          isEditing: { default: false },
+          isCollapsed: { default: false },
           createdAt: { default: '' },
           updatedAt: { default: '' },
           wordCount: { default: 400 },
@@ -165,7 +165,7 @@ export class ProseMirrorEditorService {
             'data-prompt': node.attrs['prompt'] || '',
             'data-content': node.attrs['generatedContent'] || '',
             'data-generating': node.attrs['isGenerating'] ? 'true' : 'false',
-            'data-editing': node.attrs['isEditing'] ? 'true' : 'false',
+            'data-collapsed': node.attrs['isCollapsed'] ? 'true' : 'false',
             'data-created': node.attrs['createdAt'] || '',
             'data-updated': node.attrs['updatedAt'] || '',
             'data-word-count': node.attrs['wordCount'] || 400,
@@ -191,13 +191,21 @@ export class ProseMirrorEditorService {
           getAttrs: (dom: HTMLElement) => {
             const selectedScenesStr = dom.getAttribute('data-selected-scenes') || '';
             const includeStoryOutlineStr = dom.getAttribute('data-include-story-outline') || '';
+            const collapsedAttr = dom.getAttribute('data-collapsed');
+            const legacyEditingAttr = dom.getAttribute('data-editing');
+            let isCollapsed = false;
+            if (collapsedAttr !== null) {
+              isCollapsed = collapsedAttr === 'true';
+            } else if (legacyEditingAttr !== null) {
+              isCollapsed = legacyEditingAttr === 'false';
+            }
             
             const attrs = {
               id: dom.getAttribute('data-id') || '',
               prompt: dom.getAttribute('data-prompt') || '',
               generatedContent: dom.getAttribute('data-content') || '',
               isGenerating: dom.getAttribute('data-generating') === 'true',
-              isEditing: dom.getAttribute('data-editing') === 'true',
+              isCollapsed,
               createdAt: dom.getAttribute('data-created') || '',
               updatedAt: dom.getAttribute('data-updated') || '',
               wordCount: parseInt(dom.getAttribute('data-word-count') || '400', 10),
@@ -587,7 +595,7 @@ export class ProseMirrorEditorService {
         prompt: beatData.prompt,
         generatedContent: beatData.generatedContent,
         isGenerating: beatData.isGenerating,
-        isEditing: beatData.isEditing,
+        isCollapsed: beatData.isCollapsed,
         createdAt: beatData.createdAt.toISOString(),
         updatedAt: beatData.updatedAt.toISOString(),
         wordCount: beatData.wordCount,

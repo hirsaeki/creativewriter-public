@@ -111,7 +111,7 @@ export class BeatAINodeView implements NodeView {
       this.beatData.prompt = newBeatData.prompt;
       this.beatData.generatedContent = newBeatData.generatedContent;
       this.beatData.updatedAt = newBeatData.updatedAt;
-      // Keep the existing isGenerating and isEditing states
+      // Keep the existing streaming state while allowing prompt/content updates
     }
     
     return true;
@@ -181,7 +181,7 @@ export class BeatAINodeView implements NodeView {
       prompt: attrs['prompt'] || '',
       generatedContent: attrs['generatedContent'] || '',
       isGenerating: attrs['isGenerating'] || false,
-      isEditing: attrs['isEditing'] || false,
+      isCollapsed: this.resolveCollapsedState(attrs),
       createdAt: attrs['createdAt'] ? new Date(attrs['createdAt']) : new Date(),
       updatedAt: attrs['updatedAt'] ? new Date(attrs['updatedAt']) : new Date(),
       wordCount: attrs['wordCount'] || 400,
@@ -201,7 +201,7 @@ export class BeatAINodeView implements NodeView {
       prompt: beatData.prompt,
       generatedContent: beatData.generatedContent,
       isGenerating: beatData.isGenerating,
-      isEditing: beatData.isEditing,
+      isCollapsed: beatData.isCollapsed,
       createdAt: beatData.createdAt.toISOString(),
       updatedAt: beatData.updatedAt.toISOString(),
       wordCount: beatData.wordCount || 400,
@@ -219,6 +219,33 @@ export class BeatAINodeView implements NodeView {
 
     const tr = this.view.state.tr.setNodeMarkup(pos, undefined, attrs);
     this.view.dispatch(tr);
+  }
+
+  private resolveCollapsedState(attrs: Record<string, unknown>): boolean {
+    const rawCollapsed = attrs['isCollapsed'];
+    if (typeof rawCollapsed === 'boolean') {
+      return rawCollapsed;
+    }
+
+    if (rawCollapsed === 'true') {
+      return true;
+    }
+    if (rawCollapsed === 'false') {
+      return false;
+    }
+
+    const legacyEditing = attrs['isEditing'];
+    if (typeof legacyEditing === 'boolean') {
+      return !legacyEditing;
+    }
+    if (legacyEditing === 'true') {
+      return false;
+    }
+    if (legacyEditing === 'false') {
+      return true;
+    }
+
+    return false;
   }
 
   private deleteNode(): void {
