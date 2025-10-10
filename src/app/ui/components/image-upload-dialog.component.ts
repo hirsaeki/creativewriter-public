@@ -649,7 +649,17 @@ export class ImageUploadDialogComponent {
     }
   }
 
-  private readFileAsDataURL(file: File): Promise<string> {
+  private async readFileAsDataURL(file: File): Promise<string> {
+    try {
+      return await this.readFileWithFileReader(file);
+    } catch (error) {
+      console.warn('FileReader failed, falling back to arrayBuffer for preview', error);
+      const buffer = await file.arrayBuffer();
+      return this.arrayBufferToDataUrl(buffer, file.type);
+    }
+  }
+
+  private readFileWithFileReader(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
@@ -657,6 +667,25 @@ export class ImageUploadDialogComponent {
       reader.onabort = () => reject(new Error('File reading was aborted'));
       reader.readAsDataURL(file);
     });
+  }
+
+  private arrayBufferToDataUrl(buffer: ArrayBuffer, mimeType: string): string {
+    const base64 = this.arrayBufferToBase64(buffer);
+    const safeMime = mimeType && mimeType.length > 0 ? mimeType : 'application/octet-stream';
+    return `data:${safeMime};base64,${base64}`;
+  }
+
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    let binary = '';
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+
+    return btoa(binary);
   }
 
   private commitState(mutator: () => void): void {

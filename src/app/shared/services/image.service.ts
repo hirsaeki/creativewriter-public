@@ -228,22 +228,51 @@ export class ImageService {
   }
 
   private async fileToBase64(file: File): Promise<string> {
+    try {
+      const dataUrl = await this.readFileWithFileReader(file);
+      return this.extractBase64(dataUrl);
+    } catch (error) {
+      console.warn('FileReader failed, falling back to arrayBuffer for upload', error);
+      const buffer = await file.arrayBuffer();
+      const dataUrl = this.arrayBufferToDataUrl(buffer, file.type);
+      return this.extractBase64(dataUrl);
+    }
+  }
+
+  private readFileWithFileReader(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
-      reader.onload = () => {
-        const result = reader.result as string;
-        // Remove the data URL prefix to get just the base64 data
-        const base64Data = result.split(',')[1];
-        resolve(base64Data);
-      };
-      
-      reader.onerror = () => {
-        reject(new Error('Error reading the file'));
-      };
-      
+
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error ?? new Error('Error reading the file'));
+      reader.onabort = () => reject(new Error('File reading was aborted'));
+
       reader.readAsDataURL(file);
     });
+  }
+
+  private extractBase64(dataUrl: string): string {
+    const parts = dataUrl.split(',');
+    return parts.length > 1 ? parts[1] : dataUrl;
+  }
+
+  private arrayBufferToDataUrl(buffer: ArrayBuffer, mimeType: string): string {
+    const base64 = this.arrayBufferToBase64(buffer);
+    const safeMime = mimeType && mimeType.length > 0 ? mimeType : 'application/octet-stream';
+    return `data:${safeMime};base64,${base64}`;
+  }
+
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    let binary = '';
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+
+    return btoa(binary);
   }
 
   private async storeImage(image: StoredImage): Promise<void> {
