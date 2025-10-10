@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output, inject } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Output, ViewChild, inject, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ModalController } from '@ionic/angular/standalone';
@@ -480,6 +480,7 @@ export interface ImageInsertResult {
 export class ImageUploadDialogComponent {
   @Output() imageInserted = new EventEmitter<ImageInsertResult>();
   @Output() cancelled = new EventEmitter<void>();
+  @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
 
   activeTab: 'upload' | 'url' = 'upload';
   isDragging = false;
@@ -505,12 +506,14 @@ export class ImageUploadDialogComponent {
 
   private readonly imageService = inject(ImageService);
   private readonly modalController = inject(ModalController);
+  private readonly zone = inject(NgZone);
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files[0]) {
       this.handleFile(input.files[0]);
     }
+    this.resetFileInput(input);
   }
 
   onDrop(event: DragEvent): void {
@@ -543,13 +546,45 @@ export class ImageUploadDialogComponent {
 
     this.uploadedFile = file;
     this.originalSize = file.size;
+    this.activeTab = 'upload';
+    this.imageUrl = '';
+    this.urlPreview = null;
+    this.compressedSize = 0;
+    if (!this.altText) {
+      this.altText = this.buildAltText(file.name);
+    }
     
     // Create preview
     const reader = new FileReader();
-    reader.onload = (e) => {
-      this.uploadPreview = e.target?.result as string;
+    reader.onload = () => {
+      this.zone.run(() => {
+        this.uploadPreview = reader.result as string;
+      });
+    };
+    reader.onerror = () => {
+      this.zone.run(() => {
+        console.error('Error reading image file');
+        alert('Error loading the image preview. Please try again.');
+        this.removeUploadedImage();
+      });
     };
     reader.readAsDataURL(file);
+  }
+
+  private resetFileInput(input?: HTMLInputElement | null): void {
+    const target = input ?? this.fileInput?.nativeElement ?? null;
+    if (target) {
+      target.value = '';
+    }
+  }
+
+  private buildAltText(filename: string): string {
+    const nameWithoutExtension = filename.replace(/\.[^/.]+$/, '');
+    return nameWithoutExtension
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase()) || 'Image';
   }
 
   removeUploadedImage(): void {
@@ -557,6 +592,7 @@ export class ImageUploadDialogComponent {
     this.uploadPreview = null;
     this.originalSize = 0;
     this.compressedSize = 0;
+    this.resetFileInput();
   }
 
   async cropImage(): Promise<void> {
