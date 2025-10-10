@@ -22,8 +22,19 @@
     </header>
 
     <section class="dialog-body">
-      <div class="image-container" *ngIf="imageSrc">
-        <img [src]="imageSrc" [alt]="imageAlt || 'Story image'" />
+      <div 
+        class="image-container"
+        *ngIf="imageSrc"
+        (wheel)="onWheel($event)"
+        (dblclick)="onToggleZoom()"
+        tabindex="0"
+      >
+        <img 
+          [src]="imageSrc" 
+          [alt]="imageAlt || 'Story image'" 
+          [style.width.%]="zoomLevel * 100"
+          [style.maxWidth.%]="zoomLevel * 100"
+        />
       </div>
 
       <div class="video-container loading" *ngIf="loadingVideo">
@@ -44,6 +55,18 @@
     </section>
 
     <footer class="dialog-footer">
+      <div class="zoom-controls" role="group" aria-label="Image zoom controls">
+        <button type="button" (click)="zoomOut()" [disabled]="zoomLevel <= minZoom" aria-label="Zoom out">
+          −
+        </button>
+        <span class="zoom-indicator" aria-live="polite">{{ (zoomLevel * 100) | number:'1.0-0' }}%</span>
+        <button type="button" (click)="zoomIn()" [disabled]="zoomLevel >= maxZoom" aria-label="Zoom in">
+          +
+        </button>
+        <button type="button" (click)="resetZoom()" [disabled]="zoomLevel === 1" aria-label="Reset zoom">
+          Reset
+        </button>
+      </div>
       <button type="button" class="manage-video-btn" (click)="onManageVideo($event)">
         Manage Video
       </button>
