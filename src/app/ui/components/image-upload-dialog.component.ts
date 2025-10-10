@@ -202,9 +202,9 @@ export interface ImageInsertResult {
       width: 90vw;
       max-height: 90vh;
       overflow-y: auto;
+      overflow-x: hidden;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
       position: relative;
-      overflow: hidden;
     }
 
     h3 {
