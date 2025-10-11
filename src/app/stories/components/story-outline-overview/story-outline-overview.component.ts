@@ -370,7 +370,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
     // Clean content and build prompt
     let sceneContent = this.removeEmbeddedImages(scene.content);
     sceneContent = this.promptManager.extractPlainTextFromHtml(sceneContent);
-    const sceneWordCount = this.countWords(sceneContent);
+    const sceneWordCount = this.getSceneWordCount(sceneId) || this.storyStats.calculateSceneWordCount(scene);
     const minimumSummaryWords = this.calculateSummaryMinimumWords(sceneWordCount);
     const wordCountInstruction = `Ensure the summary is at least ${minimumSummaryWords} words.`;
     const maxContentLength = 200000;
@@ -756,11 +756,6 @@ export class StoryOutlineOverviewComponent implements OnInit {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
-  }
-
-  private countWords(text: string): number {
-    if (!text) return 0;
-    return text.trim().split(/\s+/).filter(Boolean).length;
   }
 
   private calculateSummaryMinimumWords(sceneWordCount: number): number {
