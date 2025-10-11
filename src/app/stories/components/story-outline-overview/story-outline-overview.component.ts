@@ -18,6 +18,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { OpenRouterApiService } from '../../../core/services/openrouter-api.service';
 import { GoogleGeminiApiService } from '../../../core/services/google-gemini-api.service';
 import { PromptManagerService } from '../../../shared/services/prompt-manager.service';
+import { PromptTemplateService } from '../../../shared/services/prompt-template.service';
 
 @Component({
   selector: 'app-story-outline-overview',
@@ -45,6 +46,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
   private openRouterApi = inject(OpenRouterApiService);
   private geminiApi = inject(GoogleGeminiApiService);
   private promptManager = inject(PromptManagerService);
+  private promptTemplateService = inject(PromptTemplateService);
 
   // Header config
   leftActions: HeaderAction[] = [];
@@ -309,7 +311,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
   }
 
   // --- AI Generation (reuse logic from StoryStructureComponent) ---
-  generateSceneSummary(chapterId: string, sceneId: string): void {
+  async generateSceneSummary(chapterId: string, sceneId: string): Promise<void> {
     const s = this.story();
     if (!s) return;
     const chapter = s.chapters.find(c => c.id === chapterId);
@@ -357,20 +359,36 @@ export class StoryOutlineOverviewComponent implements OnInit {
       }
     })();
 
+    const truncatedNote = truncated ? '\n\n[Note: Content was truncated as it was too long]' : '';
+    const additionalInstructions = settings.sceneSummaryGeneration.customInstruction
+      ? `\n\nZusätzliche Anweisungen: ${settings.sceneSummaryGeneration.customInstruction}`
+      : '';
+
     let prompt: string;
     if (settings.sceneSummaryGeneration.useCustomPrompt) {
       prompt = settings.sceneSummaryGeneration.customPrompt
         .replace(/{sceneTitle}/g, scene.title || 'Untitled')
-        .replace(/{sceneContent}/g, sceneContent + (truncated ? '\n\n[Note: Content was truncated as it was too long]' : ''))
+        .replace(/{sceneContent}/g, sceneContent + truncatedNote)
         .replace(/{customInstruction}/g, settings.sceneSummaryGeneration.customInstruction || '')
         .replace(/{languageInstruction}/g, languageInstruction)
         .replace(/{summaryWordCount}/g, '');
       if (!prompt.includes(languageInstruction)) prompt += `\n\n${languageInstruction}`;
     } else {
-      prompt = `Create a summary of the following scene:\n\nTitle: ${scene.title || 'Untitled'}\n\nContent:\n${sceneContent}${truncated ? '\n\n[Note: Content was truncated as it was too long]' : ''}\n\nImportant: Write it structured to be used as context for an AI that continues the story.`;
-      if (settings.sceneSummaryGeneration.customInstruction) prompt += `\n\nZusätzliche Anweisungen: ${settings.sceneSummaryGeneration.customInstruction}`;
-      prompt += `\n\n${languageInstruction}`;
-      prompt += '\n\nAnswer only with and directly with the summary!';
+      try {
+        const template = await this.promptTemplateService.getSceneSummaryTemplate();
+        prompt = template
+          .replace(/\{sceneTitle\}/g, scene.title || 'Untitled')
+          .replace(/\{sceneContent\}/g, sceneContent)
+          .replace(/\{truncatedNote\}/g, truncatedNote)
+          .replace(/\{additionalInstructions\}/g, additionalInstructions)
+          .replace(/\{languageInstruction\}/g, languageInstruction);
+      } catch (error) {
+        console.error('Failed to load default scene summary template', error);
+        prompt = `Create a summary of the following scene:\n\nTitle: ${scene.title || 'Untitled'}\n\nContent:\n${sceneContent}${truncatedNote}\n\nImportant: Write it structured to be used as context for an AI that continues the story.`;
+        prompt += additionalInstructions;
+        prompt += `\n\n${languageInstruction}`;
+        prompt += '\n\nAnswer only with and directly with the summary!';
+      }
     }
 
     let provider: string | null = null; let actualModelId: string | null = null;
