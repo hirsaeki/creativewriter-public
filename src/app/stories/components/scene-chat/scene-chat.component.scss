@@ -285,6 +285,94 @@ ion-modal ion-item {
   -webkit-backdrop-filter: blur(8px);
 }
 
+.codex-review-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.codex-review-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 8px;
+}
+
+.codex-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.codex-entry-header h3 {
+  font-size: 1rem;
+  margin: 0;
+  color: var(--ion-color-light, #f8f9fa);
+}
+
+.codex-entry-header ion-chip {
+  margin: 0;
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  height: 24px;
+}
+
+.codex-entry-description {
+  font-size: 0.9rem;
+  color: rgba(248, 249, 250, 0.85);
+  line-height: 1.5;
+}
+
+.codex-entry-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.codex-entry-tags ion-chip {
+  margin: 0;
+  --padding-start: 6px;
+  --padding-end: 6px;
+  --padding-top: 2px;
+  --padding-bottom: 2px;
+  font-size: 0.75rem;
+}
+
+.codex-review-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: rgba(248, 249, 250, 0.7);
+}
+
+.codex-review-footer {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(20, 20, 20, 0.7);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.codex-review-meta {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: rgba(248, 249, 250, 0.7);
+}
+
+.codex-review-error {
+  color: var(--ion-color-danger, #eb445a);
+  font-size: 0.85rem;
+}
+
 ion-modal ion-item:hover {
   --background: linear-gradient(135deg, rgba(71, 118, 230, 0.3) 0%, rgba(139, 180, 248, 0.3) 100%);
   border-color: rgba(71, 118, 230, 0.5);

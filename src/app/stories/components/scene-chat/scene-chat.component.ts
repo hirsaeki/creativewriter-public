@@ -6,7 +6,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { 
   IonContent, IonFooter, IonItem, IonLabel, IonTextarea, IonList,
   IonChip, IonAvatar, IonSearchbar, IonModal, IonCheckbox, IonItemDivider,
-  IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader
+  IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader, IonSpinner
 } from '@ionic/angular/standalone';
 import { AlertController } from '@ionic/angular';
 import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
@@ -64,6 +64,14 @@ interface PresetPrompt {
   icon: string;
 }
 
+interface CodexEntryPreview {
+  name: string;
+  description: string;
+  role?: string;
+  tags: string[];
+  selected: boolean;
+}
+
 @Component({
   selector: 'app-scene-chat',
   standalone: true,
@@ -71,7 +79,7 @@ interface PresetPrompt {
     CommonModule, FormsModule, NgSelectModule, AppHeaderComponent,
     IonContent, IonFooter, IonItem, IonLabel, IonTextarea, IonList,
     IonChip, IonAvatar, IonSearchbar, IonModal, IonCheckbox, IonItemDivider,
-    IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader,
+    IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader, IonSpinner,
     OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent
   ],
   templateUrl: './scene-chat.component.html',
@@ -132,6 +140,13 @@ export class SceneChatComponent implements OnInit, OnDestroy {
   private activeHistoryId: string | null = null;
   showHistoryList = false;
   histories: ChatHistoryDoc[] = [];
+
+  // Codex review modal state
+  showCodexReviewModal = false;
+  codexReviewEntries: CodexEntryPreview[] = [];
+  codexReviewExtractionType: 'characters' | 'locations' | 'objects' | null = null;
+  isSavingCodexEntries = false;
+  codexReviewError = '';
 
   constructor() {
     addIcons({ 
@@ -699,55 +714,132 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
     }
   }
 
-  async addToCodex(message: ChatMessage) {
+  addToCodex(message: ChatMessage): void {
     if (!message.extractionType || !this.story) return;
 
+    const entries = this.parseExtractionResponse(message.content, message.extractionType);
+
+    if (entries.length === 0) {
+      this.messages.push({
+        role: 'assistant',
+        content: '⚠️ No structured entries detected to add to Codex. Please adjust the extraction prompt and try again.',
+        timestamp: new Date()
+      });
+      this.cdr.markForCheck();
+      this.scrollToBottom();
+      return;
+    }
+
+    this.codexReviewEntries = entries.map(entry => ({
+      name: entry.name,
+      description: entry.description || '',
+      role: entry.role,
+      tags: entry.tags || [],
+      selected: true
+    }));
+    this.codexReviewExtractionType = message.extractionType;
+    this.codexReviewError = '';
+    this.showCodexReviewModal = true;
+    this.cdr.markForCheck();
+  }
+
+  areAllCodexEntriesSelected(): boolean {
+    return this.codexReviewEntries.length > 0 && this.codexReviewEntries.every(entry => entry.selected);
+  }
+
+  getSelectedCodexEntriesCount(): number {
+    return this.codexReviewEntries.filter(entry => entry.selected).length;
+  }
+
+  toggleSelectAllCodexEntries(selectAll: boolean): void {
+    if (this.isSavingCodexEntries || this.codexReviewEntries.length === 0) return;
+    this.codexReviewEntries = this.codexReviewEntries.map(entry => ({
+      ...entry,
+      selected: selectAll
+    }));
+    if (selectAll && this.codexReviewError) {
+      this.codexReviewError = '';
+    }
+    this.cdr.markForCheck();
+  }
+
+  onCodexEntrySelectionChanged(): void {
+    if (this.codexReviewError && this.getSelectedCodexEntriesCount() > 0) {
+      this.codexReviewError = '';
+    }
+    this.cdr.markForCheck();
+  }
+
+  dismissCodexReviewModal(): void {
+    if (this.isSavingCodexEntries) return;
+    this.showCodexReviewModal = false;
+    this.cdr.markForCheck();
+  }
+
+  handleCodexReviewDismiss(): void {
+    if (this.isSavingCodexEntries) return;
+    this.resetCodexReviewState();
+    this.cdr.markForCheck();
+  }
+
+  async confirmCodexReviewAdd(): Promise<void> {
+    if (this.isSavingCodexEntries || !this.story || !this.codexReviewExtractionType) return;
+
+    const selectedEntries = this.codexReviewEntries.filter(entry => entry.selected);
+
+    if (selectedEntries.length === 0) {
+      this.codexReviewError = 'Select at least one entry to continue.';
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.isSavingCodexEntries = true;
+    this.codexReviewError = '';
+    this.cdr.markForCheck();
+
     try {
-      // Get or create codex
       const codex = await this.codexService.getOrCreateCodex(this.story.id);
-      
-      // Find the appropriate category
-      const categoryName = this.getCategoryName(message.extractionType);
+      const categoryName = this.getCategoryName(this.codexReviewExtractionType);
       const category = codex.categories.find(c => c.title === categoryName);
-      
+
       if (!category) {
-        console.error(`Category ${categoryName} not found`);
-        return;
+        throw new Error(`Category ${categoryName} not found`);
       }
 
-      // Parse the AI response to extract entries
-      const entries = this.parseExtractionResponse(message.content, message.extractionType);
-      
-      // Add each entry to the codex
-      for (const entry of entries) {
+      for (const entry of selectedEntries) {
         await this.codexService.addEntry(this.story.id, category.id, {
           title: entry.name,
           content: entry.description,
           tags: entry.tags || [],
-          storyRole: message.extractionType === 'characters' ? (entry.role as StoryRole) : undefined
+          storyRole: this.codexReviewExtractionType === 'characters' ? (entry.role as StoryRole | undefined) : undefined
         });
       }
 
-      // Show success message
       this.messages.push({
         role: 'assistant',
-        content: `✅ ${entries.length} ${this.getExtractionTypeLabel(message.extractionType)} successfully added to Codex!`,
+        content: `✅ ${selectedEntries.length} ${this.getExtractionTypeLabel(this.codexReviewExtractionType)} added to Codex.`,
         timestamp: new Date()
       });
-      
+      this.cdr.markForCheck();
       this.scrollToBottom();
+
+      this.isSavingCodexEntries = false;
+      this.dismissCodexReviewModal();
     } catch (error) {
       console.error('Error adding to codex:', error);
-      this.messages.push({
-        role: 'assistant',
-        content: '❌ Error adding to codex. Please try again.',
-        timestamp: new Date()
-      });
-      this.scrollToBottom();
+      this.codexReviewError = '❌ Error adding to Codex. Please try again.';
+      this.isSavingCodexEntries = false;
+      this.cdr.markForCheck();
     }
   }
 
-  private getExtractionTypeLabel(type: 'characters' | 'locations' | 'objects'): string {
+  private resetCodexReviewState(): void {
+    this.codexReviewEntries = [];
+    this.codexReviewExtractionType = null;
+    this.codexReviewError = '';
+  }
+
+  getExtractionTypeLabel(type: 'characters' | 'locations' | 'objects'): string {
     switch (type) {
       case 'characters': return 'Characters';
       case 'locations': return 'Locations';
