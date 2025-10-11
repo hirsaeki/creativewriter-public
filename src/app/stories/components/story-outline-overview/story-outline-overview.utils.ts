@@ -1,13 +1,14 @@
 export function calculateDesiredSummaryWordCount(sceneText: string, configuredWordCount?: number | null): number {
   const wordCount = countWords(sceneText);
-  const baseWordCount = configuredWordCount && configuredWordCount > 0 ? configuredWordCount : 120;
+  const numericOverride = configuredWordCount != null ? Number(configuredWordCount) : NaN;
+  const baseWordCount = Number.isFinite(numericOverride) && numericOverride > 0 ? numericOverride : 120;
   const baseWordThreshold = 5000;
 
-  const extraWordCount = wordCount > baseWordThreshold
-    ? Math.floor((wordCount - baseWordThreshold) / 1000) * 20
+  const extraSegments = wordCount > baseWordThreshold
+    ? Math.floor((wordCount - baseWordThreshold) / 1000)
     : 0;
 
-  const target = baseWordCount + extraWordCount;
+  const target = baseWordCount + extraSegments * 20;
 
   return Math.max(20, Math.min(1000, target));
 }
