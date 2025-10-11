@@ -371,7 +371,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
       if (!prompt.includes(languageInstruction)) prompt += `\n\n${languageInstruction}`;
       if (!/\bword(s)?\b/i.test(prompt)) prompt += `\n\n${wordCountInstruction}`;
     } else {
-      prompt = `Create a summary of the following scene:\n\nTitle: ${scene.title || 'Untitled'}\n\nContent:\n${sceneContent}${truncated ? '\n\n[Note: Content was truncated as it was too long]' : ''}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments. ${wordCountInstruction}`;
+      prompt = `Create a summary of the following scene:\n\nTitle: ${scene.title || 'Untitled'}\n\nContent:\n${sceneContent}${truncated ? '\n\n[Note: Content was truncated as it was too long]' : ''}\n\nWrite it structured to be used as context for ai that captures plot points and character developments. ${wordCountInstruction}/n/nAnswer only with and directly with the summary!`;
       if (settings.sceneSummaryGeneration.customInstruction) prompt += `\n\nZusätzliche Anweisungen: ${settings.sceneSummaryGeneration.customInstruction}`;
       prompt += `\n\n${languageInstruction}`;
     }
