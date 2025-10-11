@@ -9,4 +9,4 @@ Important: Write it structured to be used as context for an AI that continues th
 
 {languageInstruction}
 
-<ai_ignore>Test</ai_ignore>
+Answer only with the summary.

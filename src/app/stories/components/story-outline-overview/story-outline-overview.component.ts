@@ -408,10 +408,14 @@ export class StoryOutlineOverviewComponent implements OnInit {
           .replace(/\{languageInstruction\}/g, languageInstruction);
       } catch (error) {
         console.error('Failed to load default scene summary template', error);
-        prompt = `Create a summary of the following scene:\n\nTitle: ${scene.title || 'Untitled'}\n\nContent:\n${sceneContent}${truncatedNote}\n\nImportant: Write it structured to be used as context for an AI that continues the story.`;
-        prompt += additionalInstructions;
-        prompt += `\n\n${languageInstruction}`;
-        prompt += '\n\nAnswer only with and directly with the summary!';
+        clearTimeout(timeoutId);
+        this.generatingSummary.update(set => {
+          const newSet = new Set(set);
+          newSet.delete(sceneId);
+          return newSet;
+        });
+        alert('Failed to load the scene summary prompt template. Please try again later or configure a custom prompt.');
+        return;
       }
     }
 
