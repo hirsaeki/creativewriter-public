@@ -18,8 +18,6 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { OpenRouterApiService } from '../../../core/services/openrouter-api.service';
 import { GoogleGeminiApiService } from '../../../core/services/google-gemini-api.service';
 import { PromptManagerService } from '../../../shared/services/prompt-manager.service';
-import { calculateDesiredSummaryWordCount } from './story-outline-overview.utils';
-import { StoryStatsService } from '../../services/story-stats.service';
 
 @Component({
   selector: 'app-story-outline-overview',
@@ -47,7 +45,6 @@ export class StoryOutlineOverviewComponent implements OnInit {
   private openRouterApi = inject(OpenRouterApiService);
   private geminiApi = inject(GoogleGeminiApiService);
   private promptManager = inject(PromptManagerService);
-  private storyStats = inject(StoryStatsService);
 
   // Header config
   leftActions: HeaderAction[] = [];
@@ -343,10 +340,6 @@ export class StoryOutlineOverviewComponent implements OnInit {
     }, 30000);
 
     // Clean content and build prompt
-    const sceneWordCount = Math.max(
-      this.storyStats.calculateSceneWordCount(scene),
-      this.getWordCountFromHtml(scene.content || '')
-    );
     let sceneContent = this.removeEmbeddedImages(scene.content);
     sceneContent = this.promptManager.extractPlainTextFromHtml(sceneContent);
     const maxContentLength = 200000;
@@ -364,9 +357,6 @@ export class StoryOutlineOverviewComponent implements OnInit {
       }
     })();
 
-    const desiredWordCount = calculateDesiredSummaryWordCount(sceneWordCount);
-    const wordCountInstruction = `Aim for about ${desiredWordCount} words.`;
-
     let prompt: string;
     if (settings.sceneSummaryGeneration.useCustomPrompt) {
       prompt = settings.sceneSummaryGeneration.customPrompt
@@ -374,11 +364,10 @@ export class StoryOutlineOverviewComponent implements OnInit {
         .replace(/{sceneContent}/g, sceneContent + (truncated ? '\n\n[Note: Content was truncated as it was too long]' : ''))
         .replace(/{customInstruction}/g, settings.sceneSummaryGeneration.customInstruction || '')
         .replace(/{languageInstruction}/g, languageInstruction)
-        .replace(/{summaryWordCount}/g, String(desiredWordCount));
+        .replace(/{summaryWordCount}/g, '');
       if (!prompt.includes(languageInstruction)) prompt += `\n\n${languageInstruction}`;
-      if (!/\bword(s)?\b/i.test(prompt)) prompt += `\n\n${wordCountInstruction}`;
     } else {
-      prompt = `Create a summary of the following scene:\n\nTitle: ${scene.title || 'Untitled'}\n\nContent:\n${sceneContent}${truncated ? '\n\n[Note: Content was truncated as it was too long]' : ''}\n\nImportant: Write it structured to be used as context for an AI that continues the story. ${wordCountInstruction}`;
+      prompt = `Create a summary of the following scene:\n\nTitle: ${scene.title || 'Untitled'}\n\nContent:\n${sceneContent}${truncated ? '\n\n[Note: Content was truncated as it was too long]' : ''}\n\nImportant: Write it structured to be used as context for an AI that continues the story.`;
       if (settings.sceneSummaryGeneration.customInstruction) prompt += `\n\nZusätzliche Anweisungen: ${settings.sceneSummaryGeneration.customInstruction}`;
       prompt += `\n\n${languageInstruction}`;
       prompt += '\n\nAnswer only with and directly with the summary!';
@@ -609,19 +598,6 @@ export class StoryOutlineOverviewComponent implements OnInit {
     if (err.status === 500) return 'Gemini server error. Please try again later.';
     if (err.message?.includes('nicht aktiviert')) return err.message;
     return 'Error generating text.';
-  }
-
-  private getWordCountFromHtml(html: string): number {
-    if (!html) return 0;
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const text = doc.body?.textContent || '';
-      return text.trim().split(/\s+/).filter(Boolean).length;
-    } catch (error) {
-      console.warn('Failed to derive word count from HTML content', error);
-      return 0;
-    }
   }
 
   // Chapter title inline editing

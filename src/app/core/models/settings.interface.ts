@@ -163,7 +163,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sceneSummaryGeneration: {
     temperature: 0.7,
     customInstruction: '',
-    customPrompt: 'Create a summary of the following scene:\n\nTitle: {sceneTitle}\n\nContent:\n{sceneContent}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments. Aim for about {summaryWordCount} words.\n\n{languageInstruction}',
+    customPrompt: 'Create a summary of the following scene:\n\nTitle: {sceneTitle}\n\nContent:\n{sceneContent}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments.\n\n{languageInstruction}',
     useCustomPrompt: false,
     selectedModel: ''
   },

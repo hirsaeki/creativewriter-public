@@ -278,7 +278,7 @@ import { ModelOption } from '../../core/models/model.interface';
           <ion-label position="stacked">
             Custom Prompt
             <p class="prompt-help">
-              Available placeholders: {{ '{' }}sceneTitle{{ '}' }}, {{ '{' }}sceneContent{{ '}' }}, {{ '{' }}customInstruction{{ '}' }}, {{ '{' }}languageInstruction{{ '}' }}, {{ '{' }}summaryWordCount{{ '}' }}
+              Available placeholders: {{ '{' }}sceneTitle{{ '}' }}, {{ '{' }}sceneContent{{ '}' }}, {{ '{' }}customInstruction{{ '}' }}, {{ '{' }}languageInstruction{{ '}' }}
             </p>
           </ion-label>
           <ion-textarea
@@ -427,7 +427,7 @@ export class PromptsSettingsComponent {
   }
 
   resetToDefaultSummaryPrompt(): void {
-    const defaultPrompt = 'Create a summary of the following scene:\n\nTitle: {sceneTitle}\n\nContent:\n{sceneContent}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments. Aim for about {summaryWordCount} words.\n\n{languageInstruction}';
+    const defaultPrompt = 'Create a summary of the following scene:\n\nTitle: {sceneTitle}\n\nContent:\n{sceneContent}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments.\n\n{languageInstruction}';
     this.settings.sceneSummaryGeneration.customPrompt = defaultPrompt;
     this.settingsChange.emit();
   }
