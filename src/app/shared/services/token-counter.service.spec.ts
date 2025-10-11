@@ -14,44 +14,48 @@ describe('TokenCounterService', () => {
   });
 
   describe('countTokens', () => {
-    it('should return token count for simple text', () => {
-      const result = service.countTokens('Hello world', 'claude-3.7-sonnet');
+    it('should return token count for simple text', async () => {
+      const result = await service.countTokens('Hello world', 'claude-3.7-sonnet');
       expect(result.tokens).toBeGreaterThan(0);
       expect(result.model).toBe('claude-3.7-sonnet');
       expect(result.method).toBe('estimation');
     });
 
-    it('should handle empty string', () => {
-      const result = service.countTokens('', 'claude-3.7-sonnet');
+    it('should handle empty string', async () => {
+      const result = await service.countTokens('', 'claude-3.7-sonnet');
       expect(result.tokens).toBe(0);
     });
 
-    it('should handle long text', () => {
+    it('should handle long text', async () => {
       const longText = 'Lorem ipsum '.repeat(100);
-      const result = service.countTokens(longText, 'gemini-2.5-pro');
+      const result = await service.countTokens(longText, 'gemini-2.5-pro');
       expect(result.tokens).toBeGreaterThan(100);
     });
 
-    it('should count special characters as additional tokens', () => {
+    it('should count special characters as additional tokens', async () => {
       const textWithSpecial = 'Hello <world> {test} [array]';
       const textWithout = 'Hello world test array';
       
-      const resultWith = service.countTokens(textWithSpecial, 'claude-3.7-sonnet');
-      const resultWithout = service.countTokens(textWithout, 'claude-3.7-sonnet');
+      const [resultWith, resultWithout] = await Promise.all([
+        service.countTokens(textWithSpecial, 'claude-3.7-sonnet'),
+        service.countTokens(textWithout, 'claude-3.7-sonnet')
+      ]);
       
       expect(resultWith.tokens).toBeGreaterThan(resultWithout.tokens);
     });
 
-    it('should handle code blocks', () => {
+    it('should handle code blocks', async () => {
       const textWithCode = '```\nfunction test() {\n  return true;\n}\n```';
-      const result = service.countTokens(textWithCode, 'grok-3');
+      const result = await service.countTokens(textWithCode, 'grok-3');
       expect(result.tokens).toBeGreaterThan(10);
     });
 
-    it('should use different ratios for different models', () => {
+    it('should use different ratios for different models', async () => {
       const text = 'This is a test prompt for token counting';
-      const claudeResult = service.countTokens(text, 'claude-3.7-sonnet');
-      const geminiResult = service.countTokens(text, 'gemini-2.5-pro');
+      const [claudeResult, geminiResult] = await Promise.all([
+        service.countTokens(text, 'claude-3.7-sonnet'),
+        service.countTokens(text, 'gemini-2.5-pro')
+      ]);
       
       // Different models should produce different token counts
       expect(claudeResult.tokens).not.toBe(geminiResult.tokens);
@@ -59,20 +63,20 @@ describe('TokenCounterService', () => {
   });
 
   describe('estimateTokensAdvanced', () => {
-    it('should provide advanced estimation', () => {
+    it('should provide advanced estimation', async () => {
       const text = 'The quick brown fox jumps over the lazy dog';
-      const result = service.estimateTokensAdvanced(text, 'claude-3.7-sonnet');
+      const result = await service.estimateTokensAdvanced(text, 'claude-3.7-sonnet');
       
       expect(result.tokens).toBeGreaterThan(0);
       expect(result.method).toBe('estimation');
     });
 
-    it('should handle multi-line text', () => {
+    it('should handle multi-line text', async () => {
       const multiLineText = `Line one
       Line two
       Line three`;
       
-      const result = service.estimateTokensAdvanced(multiLineText);
+      const result = await service.estimateTokensAdvanced(multiLineText);
       expect(result.tokens).toBeGreaterThan(5);
     });
   });
