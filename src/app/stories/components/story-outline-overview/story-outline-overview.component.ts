@@ -357,7 +357,19 @@ export class StoryOutlineOverviewComponent implements OnInit {
       }
     })();
 
-    const desiredWordCount = Math.max(20, Math.min(1000, settings.sceneSummaryGeneration.wordCount || 120));
+    const sceneWordCount = this.countWords(sceneContent);
+    const baseWordCount = 120;
+    const baseWordThreshold = 5000;
+    const extraWordCount = sceneWordCount > baseWordThreshold
+      ? Math.floor((sceneWordCount - baseWordThreshold) / 1000) * 20
+      : 0;
+    const dynamicWordCount = baseWordCount + extraWordCount;
+
+    const configuredWordCount = settings.sceneSummaryGeneration.wordCount;
+    const desiredWordCount = Math.max(
+      20,
+      Math.min(1000, configuredWordCount && configuredWordCount > 0 ? configuredWordCount : dynamicWordCount)
+    );
     const wordCountInstruction = `Aim for about ${desiredWordCount} words.`;
 
     let prompt: string;
@@ -571,6 +583,11 @@ export class StoryOutlineOverviewComponent implements OnInit {
           }
         });
     }
+  }
+
+  private countWords(text: string): number {
+    if (!text) return 0;
+    return text.trim().split(/\s+/).filter(Boolean).length;
   }
 
   private removeEmbeddedImages(content: string): string {
