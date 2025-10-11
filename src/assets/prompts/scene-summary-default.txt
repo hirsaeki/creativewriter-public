@@ -14,6 +14,7 @@
   <instructions>
     {languageInstruction}
     <focus>Important: Structure the summary so it can be used as context for an AI that continues the story.</focus>
+    {lengthRequirement}
     <redundancy>Do not repeat information already captured in the codex context.</redundancy>
     <responseFormat>Answer only with the summary.</responseFormat>
 {additionalInstructions}

@@ -370,6 +370,9 @@ export class StoryOutlineOverviewComponent implements OnInit {
     // Clean content and build prompt
     let sceneContent = this.removeEmbeddedImages(scene.content);
     sceneContent = this.promptManager.extractPlainTextFromHtml(sceneContent);
+    const sceneWordCount = this.countWords(sceneContent);
+    const minimumSummaryWords = this.calculateSummaryMinimumWords(sceneWordCount);
+    const wordCountInstruction = `Ensure the summary is at least ${minimumSummaryWords} words.`;
     const maxContentLength = 200000;
     let truncated = false;
     if (sceneContent.length > maxContentLength) { sceneContent = sceneContent.slice(0, maxContentLength); truncated = true; }
@@ -410,6 +413,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
       : '      <codex />';
     const codexEntriesForCustomPrompt = codexEntriesRaw || '<codex />';
     const languageInstructionXml = `<languageRequirement>${this.escapeXml(languageInstruction)}</languageRequirement>`;
+    const lengthRequirementXml = `<lengthRequirement>${this.escapeXml(wordCountInstruction)}</lengthRequirement>`;
     const redundancyNote = 'Do not repeat information already captured in the codex context.';
 
     let prompt: string;
@@ -421,10 +425,12 @@ export class StoryOutlineOverviewComponent implements OnInit {
         .replace(/{customInstructionXml}/g, additionalInstructionsXml.trim())
         .replace(/{languageInstructionXml}/g, languageInstructionXml)
         .replace(/{languageInstruction}/g, languageInstruction)
-        .replace(/{summaryWordCount}/g, '')
+        .replace(/{summaryWordCount}/g, minimumSummaryWords.toString())
+        .replace(/{lengthRequirement}/g, wordCountInstruction)
         .replace(/{codexEntries}/g, codexEntriesForCustomPrompt);
       if (!prompt.includes(languageInstruction)) prompt += `\n\n${languageInstruction}`;
       if (!prompt.includes(redundancyNote)) prompt += `\n\n${redundancyNote}`;
+      if (!prompt.includes(wordCountInstruction)) prompt += `\n\n${wordCountInstruction}`;
     } else {
       try {
         const template = await this.promptTemplateService.getSceneSummaryTemplate();
@@ -434,7 +440,9 @@ export class StoryOutlineOverviewComponent implements OnInit {
           .replace(/\{truncatedNote\}/g, truncatedNote)
           .replace(/\{codexEntries\}/g, codexEntriesForTemplate)
           .replace(/\{languageInstruction\}/g, languageInstructionXml)
+          .replace(/\{lengthRequirement\}/g, lengthRequirementXml)
           .replace(/\{additionalInstructions\}/g, additionalInstructionsXml);
+        prompt = prompt.replace(/\{summaryWordCount\}/g, minimumSummaryWords.toString());
       } catch (error) {
         console.error('Failed to load default scene summary template', error);
         clearTimeout(timeoutId);
@@ -748,6 +756,19 @@ export class StoryOutlineOverviewComponent implements OnInit {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
+  }
+
+  private countWords(text: string): number {
+    if (!text) return 0;
+    return text.trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  private calculateSummaryMinimumWords(sceneWordCount: number): number {
+    const baseMinimum = 120;
+    if (sceneWordCount <= 2000) return baseMinimum;
+    const extraWords = sceneWordCount - 2000;
+    const increments = Math.ceil(extraWords / 500);
+    return baseMinimum + increments * 25;
   }
 
   private async scrollToScene(sceneId: string): Promise<void> {
