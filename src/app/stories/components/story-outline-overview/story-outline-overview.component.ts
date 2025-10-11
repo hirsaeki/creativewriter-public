@@ -19,6 +19,7 @@ import { OpenRouterApiService } from '../../../core/services/openrouter-api.serv
 import { GoogleGeminiApiService } from '../../../core/services/google-gemini-api.service';
 import { PromptManagerService } from '../../../shared/services/prompt-manager.service';
 import { PromptTemplateService } from '../../../shared/services/prompt-template.service';
+import { StoryStatsService } from '../../services/story-stats.service';
 
 @Component({
   selector: 'app-story-outline-overview',
@@ -47,6 +48,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
   private geminiApi = inject(GoogleGeminiApiService);
   private promptManager = inject(PromptManagerService);
   private promptTemplateService = inject(PromptTemplateService);
+  private storyStats = inject(StoryStatsService);
 
   // Header config
   leftActions: HeaderAction[] = [];
@@ -79,6 +81,18 @@ export class StoryOutlineOverviewComponent implements OnInit {
     })).filter(ch => ch.scenes.length > 0);
   });
 
+  sceneWordCounts = computed<Record<string, number>>(() => {
+    const s = this.story();
+    if (!s) return {};
+    const counts: Record<string, number> = {};
+    for (const chapter of s.chapters ?? []) {
+      for (const scene of chapter.scenes ?? []) {
+        counts[scene.id] = this.storyStats.calculateSceneWordCount(scene);
+      }
+    }
+    return counts;
+  });
+
   // UI state
   toolbarVisible = signal<boolean>(false);
 
@@ -92,6 +106,16 @@ export class StoryOutlineOverviewComponent implements OnInit {
     if (next) {
       setTimeout(() => this.querySearchbar?.setFocus(), 200);
     }
+  }
+
+  getSceneWordCount(sceneId: string): number {
+    return this.sceneWordCounts()[sceneId] ?? 0;
+  }
+
+  getSceneWordCountLabel(sceneId: string): string {
+    const count = this.getSceneWordCount(sceneId);
+    const noun = count === 1 ? 'word' : 'words';
+    return `${count} ${noun}`;
   }
 
   async ngOnInit(): Promise<void> {

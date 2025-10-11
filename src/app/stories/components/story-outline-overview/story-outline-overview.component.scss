@@ -195,6 +195,19 @@ ion-fab.model-fab {
   --background: transparent !important;
 }
 
+.scene-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}
+
 .scene-card ion-card-title {
   color: #f8f9fa !important;
   --color: #f8f9fa !important;
@@ -204,6 +217,13 @@ ion-fab.model-fab {
   @media (max-width: 768px) {
     font-size: 0.95rem !important;
   }
+}
+
+.scene-word-count {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .scene-card:hover {

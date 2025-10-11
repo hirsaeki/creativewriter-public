@@ -116,25 +116,30 @@
         <ion-list lines="none">
           <ion-card *ngFor="let scene of chapter.scenes; trackBy: trackSceneById" class="scene-card" [id]="'scene-' + scene.id">
             <ion-card-header>
-              <ion-card-title>
-                <ng-container *ngIf="!isEditingTitle(scene.id); else editTitleTpl">
-                  <span class="idx">{{scene.sceneNumber}}.</span>
-                  <span>{{ scene.title || 'Untitled Scene' }}</span>
-                  <ion-badge color="warning" *ngIf="!scene.summary">No summary</ion-badge>
-                </ng-container>
-                <ng-template #editTitleTpl>
-                  <div class="title-edit">
+              <div class="scene-header">
+                <ion-card-title>
+                  <ng-container *ngIf="!isEditingTitle(scene.id); else editTitleTpl">
                     <span class="idx">{{scene.sceneNumber}}.</span>
-                    <ion-input
-                      class="title-input"
-                      [ngModel]="editingTitles[scene.id] || ''"
-                      (ngModelChange)="onEditTitleChange(scene.id, $event)"
-                      placeholder="Untitled Scene"
-                      (keydown.enter)="saveSceneTitle(chapter.id, scene.id)">
-                    </ion-input>
-                  </div>
-                </ng-template>
-              </ion-card-title>
+                    <span>{{ scene.title || 'Untitled Scene' }}</span>
+                    <ion-badge color="warning" *ngIf="!scene.summary">No summary</ion-badge>
+                  </ng-container>
+                  <ng-template #editTitleTpl>
+                    <div class="title-edit">
+                      <span class="idx">{{scene.sceneNumber}}.</span>
+                      <ion-input
+                        class="title-input"
+                        [ngModel]="editingTitles[scene.id] || ''"
+                        (ngModelChange)="onEditTitleChange(scene.id, $event)"
+                        placeholder="Untitled Scene"
+                        (keydown.enter)="saveSceneTitle(chapter.id, scene.id)">
+                      </ion-input>
+                    </div>
+                  </ng-template>
+                </ion-card-title>
+                <ion-note class="scene-word-count" color="medium">
+                  {{ getSceneWordCountLabel(scene.id) }}
+                </ion-note>
+              </div>
             </ion-card-header>
             <ion-card-content>
               <ng-container *ngIf="!isEditing(scene.id); else editSummaryTpl">
