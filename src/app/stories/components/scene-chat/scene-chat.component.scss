@@ -299,6 +299,12 @@ ion-modal ion-item {
   margin: 0 8px;
 }
 
+.codex-review-actions .codex-review-confirm {
+  margin-left: auto;
+  --padding-start: 12px;
+  --padding-end: 12px;
+}
+
 .codex-entry-header {
   display: flex;
   align-items: center;

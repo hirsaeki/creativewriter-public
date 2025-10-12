@@ -206,6 +206,15 @@
           <ion-button size="small" fill="clear" (click)="toggleSelectAllCodexEntries(false)" [disabled]="isSavingCodexEntries || getSelectedCodexEntriesCount() === 0">
             Clear
           </ion-button>
+          <ion-button size="small"
+                      color="primary"
+                      fill="solid"
+                      class="codex-review-confirm"
+                      (click)="confirmCodexReviewAdd()"
+                      [disabled]="isSavingCodexEntries || codexReviewEntries.length === 0">
+            <ion-spinner slot="start" *ngIf="isSavingCodexEntries"></ion-spinner>
+            Add Selected
+          </ion-button>
         </div>
         <ion-list>
           <ion-item *ngFor="let entry of codexReviewEntries">
