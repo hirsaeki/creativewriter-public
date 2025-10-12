@@ -67,9 +67,54 @@ interface PresetPrompt {
 interface CodexEntryPreview {
   name: string;
   description: string;
-  role?: string;
+  role?: StoryRole;
   tags: string[];
+  fields: Record<string, string>;
   selected: boolean;
+}
+
+const CHARACTER_FIELD_ORDER: string[] = [
+  'Description',
+  'Physical Appearance',
+  'Personality',
+  'Backstory',
+  'Relationships',
+  'History with Protagonist',
+  'Motivations & Goals',
+  'Skills & Abilities',
+  'Current Status',
+  'Plot Hooks'
+];
+
+const LOCATION_FIELD_ORDER: string[] = [
+  'Description',
+  'Overview',
+  'Sensory Details',
+  'Key Features',
+  'History & Lore',
+  'Story Significance',
+  'Mood & Atmosphere',
+  'Notable Characters',
+  'Plot Hooks'
+];
+
+const OBJECT_FIELD_ORDER: string[] = [
+  'Description',
+  'Physical Description',
+  'Origin & Backstory',
+  'Owner or Custodian',
+  'Abilities & Properties',
+  'Story Significance',
+  'Current Status or Location',
+  'Plot Hooks'
+];
+
+interface ParsedExtractionEntry {
+  name: string;
+  tags: string[];
+  role?: StoryRole;
+  fields: Record<string, string>;
+  rawBlock: string;
 }
 
 @Component({
@@ -147,6 +192,7 @@ export class SceneChatComponent implements OnInit, OnDestroy {
   codexReviewExtractionType: 'characters' | 'locations' | 'objects' | null = null;
   isSavingCodexEntries = false;
   codexReviewError = '';
+  private customFieldIdCounter = 0;
 
   constructor() {
     addIcons({ 
@@ -764,9 +810,10 @@ Separate each object block with a blank line.`
 
     this.codexReviewEntries = entries.map(entry => ({
       name: entry.name,
-      description: entry.description || '',
+      description: entry.fields['Description'] || entry.rawBlock,
       role: entry.role,
-      tags: entry.tags || [],
+      tags: entry.tags,
+      fields: entry.fields,
       selected: true
     }));
     this.codexReviewExtractionType = message.extractionType;
@@ -839,11 +886,13 @@ Separate each object block with a blank line.`
       }
 
       for (const entry of selectedEntries) {
+        const { content, metadata } = this.buildCodexEntryPayload(entry, this.codexReviewExtractionType);
         await this.codexService.addEntry(this.story.id, category.id, {
           title: entry.name,
-          content: entry.description,
-          tags: entry.tags || [],
-          storyRole: this.codexReviewExtractionType === 'characters' ? (entry.role as StoryRole | undefined) : undefined
+          content,
+          tags: entry.tags,
+          metadata,
+          storyRole: this.codexReviewExtractionType === 'characters' ? entry.role : undefined
         });
       }
 
@@ -1184,8 +1233,8 @@ Separate each object block with a blank line.`
     });
   }
 
-  private parseExtractionResponse(content: string, type: 'characters' | 'locations' | 'objects'): {name: string; description?: string; role?: string; tags?: string[]}[] {
-    const entries: {name: string; description?: string; role?: string; tags?: string[]}[] = [];
+  private parseExtractionResponse(content: string, type: 'characters' | 'locations' | 'objects'): ParsedExtractionEntry[] {
+    const entries: ParsedExtractionEntry[] = [];
 
     const nameRegex = /\*\*Name:\*\*\s*([^\n]+)/g;
     let match: RegExpExecArray | null;
@@ -1197,42 +1246,95 @@ Separate each object block with a blank line.`
       const startIndex = match.index + match[0].length;
       const nextMatchIndex = content.indexOf('**Name:**', startIndex);
       const endIndex = nextMatchIndex !== -1 ? nextMatchIndex : content.length;
-      const block = content.substring(startIndex, endIndex).trim();
+      const rawBlock = content.substring(startIndex, endIndex).trim();
 
-      const tagsMatch = block.match(/\*\*Tags:\*\*\s*([^\n]+)/i);
-      const tags = tagsMatch
-        ? tagsMatch[1]
-            .split(/[,;|]/)
-            .map(tag => tag.trim())
-            .filter(tag => tag.length > 0)
-        : [];
-
-      let role: string | undefined;
-      if (type === 'characters') {
-        const roleMatch = block.match(/\*\*(Story Role|Role):\*\*\s*([^\n]+)/i);
-        if (roleMatch) {
-          role = this.normalizeStoryRole(roleMatch[2]);
-        }
-
-        if (!role) {
-          const lower = block.toLowerCase();
-          if (lower.includes('protagonist')) role = 'Protagonist';
-          else if (lower.includes('antagonist')) role = 'Antagonist';
-          else if (lower.includes('love interest')) role = 'Love Interest';
-          else if (lower.includes('supporting')) role = 'Supporting Character';
-          else if (lower.includes('background')) role = 'Background Character';
-        }
-      }
+      const { fields, tags, role } = this.extractFieldsFromBlock(rawBlock, type);
 
       entries.push({
         name,
-        description: block,
+        tags,
         role,
-        tags
+        fields,
+        rawBlock
       });
     }
 
     return entries;
+  }
+
+  private extractFieldsFromBlock(block: string, type: 'characters' | 'locations' | 'objects') {
+    const fields: Record<string, string> = {};
+    let tags: string[] = [];
+    let role: StoryRole | undefined;
+
+    const fieldRegex = /\*\*([^*:]+):\*\*\s*([\s\S]*?)(?=\n\*\*[^*\n]+:\*\*|\s*$)/g;
+    let fieldMatch: RegExpExecArray | null;
+
+    const recognizedFields = this.buildFieldLabelMap(type);
+
+    while ((fieldMatch = fieldRegex.exec(block)) !== null) {
+      const rawLabel = fieldMatch[1].trim();
+      const rawValue = this.sanitizeFieldValue(fieldMatch[2]);
+      if (!rawLabel) continue;
+
+      const normalizedKey = this.normalizeFieldKey(rawLabel);
+
+      if (normalizedKey === 'tags') {
+        tags = rawValue
+          .split(/[,;|]/)
+          .map(tag => tag.trim())
+          .filter(tag => tag.length > 0);
+        continue;
+      }
+
+      if (normalizedKey === 'story role' || normalizedKey === 'role') {
+        role = this.normalizeStoryRole(rawValue);
+        continue;
+      }
+
+      const label = recognizedFields.get(normalizedKey) ?? rawLabel;
+
+      if (!rawValue) continue;
+
+      fields[label] = rawValue;
+    }
+
+    if (type === 'characters' && !role) {
+      const lowerBlock = block.toLowerCase();
+      if (lowerBlock.includes('protagonist')) role = 'Protagonist';
+      else if (lowerBlock.includes('antagonist')) role = 'Antagonist';
+      else if (lowerBlock.includes('love interest')) role = 'Love Interest';
+      else if (lowerBlock.includes('supporting')) role = 'Supporting Character';
+      else if (lowerBlock.includes('background')) role = 'Background Character';
+    }
+
+    return { fields, tags, role };
+  }
+
+  private sanitizeFieldValue(value: string): string {
+    return (value || '')
+      .replace(/\r/g, '')
+      .trim();
+  }
+
+  private buildFieldLabelMap(type: 'characters' | 'locations' | 'objects'): Map<string, string> {
+    const map = new Map<string, string>();
+    const addToMap = (label: string) => {
+      map.set(this.normalizeFieldKey(label), label);
+    };
+
+    this.getFieldOrder(type).forEach(addToMap);
+
+    return map;
+  }
+
+  private normalizeFieldKey(label: string): string {
+    return label
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private normalizeStoryRole(rawRole: string): StoryRole | undefined {
@@ -1266,6 +1368,95 @@ Separate each object block with a blank line.`
     if (normalized.includes('background') || normalized.includes('ensemble')) return 'Background Character';
 
     return undefined;
+  }
+
+  private getFieldOrder(type: 'characters' | 'locations' | 'objects'): string[] {
+    switch (type) {
+      case 'characters':
+        return CHARACTER_FIELD_ORDER;
+      case 'locations':
+        return LOCATION_FIELD_ORDER;
+      case 'objects':
+        return OBJECT_FIELD_ORDER;
+      default:
+        return [];
+    }
+  }
+
+  private buildCodexEntryPayload(entry: CodexEntryPreview, type: 'characters' | 'locations' | 'objects'): { content: string; metadata: Record<string, unknown> } {
+    const fieldOrder = this.getFieldOrder(type);
+    const description = this.getEntryDescription(entry, fieldOrder);
+    const customFields = this.buildCustomFields(fieldOrder, entry.fields);
+    const metadata: Record<string, unknown> = {};
+
+    if (customFields.length > 0) {
+      metadata['customFields'] = customFields;
+    }
+
+    if (type === 'characters' && entry.role) {
+      metadata['storyRole'] = entry.role;
+    }
+
+    return { content: description, metadata };
+  }
+
+  private getEntryDescription(entry: CodexEntryPreview, fieldOrder: string[]): string {
+    const description = entry.fields['Description']?.trim();
+    if (description && description.length > 0) {
+      return description;
+    }
+
+    for (const fieldName of fieldOrder) {
+      if (fieldName === 'Description') continue;
+      const value = entry.fields[fieldName];
+      if (value && value.trim().length > 0 && value.trim().toLowerCase() !== 'unknown') {
+        return value.trim();
+      }
+    }
+
+    return entry.description || '';
+  }
+
+  private buildCustomFields(fieldOrder: string[], fields: Record<string, string>): { id: string; name: string; value: string }[] {
+    const customFields: { id: string; name: string; value: string }[] = [];
+    const used = new Set<string>();
+
+    const addField = (name: string) => {
+      const value = fields[name];
+      if (!value) return;
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      customFields.push({
+        id: this.generateCustomFieldId(),
+        name,
+        value: trimmed
+      });
+      used.add(name);
+    };
+
+    fieldOrder.forEach(fieldName => {
+      if (fieldName === 'Description') return;
+      addField(fieldName);
+    });
+
+    Object.entries(fields).forEach(([name, value]) => {
+      if (name === 'Description' || used.has(name)) return;
+      if (!value) return;
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      customFields.push({
+        id: this.generateCustomFieldId(),
+        name,
+        value: trimmed
+      });
+    });
+
+    return customFields;
+  }
+
+  private generateCustomFieldId(): string {
+    this.customFieldIdCounter += 1;
+    return `cf-${Date.now()}-${this.customFieldIdCounter}`;
   }
 
   async copyToClipboard(text: string, event: Event): Promise<void> {
