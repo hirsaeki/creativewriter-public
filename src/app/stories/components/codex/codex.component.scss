@@ -231,10 +231,6 @@ ion-button[fill="outline"] {
     }
 
     @media (max-width: 768px) {
-      ion-content {
-        --padding-bottom: calc(88px + var(--ion-safe-area-bottom, 0px));
-      }
-
       .codex-grid {
         padding: 0.125rem;
       }
@@ -305,12 +301,6 @@ ion-button[fill="outline"] {
       --padding-end: 0;
       --padding-top: 0;
       --padding-bottom: 0;
-    }
-
-    @media (max-width: 768px) {
-      .entry-modal-content {
-        --padding-bottom: calc(128px + var(--ion-safe-area-bottom, 0px));
-      }
     }
 
     .modal-form-container {
