@@ -311,11 +311,16 @@ ion-button[fill="outline"] {
       --padding-bottom: 0;
     }
 
+    @media (max-width: 768px) {
+      .entry-modal-content {
+        --padding-bottom: calc(56px + var(--ion-safe-area-bottom, 0px));
+      }
+    }
+
     .modal-form-container {
       padding: 0;
       max-width: none;
       background: transparent;
-      padding-bottom: calc(96px + var(--ion-safe-area-bottom, 0px));
     }
 
     /* Form Sections */
@@ -337,7 +342,7 @@ ion-button[fill="outline"] {
     }
 
     .form-section:last-of-type {
-      margin-bottom: 24px;
+      margin-bottom: 80px; /* Space for sticky action buttons */
     }
 
     .section-title {
@@ -602,25 +607,20 @@ ion-button[fill="outline"] {
       box-shadow: 0 2px 8px rgba(71, 118, 230, 0.1);
     }
 
-    .entry-modal-footer {
-      background: linear-gradient(135deg, rgba(20, 20, 20, 0.98) 0%, rgba(15, 15, 15, 0.98) 100%);
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(15px) saturate(150%);
-      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
-    }
-
-    .entry-modal-footer::part(background) {
-      background: transparent;
-    }
-
     /* Modal Actions */
-    .entry-modal-footer .modal-actions {
+    .modal-actions {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      padding: 16px 20px calc(16px + var(--ion-safe-area-bottom, 0px));
-      width: 100%;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, rgba(20, 20, 20, 0.98) 0%, rgba(15, 15, 15, 0.98) 100%);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+      backdrop-filter: blur(15px) saturate(150%);
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
     }
 
     .modal-actions ion-button {
@@ -682,7 +682,7 @@ ion-button[fill="outline"] {
         width: fit-content;
       }
 
-      .entry-modal-footer .modal-actions {
+      .modal-actions {
         flex-direction: column-reverse;
         gap: 8px;
         padding: 16px;

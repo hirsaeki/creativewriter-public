@@ -401,21 +401,19 @@
                 </div>
               </div>
                 
+              <!-- Action Buttons -->
+              <div class="modal-actions">
+                <ion-button (click)="deleteEntry()" fill="outline" color="danger" size="default">
+                  <ion-icon name="trash" slot="start"></ion-icon>
+                  Delete
+                </ion-button>
+                <ion-button (click)="saveEntry()" color="primary" size="default">
+                  <ion-icon name="save" slot="start"></ion-icon>
+                  Save
+                </ion-button>
+              </div>
             </div>
           </ion-content>
-          
-          <ion-footer class="entry-modal-footer">
-            <div class="modal-actions">
-              <ion-button (click)="deleteEntry()" fill="outline" color="danger" size="default">
-                <ion-icon name="trash" slot="start"></ion-icon>
-                Delete
-              </ion-button>
-              <ion-button (click)="saveEntry()" color="primary" size="default">
-                <ion-icon name="save" slot="start"></ion-icon>
-                Save
-              </ion-button>
-            </div>
-          </ion-footer>
         </ng-template>
       </ion-modal>
 

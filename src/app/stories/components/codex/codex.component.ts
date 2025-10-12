@@ -7,7 +7,7 @@ import { Subscription } from 'rxjs';
 import {
   IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
   IonSearchbar, IonList, IonChip, IonTextarea, IonInput, IonButton, IonIcon,
-  IonModal, IonGrid, IonRow, IonCol, IonText, IonNote, IonButtons, IonToolbar, IonTitle, IonHeader, IonFooter,
+  IonModal, IonGrid, IonRow, IonCol, IonText, IonNote, IonButtons, IonToolbar, IonTitle, IonHeader,
   IonSelect, IonSelectOption, IonToggle
 } from '@ionic/angular/standalone';
 import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
@@ -26,7 +26,7 @@ import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole }
     CommonModule, FormsModule, NgSelectModule, AppHeaderComponent,
     IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
     IonSearchbar, IonList, IonChip, IonTextarea, IonInput, IonButton, IonIcon,
-    IonModal, IonGrid, IonRow, IonCol, IonText, IonNote, IonButtons, IonToolbar, IonTitle, IonHeader, IonFooter,
+    IonModal, IonGrid, IonRow, IonCol, IonText, IonNote, IonButtons, IonToolbar, IonTitle, IonHeader,
     IonSelect, IonSelectOption, IonToggle
   ],
   templateUrl: './codex.component.html',
