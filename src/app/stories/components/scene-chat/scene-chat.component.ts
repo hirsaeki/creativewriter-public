@@ -240,13 +240,22 @@ export class SceneChatComponent implements OnInit, OnDestroy {
         contextText += `Previous chat history:\n${chatHistory}\n\n`;
       }
 
+      const languageInstruction = this.getLanguageInstruction();
+
       // Build prompt based on type
       if (extractionType) {
         // Use the extraction prompt directly
         prompt = `${contextText}${userMessage}`;
+        if (languageInstruction) {
+          prompt += `\n\n${languageInstruction}`;
+        }
       } else {
         // For normal chat, just add the user's question
-        prompt = `${contextText}User Question: ${userMessage}\n\nPlease answer helpfully and creatively based on the given context and previous conversation.`;
+        prompt = `${contextText}User Question: ${userMessage}\n\n`;
+        if (languageInstruction) {
+          prompt += `${languageInstruction}\n`;
+        }
+        prompt += 'Please answer helpfully and creatively based on the given context and previous conversation.';
       }
 
       // Call AI directly without the beat generation template
@@ -845,6 +854,24 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
       case 'locations': return 'Locations';
       case 'objects': return 'Objects';
       default: return 'Entries';
+    }
+  }
+
+  private getLanguageInstruction(): string {
+    const language = this.story?.settings?.language;
+    switch (language) {
+      case 'de':
+        return 'Antworten Sie auf Deutsch.';
+      case 'fr':
+        return 'Répondez en français.';
+      case 'es':
+        return 'Responda en español.';
+      case 'en':
+        return 'Respond in English.';
+      case 'custom':
+        return 'Respond in the same language as the provided story context.';
+      default:
+        return 'Use the story\'s language for your response.';
     }
   }
 
