@@ -192,6 +192,7 @@
       <!-- Entry Modal -->
       <ion-modal [isOpen]="!!selectedEntry()" (didDismiss)="closeEntryModal()" class="entry-modal">
         <ng-template>
+          <div class="entry-modal-page ion-page">
           <ion-header>
             <ion-toolbar>
               <ion-title>{{ editingEntry.title || 'Edit Entry' }}</ion-title>
@@ -415,6 +416,7 @@
               </ion-button>
             </div>
           </ion-footer>
+          </div>
         </ng-template>
       </ion-modal>
 

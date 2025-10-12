@@ -255,7 +255,13 @@ ion-button[fill="outline"] {
       background: rgba(0, 0, 0, 0.8);
       backdrop-filter: blur(8px);
     }
-    
+
+    .entry-modal-page {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
     .entry-modal ion-header {
       background: transparent !important;
       --background: transparent !important;
