@@ -350,12 +350,13 @@
                     </div>
                     <ion-item lines="none" class="form-item">
                       <ion-label position="stacked">Field Value</ion-label>
-                      <ion-textarea 
-                        [(ngModel)]="field.value" 
-                        placeholder="Enter field value..."
-                        rows="3"
-                        class="scrollable-textarea">
-                      </ion-textarea>
+                    <ion-textarea 
+                      [(ngModel)]="field.value" 
+                      placeholder="Enter field value..."
+                      rows="3"
+                      [autoGrow]="true"
+                      class="scrollable-textarea">
+                    </ion-textarea>
                     </ion-item>
                   </div>
                   
@@ -370,12 +371,13 @@
                     </ion-item>
                     <ion-item lines="none" class="form-item">
                       <ion-label position="stacked">Field Value</ion-label>
-                      <ion-textarea 
-                        [(ngModel)]="newCustomFieldValue" 
-                        placeholder="Enter field value..."
-                        rows="3"
-                        class="scrollable-textarea">
-                      </ion-textarea>
+                    <ion-textarea 
+                      [(ngModel)]="newCustomFieldValue" 
+                      placeholder="Enter field value..."
+                      rows="3"
+                      [autoGrow]="true"
+                      class="scrollable-textarea">
+                    </ion-textarea>
                     </ion-item>
                   </div>
                 </div>
@@ -392,6 +394,7 @@
                       [(ngModel)]="editingEntry.content" 
                       placeholder="Description, details, notes..."
                       rows="8"
+                      [autoGrow]="true"
                       class="content-textarea scrollable-textarea">
                     </ion-textarea>
                   </ion-item>
@@ -460,6 +463,7 @@
                     [(ngModel)]="newCategory.description" 
                     placeholder="Description..."
                     rows="3"
+                    [autoGrow]="true"
                     class="scrollable-textarea">
                   </ion-textarea>
                 </ion-item>
