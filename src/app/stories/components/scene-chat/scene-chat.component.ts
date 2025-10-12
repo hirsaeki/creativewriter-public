@@ -658,12 +658,12 @@ export class SceneChatComponent implements OnInit, OnDestroy {
         description: 'Extract all characters from selected scenes',
         extractionType: 'characters',
         icon: 'person-outline',
-        prompt: `Analyze the provided scenes and identify every distinct character that appears or is referenced. For each character, fill out the template below. Keep the field labels exactly as written (in English). If a detail is unknown, write "Unknown" instead of inventing information. Use concise sentences in the story's language.
+        prompt: `Analyze the provided scenes and identify every distinct character that appears or is referenced. For each character, fill out the template below. Keep the field labels exactly as written (in English). If a detail is unknown, write "Unknown" instead of inventing information. Fill every field value in the story's language and keep sentences concise.
 
 **Name:** [Character name]
 **Story Role:** [Protagonist | Antagonist | Supporting Character | Love Interest | Background Character | Unknown]
 **Tags:** [Comma-separated keywords used only to identify the character inside beat prompts]
-**General Notes:** [...]
+**Description:** [...]
 
 **Physical Appearance:** [...]
 **Personality:** [...]
@@ -682,12 +682,12 @@ Separate each character block with a blank line.`
         description: 'Extract all locations and places from scenes',
         extractionType: 'locations',
         icon: 'location-outline',
-        prompt: `Analyze the scenes and document every distinct setting or location that appears or is mentioned. For each location, fill out the template below. Keep the field labels exactly as written (in English). If information is missing, answer with "Unknown". Write descriptive text in the story's language.
+        prompt: `Analyze the scenes and document every distinct setting or location that appears or is mentioned. For each location, fill out the template below. Keep the field labels exactly as written (in English). If information is missing, answer with "Unknown". Fill every field value in the story's language and stay concise.
 
 **Name:** [Location name]
 **Location Type:** [City, Ship, Tavern, Space Station, etc.]
 **Tags:** [Comma-separated keywords used only to identify this location inside beat prompts]
-**General Notes:** [...]
+**Description:** [...]
 
 **Overview:** [...]
 **Sensory Details:** [...]
@@ -706,12 +706,12 @@ Separate each location block with a blank line.`
         description: 'Extract important objects and items',
         extractionType: 'objects',
         icon: 'cube-outline',
-        prompt: `Analyze the scenes and capture every significant item, artifact, or object. For each one, complete the template below. Keep the field labels exactly as written (in English). When details are missing, respond with "Unknown". Provide descriptions in the story's language.
+        prompt: `Analyze the scenes and capture every significant item, artifact, or object. For each one, complete the template below. Keep the field labels exactly as written (in English). When details are missing, respond with "Unknown". Fill every field value in the story's language and keep sentences concise.
 
 **Name:** [Object name]
 **Object Type:** [Weapon, Relic, Document, Tool, etc.]
 **Tags:** [Comma-separated keywords used only to identify this object inside beat prompts]
-**General Notes:** [...]
+**Description:** [...]
 
 **Physical Description:** [...]
 **Origin & Backstory:** [...]
