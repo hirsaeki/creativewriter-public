@@ -232,11 +232,7 @@ ion-button[fill="outline"] {
 
     @media (max-width: 768px) {
       ion-content {
-        --padding-bottom: calc(72px + var(--ion-safe-area-bottom, 0px));
-      }
-
-      .entries-main {
-        padding-bottom: calc(72px + var(--ion-safe-area-bottom, 0px));
+        --padding-bottom: calc(88px + var(--ion-safe-area-bottom, 0px));
       }
 
       .codex-grid {
@@ -313,7 +309,7 @@ ion-button[fill="outline"] {
 
     @media (max-width: 768px) {
       .entry-modal-content {
-        --padding-bottom: calc(80px + var(--ion-safe-area-bottom, 0px));
+        --padding-bottom: calc(128px + var(--ion-safe-area-bottom, 0px));
       }
     }
 
