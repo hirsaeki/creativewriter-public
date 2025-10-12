@@ -328,7 +328,7 @@ ion-button[fill="outline"] {
     }
 
     .form-section:last-of-type {
-      margin-bottom: 80px; /* Space for sticky action buttons */
+      margin-bottom: 24px;
     }
 
     .section-title {
@@ -594,6 +594,18 @@ ion-button[fill="outline"] {
     }
 
     /* Modal Actions */
+    .entry-modal-footer {
+      --background: transparent;
+      --border-color: transparent;
+      --border-width: 0;
+      padding: 0;
+      background: transparent;
+    }
+
+    .entry-modal-footer::part(background) {
+      background: transparent;
+    }
+
     .modal-actions {
       display: flex;
       justify-content: space-between;
@@ -602,11 +614,10 @@ ion-button[fill="outline"] {
       padding: 16px 20px;
       background: linear-gradient(135deg, rgba(20, 20, 20, 0.98) 0%, rgba(15, 15, 15, 0.98) 100%);
       border-top: 1px solid rgba(255, 255, 255, 0.08);
-      position: sticky;
-      bottom: 0;
-      z-index: 10;
       backdrop-filter: blur(15px) saturate(150%);
       box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .modal-actions ion-button {
