@@ -1,32 +1,33 @@
-<ion-header>
-  <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-back-button defaultHref="/"></ion-back-button>
-    </ion-buttons>
-    <ion-title>Mobile Debug Console</ion-title>
-    <ion-buttons slot="end">
-      <ion-button (click)="loadData()">
-        <ion-icon name="refresh" slot="icon-only"></ion-icon>
-      </ion-button>
-    </ion-buttons>
-  </ion-toolbar>
+<div class="ion-page">
+  <ion-header>
+    <ion-toolbar>
+      <ion-buttons slot="start">
+        <ion-back-button defaultHref="/"></ion-back-button>
+      </ion-buttons>
+      <ion-title>Mobile Debug Console</ion-title>
+      <ion-buttons slot="end">
+        <ion-button (click)="loadData()">
+          <ion-icon name="refresh" slot="icon-only"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
 
-  <ion-toolbar>
-    <ion-segment [(ngModel)]="activeTab" (ionChange)="loadData()" mode="md">
-      <ion-segment-button value="crashes">
-        <ion-label>Crashes<br><small>({{ crashLogs.length }})</small></ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="metrics">
-        <ion-label>Metrics</ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="storage">
-        <ion-label>Storage</ion-label>
-      </ion-segment-button>
-    </ion-segment>
-  </ion-toolbar>
-</ion-header>
+    <ion-toolbar>
+      <ion-segment [(ngModel)]="activeTab" (ionChange)="loadData()" mode="md">
+        <ion-segment-button value="crashes">
+          <ion-label>Crashes<br><small>({{ crashLogs.length }})</small></ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="metrics">
+          <ion-label>Metrics</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="storage">
+          <ion-label>Storage</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </ion-toolbar>
+  </ion-header>
 
-<ion-content>
+  <ion-content>
   <!-- Crashes Tab -->
   <div *ngIf="activeTab === 'crashes'">
     <div class="actions">
@@ -236,4 +237,5 @@
       </ion-card-content>
     </ion-card>
   </div>
-</ion-content>
+  </ion-content>
+</div>
