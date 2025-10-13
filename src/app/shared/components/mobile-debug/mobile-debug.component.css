@@ -1,0 +1,46 @@
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.error-title {
+  color: var(--ion-color-danger);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stack-trace {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: var(--ion-color-light);
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+.memory-display {
+  margin: 16px 0;
+}
+
+.memory-stats {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 16px;
+}
+
+ion-card {
+  margin-bottom: 16px;
+}
+
+ion-item {
+  --padding-start: 0;
+}
+
+ion-list {
+  padding: 0;
+}
