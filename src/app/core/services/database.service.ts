@@ -21,6 +21,10 @@ export interface SyncStatus {
   isSync: boolean;
   lastSync?: Date;
   error?: string;
+  syncProgress?: {
+    docsProcessed: number;
+    operation: 'push' | 'pull';
+  };
 }
 
 @Injectable({
@@ -275,12 +279,12 @@ export class DatabaseService {
     this.updateSyncStatus({ isSync: false });
   }
 
-  async forcePush(): Promise<void> {
-    await this.runManualReplication('push');
+  async forcePush(): Promise<{ docsProcessed: number }> {
+    return await this.runManualReplication('push');
   }
 
-  async forcePull(): Promise<void> {
-    await this.runManualReplication('pull');
+  async forcePull(): Promise<{ docsProcessed: number }> {
+    return await this.runManualReplication('pull');
   }
 
   async compact(): Promise<void> {
@@ -294,7 +298,7 @@ export class DatabaseService {
     await this.db.destroy();
   }
 
-  private async runManualReplication(direction: 'push' | 'pull'): Promise<void> {
+  private async runManualReplication(direction: 'push' | 'pull'): Promise<{ docsProcessed: number }> {
     const user = this.authService.getCurrentUser();
     const userId = user?.username ?? 'anonymous';
 
@@ -314,18 +318,62 @@ export class DatabaseService {
       userId
     );
 
-    this.updateSyncStatus({ isSync: true, error: undefined });
+    this.updateSyncStatus({
+      isSync: true,
+      error: undefined,
+      syncProgress: { docsProcessed: 0, operation: direction }
+    });
     const startTime = Date.now();
 
+    // Set up timeout (60 seconds)
+    const timeoutMs = 60000;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let timedOut = false;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        reject(new Error('Sync operation timed out after 60 seconds'));
+      }, timeoutMs);
+    });
+
     try {
-      const result = direction === 'push'
-        ? await this.db.replicate.to(this.remoteDb)
-        : await this.db.replicate.from(this.remoteDb);
+      // Create replication with progress tracking
+      const replicationPromise = (async () => {
+        const replication = direction === 'push'
+          ? this.db!.replicate.to(this.remoteDb!)
+          : this.db!.replicate.from(this.remoteDb!);
+
+        // Track progress during replication
+        (replication as PouchDB.Replication.Replication<Record<string, unknown>>)
+          .on('change', (info) => {
+            if (info && typeof info === 'object' && 'docs' in info) {
+              const docs = info.docs as unknown[];
+              this.updateSyncStatus({
+                syncProgress: {
+                  docsProcessed: docs?.length || 0,
+                  operation: direction
+                }
+              });
+            }
+          });
+
+        return await replication;
+      })();
+
+      // Race between replication and timeout
+      const result = await Promise.race([replicationPromise, timeoutPromise]);
+
+      if (timeoutId) clearTimeout(timeoutId);
 
       const duration = Date.now() - startTime;
       const itemCount = direction === 'push' ? result.docs_written : result.docs_read;
 
-      this.updateSyncStatus({ lastSync: new Date(), error: undefined });
+      this.updateSyncStatus({
+        lastSync: new Date(),
+        error: undefined,
+        syncProgress: undefined
+      });
 
       this.syncLogger.updateLog(logId, {
         type: direction === 'push' ? 'upload' : 'download',
@@ -337,14 +385,18 @@ export class DatabaseService {
         duration,
         timestamp: new Date()
       });
+
+      return { docsProcessed: itemCount };
     } catch (error) {
+      if (timeoutId) clearTimeout(timeoutId);
+
       console.error(direction === 'push' ? 'Force push failed:' : 'Force pull failed:', error);
       const friendlyMessage = this.getFriendlySyncError(
         error,
-        direction === 'push' ? 'Manual push failed' : 'Manual pull failed'
+        timedOut ? 'Sync timed out' : (direction === 'push' ? 'Manual push failed' : 'Manual pull failed')
       );
 
-      this.updateSyncStatus({ error: friendlyMessage });
+      this.updateSyncStatus({ error: friendlyMessage, syncProgress: undefined });
       this.syncLogger.updateLog(logId, {
         type: 'error',
         status: 'error',
@@ -355,7 +407,7 @@ export class DatabaseService {
 
       throw error;
     } finally {
-      this.updateSyncStatus({ isSync: false });
+      this.updateSyncStatus({ isSync: false, syncProgress: undefined });
     }
   }
 
