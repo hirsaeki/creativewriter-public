@@ -95,25 +95,19 @@ export class StoryStatsService {
    * @returns Plain text content without formatting or Beat AI suggestions
    */
   private stripHtmlTags(html: string): string {
-    if (!html) return '';
-
-    // First remove Beat AI nodes completely (they are editor-only components)
-    // Do this BEFORE parsing to catch complex nested structures
-    const cleanHtml = html.replace(/<div[^>]*class="beat-ai-node"[^>]*>.*?<\/div>/gs, '');
-
     // Use DOMParser for safe HTML parsing instead of innerHTML
     const parser = new DOMParser();
-    const doc = parser.parseFromString(cleanHtml, 'text/html');
-
+    const doc = parser.parseFromString(html, 'text/html');
+    
     // Remove Beat AI elements before extracting text
     const beatAIElements = doc.querySelectorAll(
       '.beat-ai-wrapper, .beat-ai-node, .beat-ai-container, .beat-ai-suggestion, ' +
       '.beat-ai-input, .ai-suggestion, .beat-suggestion, [data-beat-ai], ' +
       '[class*="beat-ai"], [class*="ai-beat"]'
     );
-
+    
     beatAIElements.forEach(element => element.remove());
-
+    
     // Also remove any elements with Beat AI specific attributes or content
     const allElements = doc.querySelectorAll('*');
     allElements.forEach(element => {
@@ -124,16 +118,8 @@ export class StoryStatsService {
         element.remove();
       }
     });
-
-    // Get text content safely
-    const textContent = doc.body.textContent || '';
-
-    // Remove any remaining Beat AI artifacts that might appear as plain text
-    return textContent
-      .replace(/🎭\s*Beat\s*AI/gi, '')
-      .replace(/Prompt:\s*/gi, '')
-      .replace(/BeatAIPrompt/gi, '')
-      .trim();
+    
+    return doc.body.textContent || '';
   }
 
   /**
