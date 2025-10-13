@@ -7,7 +7,7 @@ import {
   IonButton, IonButtons, IonToolbar, IonTitle, IonHeader, IonContent, IonList, IonItem
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline } from 'ionicons/icons';
+import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline } from 'ionicons/icons';
 import { BeatAIModalService } from '../../../shared/services/beat-ai-modal.service';
 import { TokenInfoPopoverComponent } from '../../../ui/components/token-info-popover.component';
 import { TokenCounterService, SupportedModel } from '../../../shared/services/token-counter.service';
@@ -121,7 +121,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   constructor() {
     // Register icons
-    addIcons({ logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline });
+    addIcons({ logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline });
   }
   
   ngOnInit(): void {
