@@ -986,7 +986,7 @@ export class ProseMirrorEditorService {
     let nextBeatPos: number | null = null;
 
     state.doc.descendants((node, pos) => {
-      if (pos <= startPos) {
+      if (pos < startPos) {
         return true;
       }
 
