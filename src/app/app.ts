@@ -6,6 +6,16 @@ import { BeatAIModalService } from './shared/services/beat-ai-modal.service';
 import { BeatAIPreviewModalComponent } from './stories/components/beat-ai-preview-modal/beat-ai-preview-modal.component';
 import { MemoryWarningService } from './core/services/memory-warning.service';
 
+// Preload PouchDB modules to avoid lazy loading delay during database initialization
+import PouchDB from 'pouchdb-browser';
+import PouchDBFind from 'pouchdb-find';
+
+// Register PouchDB plugins at app startup
+PouchDB.plugin(PouchDBFind);
+
+// Export for DatabaseService to use
+export { PouchDB };
+
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet, IonApp, BeatAIPreviewModalComponent],

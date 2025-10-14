@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { AuthService, User } from './auth.service';
 import { SyncLoggerService } from './sync-logger.service';
+import { PouchDB } from '../../app';
 
 // Minimal static type for the PouchDB constructor when loaded via ESM
 interface PouchDBStatic {
@@ -50,9 +51,12 @@ export class DatabaseService {
   public syncStatus$: Observable<SyncStatus> = this.syncStatusSubject.asObservable();
 
   constructor() {
+    // Use preloaded PouchDB from app.ts
+    this.pouchdbCtor = PouchDB as unknown as PouchDBStatic;
+
     // Initialize with default database (will be updated when user logs in)
     this.initializationPromise = this.initializeDatabase('creative-writer-stories');
-    
+
     // Subscribe to user changes to switch databases
     this.authService.currentUser$.subscribe(user => {
       this.handleUserChange(user);
@@ -64,19 +68,11 @@ export class DatabaseService {
   }
 
   private async initializeDatabase(dbName: string): Promise<void> {
-    // Ensure PouchDB ESM is loaded and plugin registered (lazy load to reduce initial bundle)
+    // PouchDB is now preloaded in app.ts, no need for dynamic imports
     if (!this.pouchdbCtor) {
-      interface PouchDBModule { default: PouchDBStatic }
-      interface PouchDBFindModule { default: unknown }
-      const [{ default: PouchDB }, { default: PouchDBFind }] = await Promise.all([
-        import('pouchdb-browser') as Promise<PouchDBModule>,
-        import('pouchdb-find') as Promise<PouchDBFindModule>
-      ]);
-      // Register find/mango plugin
-      PouchDB.plugin(PouchDBFind);
-      this.pouchdbCtor = PouchDB;
+      throw new Error('PouchDB not preloaded - check app.ts initialization');
     }
-    
+
     // Stop sync first
     await this.stopSync();
     
