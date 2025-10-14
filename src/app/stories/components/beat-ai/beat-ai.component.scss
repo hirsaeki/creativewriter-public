@@ -497,34 +497,44 @@
     }
     
     .favorite-models {
-      display: flex;
-      flex-wrap: wrap;
+      display: inline-flex;
       align-items: center;
       gap: 0.4rem;
-      padding: 0.25rem 0.5rem;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(18, 18, 18, 0.6);
+      padding: 0.35rem 0.5rem;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: linear-gradient(
+        135deg,
+        rgba(20, 20, 28, 0.5) 0%,
+        rgba(15, 15, 22, 0.6) 100%
+      );
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       grid-column: 1 / -1;
-      margin-bottom: 0.25rem;
+      margin-bottom: 0.4rem;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
     }
 
     .favorite-icon {
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       color: #ffd43b;
-      opacity: 0.85;
+      opacity: 0.8;
       flex: 0 0 auto;
+      filter: drop-shadow(0 1px 2px rgba(255, 212, 59, 0.2));
+      margin-right: 0.15rem;
     }
 
     .favorite-buttons {
       display: inline-flex;
-      align-items: center;
+      align-items: stretch;
       gap: 0;
       padding: 0;
-      flex: 1 1 auto;
-      border-radius: 6px;
+      flex: 0 1 auto;
+      border-radius: 8px;
       overflow: hidden;
       border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(30, 30, 38, 0.4);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
     }
 
     .favorite-buttons::-webkit-scrollbar {
@@ -535,35 +545,67 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 0.3rem 0.6rem;
+      padding: 0.35rem 0.7rem;
+      min-height: 32px;
       border-radius: 0;
-      background: rgba(255, 255, 255, 0.06);
+      background: transparent;
       border: none;
-      border-right: 1px solid rgba(255, 255, 255, 0.12);
-      color: rgba(255, 255, 255, 0.85);
-      font-size: 0.72rem;
-      font-weight: 500;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 0.75rem;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.18s ease;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
       min-width: 0;
       white-space: nowrap;
       position: relative;
+      overflow: hidden;
     }
 
     .favorite-btn:last-child {
       border-right: none;
     }
 
-    .favorite-btn:hover {
-      background: rgba(255, 255, 255, 0.12);
-      z-index: 1;
+    .favorite-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.06) 0%,
+        rgba(255, 255, 255, 0.02) 100%
+      );
+      opacity: 0;
+      transition: opacity 0.18s ease;
+    }
+
+    .favorite-btn:hover:not(.active) {
+      color: rgba(255, 255, 255, 0.95);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .favorite-btn:hover:not(.active)::before {
+      opacity: 1;
     }
 
     .favorite-btn.active {
-      background: rgba(77, 171, 247, 0.2);
+      background: linear-gradient(
+        180deg,
+        rgba(77, 171, 247, 0.3) 0%,
+        rgba(77, 171, 247, 0.25) 100%
+      );
       color: #4dabf7;
-      z-index: 2;
-      box-shadow: inset 0 0 0 1px rgba(77, 171, 247, 0.4);
+      box-shadow:
+        inset 0 0 0 1px rgba(77, 171, 247, 0.4),
+        inset 0 2px 4px rgba(77, 171, 247, 0.2);
+      z-index: 1;
+    }
+
+    .favorite-btn.active::before {
+      opacity: 0;
     }
 
     .favorite-btn-content {
@@ -573,11 +615,16 @@
     }
 
     .favorite-btn .provider-icon-inline {
-      font-size: 0.85rem;
+      font-size: 0.9rem;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+    }
+
+    .favorite-btn.active .provider-icon-inline {
+      filter: drop-shadow(0 1px 3px rgba(77, 171, 247, 0.4));
     }
 
     .model-short-name {
-      font-weight: 500;
+      font-weight: 600;
       letter-spacing: 0.01em;
     }
     
@@ -1063,47 +1110,36 @@
     /* Mobile optimizations for Beat AI */
     @media (max-width: 768px) {
       .favorite-models {
-        padding: 0.2rem 0.45rem;
+        padding: 0.3rem 0.4rem;
         gap: 0.3rem;
-        overflow: hidden;
-        position: relative;
+        border-radius: 8px;
       }
 
-      .favorite-models::before,
-      .favorite-models::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 20px;
-        pointer-events: none;
-        z-index: 10;
-      }
-
-      .favorite-models::before {
-        left: 0;
-        background: linear-gradient(to right, rgba(18, 18, 18, 0.9) 0%, transparent 100%);
-      }
-
-      .favorite-models::after {
-        right: 0;
-        background: linear-gradient(to left, rgba(18, 18, 18, 0.9) 0%, transparent 100%);
+      .favorite-icon {
+        font-size: 0.85rem;
+        margin-right: 0.1rem;
       }
 
       .favorite-buttons {
+        border-radius: 7px;
         overflow-x: auto;
         overflow-y: hidden;
-        flex-wrap: nowrap;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
         -ms-overflow-style: none;
       }
 
       .favorite-btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.68rem;
+        padding: 0.3rem 0.6rem;
+        font-size: 0.7rem;
         flex-shrink: 0;
+        min-height: 30px;
       }
+
+      .favorite-btn .provider-icon-inline {
+        font-size: 0.85rem;
+      }
+    }
       
       .model-selection-group {
         gap: 0.5rem;
