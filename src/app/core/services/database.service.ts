@@ -84,13 +84,10 @@ export class DatabaseService {
         console.warn('Error closing database:', error);
       }
     }
-    
-    // Small delay to ensure cleanup
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     this.db = new this.pouchdbCtor(dbName);
 
-    // Create comprehensive indexes for better query performance
+    // Create comprehensive indexes for better query performance (in parallel)
     const indexes = [
       { fields: ['type'] },
       { fields: ['type', 'createdAt'] },
@@ -102,13 +99,13 @@ export class DatabaseService {
       { fields: ['id'] }
     ];
 
-    for (const indexDef of indexes) {
-      try {
-        await this.db.createIndex({ index: indexDef });
-      } catch (err) {
-        console.warn(`Could not create index for ${JSON.stringify(indexDef.fields)}:`, err);
-      }
-    }
+    // Create all indexes in parallel for faster initialization
+    await Promise.all(
+      indexes.map(indexDef =>
+        this.db!.createIndex({ index: indexDef })
+          .catch(err => console.warn(`Could not create index for ${JSON.stringify(indexDef.fields)}:`, err))
+      )
+    );
 
     // Setup sync for the new database
     await this.setupSync();

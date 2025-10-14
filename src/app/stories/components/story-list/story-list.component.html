@@ -108,8 +108,14 @@
   
   <ng-template #noStories>
     <div class="no-stories">
-      <p>No stories available yet.</p>
-      <p>Start writing your first story!</p>
+      <ng-container *ngIf="isLoadingStories; else emptyState">
+        <ion-spinner name="crescent"></ion-spinner>
+        <p>Loading stories...</p>
+      </ng-container>
+      <ng-template #emptyState>
+        <p>No stories available yet.</p>
+        <p>Start writing your first story!</p>
+      </ng-template>
     </div>
   </ng-template>
   

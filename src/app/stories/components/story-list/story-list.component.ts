@@ -5,9 +5,9 @@ import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer } from '@angular/platform-browser';
-import { 
-  IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonChip, IonIcon, IonButton, 
-  IonContent, IonLabel, ActionSheetController
+import {
+  IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonChip, IonIcon, IonButton,
+  IonContent, IonLabel, IonSpinner, ActionSheetController
 } from '@ionic/angular/standalone';
 import { CdkDropList, CdkDrag, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { addIcons } from 'ionicons';
@@ -27,8 +27,8 @@ import { VersionService } from '../../../core/services/version.service';
   standalone: true,
   imports: [
     CommonModule, FormsModule,
-    IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonChip, IonIcon, IonButton, 
-    IonContent, IonLabel,
+    IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonChip, IonIcon, IonButton,
+    IonContent, IonLabel, IonSpinner,
     CdkDropList, CdkDrag,
     SyncStatusComponent, LoginComponent, AppHeaderComponent
   ],
@@ -54,6 +54,7 @@ export class StoryListComponent implements OnInit, OnDestroy {
   burgerMenuItems: BurgerMenuItem[] = [];
   rightActions: HeaderAction[] = [];
   reorderingEnabled = false;
+  isLoadingStories = true;
 
   constructor() {
     // Register Ionic icons
@@ -61,20 +62,24 @@ export class StoryListComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.isLoadingStories = true;
     this.loadStories().then(() => {
       // Setup right actions after stories are loaded
       this.setupRightActions();
+      this.isLoadingStories = false;
       this.cdr.markForCheck();
     });
-    
+
     // Subscribe to user changes
     this.authService.currentUser$
       .pipe(takeUntil(this.destroy$))
       .subscribe(user => {
         this.currentUser = user;
         // Reload stories when user changes (different database)
+        this.isLoadingStories = true;
         this.loadStories().then(() => {
           this.setupRightActions();
+          this.isLoadingStories = false;
           this.cdr.markForCheck();
         });
       });
