@@ -21,7 +21,6 @@ import { ApiSettingsComponent } from '../ui/settings/api-settings.component';
 import { UiSettingsComponent } from '../ui/settings/ui-settings.component';
 import { PromptsSettingsComponent } from '../ui/settings/prompts-settings.component';
 import { SceneGenerationSettingsComponent } from '../ui/settings/scene-generation-settings.component';
-import { ModelFavoritesSettingsComponent } from '../ui/settings/model-favorites-settings/model-favorites-settings.component';
 
 @Component({
   selector: 'app-settings',
@@ -31,7 +30,7 @@ import { ModelFavoritesSettingsComponent } from '../ui/settings/model-favorites-
     IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonChip, IonLabel,
     SettingsTabsComponent, SettingsContentComponent, DatabaseBackupComponent,
-    ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent, SceneGenerationSettingsComponent, ModelFavoritesSettingsComponent
+    ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent, SceneGenerationSettingsComponent
   ],
   template: `
     <div class="ion-page">
