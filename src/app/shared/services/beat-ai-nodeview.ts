@@ -119,19 +119,8 @@ export class BeatAINodeView implements NodeView {
 
 
   stopEvent(event: Event): boolean {
-    // Allow events for interactive elements (inputs, buttons, etc.)
-    const target = event.target as HTMLElement;
-    if (target) {
-      const interactiveElements = ['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT'];
-      const isInteractive = interactiveElements.includes(target.tagName) || 
-                           target.contentEditable === 'true' ||
-                           target.closest('button, input, textarea, select');
-      
-      if (isInteractive) {
-        return true; // Stop ProseMirror from handling this event
-      }
-    }
-    return false;
+    // Allow all events inside the beat AI component - don't let outer ProseMirror interfere
+    return true;
   }
 
   ignoreMutation(): boolean {

@@ -83,6 +83,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   availableModels: ModelOption[] = [];
   favoriteModels: ModelOption[] = [];
   selectedBeatType: 'story' | 'scene' = 'story';
+  private saveTimeout?: ReturnType<typeof setTimeout>;
   beatTypeOptions = [
     { value: 'story', label: 'StoryBeat', description: 'With complete story context' },
     { value: 'scene', label: 'SceneBeat', description: 'Ohne Szenen-Zusammenfassungen' }
@@ -209,6 +210,9 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   ngOnDestroy(): void {
     this.subscription.unsubscribe();
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
     if (this.editorView) {
       this.editorView.destroy();
       this.editorView = null;
@@ -424,12 +428,19 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   
   onPromptChange(): void {
-    // Update beatData with the current prompt to ensure it's persisted
-    if (this.beatData.prompt !== this.currentPrompt) {
-      this.beatData.prompt = this.currentPrompt;
-      this.beatData.updatedAt = new Date();
-      this.contentUpdate.emit(this.beatData);
+    // Debounce the save to prevent re-renders while typing
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
     }
+
+    this.saveTimeout = setTimeout(() => {
+      // Update beatData with the current prompt to ensure it's persisted
+      if (this.beatData.prompt !== this.currentPrompt) {
+        this.beatData.prompt = this.currentPrompt;
+        this.beatData.updatedAt = new Date();
+        this.contentUpdate.emit(this.beatData);
+      }
+    }, 500); // Wait 500ms after user stops typing
   }
 
   onWordCountChange(): void {

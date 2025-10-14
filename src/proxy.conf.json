@@ -12,7 +12,7 @@
     "logLevel": "debug"
   },
   "/_db": {
-    "target": "http://localhost:5984",
+    "target": "http://192.168.178.5:3080",
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug"

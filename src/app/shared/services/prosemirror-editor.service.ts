@@ -5,7 +5,7 @@ import { Schema, DOMParser, DOMSerializer, Node as ProseMirrorNode, Fragment, Sl
 import { schema } from 'prosemirror-schema-basic';
 import { addListNodes } from 'prosemirror-schema-list';
 import { keymap } from 'prosemirror-keymap';
-import { baseKeymap, splitBlock, chainCommands, newlineInCode, createParagraphNear, liftEmptyBlock } from 'prosemirror-commands';
+import { baseKeymap, splitBlock, chainCommands, newlineInCode, createParagraphNear, liftEmptyBlock, deleteSelection, joinForward, selectNodeForward } from 'prosemirror-commands';
 import { history, undo, redo } from 'prosemirror-history';
 import { Subject } from 'rxjs';
 import { ModalController } from '@ionic/angular/standalone';
@@ -358,6 +358,25 @@ export class ProseMirrorEditorService {
               dispatch(tr.scrollIntoView());
             }
             return true;
+          },
+          // Explicit Delete key binding for forward delete
+          'Delete': (state, dispatch) => {
+            console.log('Delete key pressed in simple editor', {
+              hasSelection: !state.selection.empty,
+              selectionFrom: state.selection.from,
+              selectionTo: state.selection.to
+            });
+            // Try each command in sequence until one succeeds
+            const result = deleteSelection(state, dispatch) ||
+                   joinForward(state, dispatch) ||
+                   selectNodeForward(state, dispatch);
+            console.log('Delete command result:', result);
+            return result;
+          },
+          'Mod-Delete': (state, dispatch) => {
+            return deleteSelection(state, dispatch) ||
+                   joinForward(state, dispatch) ||
+                   selectNodeForward(state, dispatch);
           }
         }),
         keymap(baseKeymap),
@@ -406,6 +425,7 @@ export class ProseMirrorEditorService {
           event.stopPropagation();
           return false;
         }
+        // Removed keydown handler - let ProseMirror's keymap handle all keyboard events
       }
     });
 
