@@ -424,7 +424,12 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   
   onPromptChange(): void {
-    // ProseMirror handles content changes automatically
+    // Update beatData with the current prompt to ensure it's persisted
+    if (this.beatData.prompt !== this.currentPrompt) {
+      this.beatData.prompt = this.currentPrompt;
+      this.beatData.updatedAt = new Date();
+      this.contentUpdate.emit(this.beatData);
+    }
   }
 
   onWordCountChange(): void {
