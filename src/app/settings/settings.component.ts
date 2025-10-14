@@ -78,19 +78,6 @@ import { ModelFavoritesSettingsComponent } from '../ui/settings/model-favorites-
               (settingsChange)="onSettingsChange()"
               (modelsLoaded)="onModelsLoaded($event)">
             </app-api-settings>
-            <app-model-favorites-settings
-              [favoriteIds]="settings.favoriteModelLists?.rewrite || []"
-              [combinedModels]="combinedModels"
-              [loadingModels]="loadingModels"
-              [modelLoadError]="modelLoadError"
-              cardTitle="Rewrite Model Favorites"
-              heading="Rewrite Quick Picks"
-              subheading="Choose up to 6 models to surface as quick actions in the rewrite dialog."
-              description="Configure which models appear as quick-select favorites when rewriting text."
-              emptyState="No rewrite favorites selected yet. Load models to add quick access options."
-              infoNote="Enable at least one AI provider and load models to populate this list."
-              (favoriteIdsChange)="onFavoriteModelsChange('rewrite', $event)">
-            </app-model-favorites-settings>
           </div>
           
           <!-- Appearance Tab -->
