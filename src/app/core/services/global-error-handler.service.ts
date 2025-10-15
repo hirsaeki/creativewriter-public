@@ -1,5 +1,6 @@
 import { ErrorHandler, Injectable, inject } from '@angular/core';
 import { AIRequestLoggerService } from './ai-request-logger.service';
+import { MobileDebugService } from './mobile-debug.service';
 
 interface PromiseRejectionError {
   rejection?: {
@@ -52,6 +53,7 @@ type ErrorWithStack = Error & { stack?: string };
 @Injectable()
 export class GlobalErrorHandlerService implements ErrorHandler {
   private readonly aiLogger = inject(AIRequestLoggerService);
+  private readonly mobileDebug = inject(MobileDebugService);
 
   handleError(error: unknown): void {
     const timestamp = new Date().toISOString();
@@ -135,7 +137,16 @@ export class GlobalErrorHandlerService implements ErrorHandler {
       console.error('Error occurred at:', timestamp);
       console.error('User agent:', navigator.userAgent);
       console.error('URL:', window.location.href);
-      
+
+      // Log to mobile debug service for crash tracking
+      if (error instanceof Error) {
+        this.mobileDebug.logCrash(error);
+      } else if (typeof error === 'string') {
+        this.mobileDebug.logCrash(error);
+      } else {
+        this.mobileDebug.logCrash(new Error(errorMessage));
+      }
+
     } catch (processingError) {
       console.error('Error in error handler:', processingError);
       errorMessage = `Error Handler Failed: ${error}`;

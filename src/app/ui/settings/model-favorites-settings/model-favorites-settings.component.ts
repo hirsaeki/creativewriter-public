@@ -125,6 +125,10 @@ export class ModelFavoritesSettingsComponent implements OnChanges {
     }
   }
 
+  formatSelectedItems(items: ModelOption[]): string {
+    return items.map(i => i.label).join(', ');
+  }
+
   private syncFromFavorites(): void {
     const favorites = Array.isArray(this.favoriteIds) ? this.favoriteIds : [];
     this.selectedFavorites = [...favorites].slice(0, this.maxFavorites);

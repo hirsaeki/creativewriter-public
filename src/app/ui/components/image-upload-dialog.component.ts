@@ -1,10 +1,12 @@
-import { Component, EventEmitter, Output, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, ElementRef, EventEmitter, Output, ViewChild, ViewRef, inject, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ModalController } from '@ionic/angular/standalone';
 import { ImageService, ImageUploadResult } from '../../shared/services/image.service';
 import { ImageCropperModalComponent } from './image-cropper-modal.component';
 import imageCompression from 'browser-image-compression';
+
+type ProcessingStage = 'prepare' | 'compressing' | 'uploading' | 'finalizing';
 
 export interface ImageInsertResult {
   url: string;
@@ -19,7 +21,19 @@ export interface ImageInsertResult {
   imports: [CommonModule, FormsModule],
   template: `
     <div class="dialog-overlay" role="button" tabindex="0" (click)="cancel()" (keyup.escape)="cancel()">
-      <div class="dialog-content" role="button" tabindex="0" (click)="$event.stopPropagation()" (keyup.enter)="$event.stopPropagation()">
+      <div 
+        class="dialog-content"
+        role="button"
+        tabindex="0"
+        (click)="$event.stopPropagation()"
+        (keyup.enter)="$event.stopPropagation()"
+        [attr.aria-busy]="isProcessing">
+        <div class="processing-overlay" *ngIf="isProcessing">
+          <div class="processing-container" role="status" aria-live="polite">
+            <div class="processing-spinner" aria-hidden="true"></div>
+            <p>{{ processingMessage }}</p>
+          </div>
+        </div>
         <h3>Insert Image</h3>
         
         <div class="upload-tabs">
@@ -157,7 +171,7 @@ export interface ImageInsertResult {
           <button class="cancel-btn" (click)="cancel()">Cancel</button>
           <button 
             class="insert-btn" 
-            [disabled]="!canInsert()"
+            [disabled]="!canInsert() || isProcessing"
             (click)="insert()">
             Insert
           </button>
@@ -188,7 +202,9 @@ export interface ImageInsertResult {
       width: 90vw;
       max-height: 90vh;
       overflow-y: auto;
+      overflow-x: hidden;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      position: relative;
     }
 
     h3 {
@@ -461,6 +477,52 @@ export interface ImageInsertResult {
       cursor: not-allowed;
     }
 
+    .processing-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+      backdrop-filter: blur(4px);
+      pointer-events: all;
+    }
+
+    .processing-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.5rem;
+      background: rgba(26, 26, 26, 0.9);
+      border: 1px solid #404040;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .processing-container p {
+      margin: 0;
+      color: #e0e0e0;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .processing-spinner {
+      width: 42px;
+      height: 42px;
+      border: 4px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #28a745;
+      border-radius: 50%;
+      animation: processing-spin 1s linear infinite;
+    }
+
+    @keyframes processing-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     @media (max-width: 480px) {
       .dialog-content {
         padding: 1rem;
@@ -480,6 +542,7 @@ export interface ImageInsertResult {
 export class ImageUploadDialogComponent {
   @Output() imageInserted = new EventEmitter<ImageInsertResult>();
   @Output() cancelled = new EventEmitter<void>();
+  @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
 
   activeTab: 'upload' | 'url' = 'upload';
   isDragging = false;
@@ -502,24 +565,37 @@ export class ImageUploadDialogComponent {
   originalSize = 0;
   compressedSize = 0;
   Math = Math;
+  isProcessing = false;
+  processingStage: ProcessingStage | null = null;
 
   private readonly imageService = inject(ImageService);
   private readonly modalController = inject(ModalController);
+  private readonly zone = inject(NgZone);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly destroyRef = inject(DestroyRef);
+  private viewDestroyed = false;
 
-  onFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files[0]) {
-      this.handleFile(input.files[0]);
-    }
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.viewDestroyed = true;
+    });
   }
 
-  onDrop(event: DragEvent): void {
+  async onFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      await this.handleFile(input.files[0]);
+    }
+    this.resetFileInput(input);
+  }
+
+  async onDrop(event: DragEvent): Promise<void> {
     event.preventDefault();
     event.stopPropagation();
     this.isDragging = false;
 
     if (event.dataTransfer?.files && event.dataTransfer.files[0]) {
-      this.handleFile(event.dataTransfer.files[0]);
+      await this.handleFile(event.dataTransfer.files[0]);
     }
   }
 
@@ -535,7 +611,7 @@ export class ImageUploadDialogComponent {
     this.isDragging = false;
   }
 
-  private handleFile(file: File): void {
+  private async handleFile(file: File): Promise<void> {
     if (!file.type.startsWith('image/')) {
       alert('Please select an image file.');
       return;
@@ -543,13 +619,135 @@ export class ImageUploadDialogComponent {
 
     this.uploadedFile = file;
     this.originalSize = file.size;
-    
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      this.uploadPreview = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    this.activeTab = 'upload';
+    this.imageUrl = '';
+    this.urlPreview = null;
+    this.compressedSize = 0;
+    if (!this.altText) {
+      this.altText = this.buildAltText(file.name);
+    }
+    this.uploadPreview = null;
+
+    try {
+      const preview = await this.readFileAsDataURL(file);
+      this.commitState(() => {
+        this.uploadPreview = preview;
+      });
+    } catch (error) {
+      console.error('Error reading image file', error);
+      this.commitState(() => {
+        alert('Error loading the image preview. Please try again.');
+        this.removeUploadedImage();
+      });
+    }
+  }
+
+  private resetFileInput(input?: HTMLInputElement | null): void {
+    const target = input ?? this.fileInput?.nativeElement ?? null;
+    if (target) {
+      target.value = '';
+    }
+  }
+
+  private async readFileAsDataURL(file: File): Promise<string> {
+    try {
+      return await this.readFileWithFileReader(file);
+    } catch (error) {
+      console.warn('FileReader failed, falling back to arrayBuffer for preview', error);
+      const buffer = await file.arrayBuffer();
+      return this.arrayBufferToDataUrl(buffer, file.type);
+    }
+  }
+
+  private readFileWithFileReader(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+      reader.onabort = () => reject(new Error('File reading was aborted'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  private arrayBufferToDataUrl(buffer: ArrayBuffer, mimeType: string): string {
+    const base64 = this.arrayBufferToBase64(buffer);
+    const safeMime = mimeType && mimeType.length > 0 ? mimeType : 'application/octet-stream';
+    return `data:${safeMime};base64,${base64}`;
+  }
+
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    let binary = '';
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+
+    return btoa(binary);
+  }
+
+  private commitState(mutator: () => void): void {
+    if (this.viewDestroyed) {
+      return;
+    }
+    this.zone.run(() => {
+      if (this.viewDestroyed) {
+        return;
+      }
+      mutator();
+      const viewRef = this.cdr as ViewRef;
+      if (!viewRef.destroyed) {
+        viewRef.detectChanges();
+      }
+    });
+  }
+
+  private beginProcessing(stage: ProcessingStage): void {
+    this.commitState(() => {
+      this.isProcessing = true;
+      this.processingStage = stage;
+    });
+  }
+
+  private updateProcessingStage(stage: ProcessingStage): void {
+    this.commitState(() => {
+      if (!this.isProcessing) {
+        return;
+      }
+      this.processingStage = stage;
+    });
+  }
+
+  private endProcessing(): void {
+    this.commitState(() => {
+      this.isProcessing = false;
+      this.processingStage = null;
+    });
+  }
+
+  get processingMessage(): string {
+    switch (this.processingStage) {
+      case 'compressing':
+        return 'Compressing image...';
+      case 'uploading':
+        return 'Uploading image...';
+      case 'finalizing':
+        return 'Finishing up...';
+      case 'prepare':
+      default:
+        return 'Preparing image...';
+    }
+  }
+
+  private buildAltText(filename: string): string {
+    const nameWithoutExtension = filename.replace(/\.[^/.]+$/, '');
+    return nameWithoutExtension
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase()) || 'Image';
   }
 
   removeUploadedImage(): void {
@@ -557,6 +755,7 @@ export class ImageUploadDialogComponent {
     this.uploadPreview = null;
     this.originalSize = 0;
     this.compressedSize = 0;
+    this.resetFileInput();
   }
 
   async cropImage(): Promise<void> {
@@ -578,7 +777,7 @@ export class ImageUploadDialogComponent {
       if (data?.croppedImage) {
         // Convert the cropped base64 back to a File
         const croppedFile = await this.base64ToFile(data.croppedImage, this.uploadedFile?.name || 'cropped-image.jpg');
-        this.handleFile(croppedFile);
+        await this.handleFile(croppedFile);
       }
     } catch (error) {
       console.error('Error cropping image:', error);
@@ -643,17 +842,19 @@ export class ImageUploadDialogComponent {
   }
 
   async insert(): Promise<void> {
-    if (!this.canInsert()) return;
+    if (!this.canInsert() || this.isProcessing) return;
+
+    this.beginProcessing('prepare');
 
     try {
       let imageUrl: string;
       let imageId: string | undefined;
 
       if (this.activeTab === 'upload' && this.uploadedFile) {
-        // Compress the image before uploading
+        this.updateProcessingStage('compressing');
         const compressedFile = await this.compressImage(this.uploadedFile);
-        
-        // Convert to base64 for local storage and get both URL and ID
+
+        this.updateProcessingStage('uploading');
         const uploadResult: ImageUploadResult = await this.imageService.uploadImageWithId(compressedFile);
         imageUrl = uploadResult.url;
         imageId = uploadResult.imageId;
@@ -663,6 +864,7 @@ export class ImageUploadDialogComponent {
         imageId = undefined;
       }
 
+      this.updateProcessingStage('finalizing');
       this.imageInserted.emit({
         url: imageUrl,
         alt: this.altText || 'Image',
@@ -670,8 +872,9 @@ export class ImageUploadDialogComponent {
         imageId: imageId
       });
     } catch (error) {
-      console.error('Error inserting image:', error);
-      alert('Error inserting image. Please try again.');
+      this.handleInsertError(error);
+    } finally {
+      this.endProcessing();
     }
   }
 
@@ -701,5 +904,28 @@ export class ImageUploadDialogComponent {
 
   cancel(): void {
     this.cancelled.emit();
+  }
+
+  private handleInsertError(error: unknown): void {
+    console.error('Error inserting image:', error);
+    const message = this.buildUserFacingError(error);
+    // Ensure alert runs inside Angular zone for consistency across platforms
+    this.zone.run(() => alert(message));
+  }
+
+  private buildUserFacingError(error: unknown): string {
+    if (error instanceof Error && error.message) {
+      const trimmed = error.message.trim();
+      const lower = trimmed.toLowerCase();
+      const hasPrefix = lower.startsWith('error') || lower.startsWith('warning');
+      return hasPrefix ? trimmed : `Image upload failed: ${trimmed}`;
+    }
+
+    if (typeof error === 'string' && error) {
+      const trimmed = error.trim();
+      return `Image upload failed: ${trimmed}`;
+    }
+
+    return 'Image upload failed. Please check the file and try again.';
   }
 }

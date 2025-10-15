@@ -7,7 +7,7 @@ import {
   IonButton, IonButtons, IonToolbar, IonTitle, IonHeader, IonContent, IonList, IonItem
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, createOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline } from 'ionicons/icons';
+import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline } from 'ionicons/icons';
 import { BeatAIModalService } from '../../../shared/services/beat-ai-modal.service';
 import { TokenInfoPopoverComponent } from '../../../ui/components/token-info-popover.component';
 import { TokenCounterService, SupportedModel } from '../../../shared/services/token-counter.service';
@@ -83,6 +83,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   availableModels: ModelOption[] = [];
   favoriteModels: ModelOption[] = [];
   selectedBeatType: 'story' | 'scene' = 'story';
+  private saveTimeout?: ReturnType<typeof setTimeout>;
   beatTypeOptions = [
     { value: 'story', label: 'StoryBeat', description: 'With complete story context' },
     { value: 'scene', label: 'SceneBeat', description: 'Ohne Szenen-Zusammenfassungen' }
@@ -121,7 +122,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   constructor() {
     // Register icons
-    addIcons({ logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, createOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline });
+    addIcons({ logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline });
   }
   
   ngOnInit(): void {
@@ -130,11 +131,11 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     this.currentTextColor = settings.appearance?.textColor || '#e0e0e0';
     
     this.currentPrompt = this.beatData.prompt;
-    
+
     // Subscribe to modal events
-    this.modalService.close$.subscribe(() => this.hidePromptPreview());
-    this.modalService.generate$.subscribe(() => this.generateContent());
-    this.modalService.copy$.subscribe(() => this.copyPromptToClipboard());
+    this.subscription.add(this.modalService.close$.subscribe(() => this.hidePromptPreview()));
+    this.subscription.add(this.modalService.generate$.subscribe(() => this.generateContent()));
+    this.subscription.add(this.modalService.copy$.subscribe(() => this.copyPromptToClipboard()));
     
     // Load saved beat type or use default
     this.selectedBeatType = this.beatData.beatType || 'story';
@@ -160,22 +161,25 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.beatData.includeStoryOutline !== undefined) {
       this.includeStoryOutline = this.beatData.includeStoryOutline;
     }
-    
+
+    // Ensure collapsed state is defined (legacy beats might rely on isEditing)
+    if (this.beatData.isCollapsed === undefined || this.beatData.isCollapsed === null) {
+      this.beatData.isCollapsed = false;
+    }
+
     // Load available models and set default
     this.loadAvailableModels();
     this.setDefaultModel();
-    
+
     // Load story and setup default context
     this.loadStoryAndSetupContext();
-    
+
     // Auto-focus prompt input if it's a new beat
     if (!this.beatData.prompt) {
-      this.beatData.isEditing = true;
-      // Wait for DOM to update with editing state, then initialize editor
+      this.beatData.isCollapsed = false;
+      // Wait for DOM to update with expanded state, then initialize editor
       setTimeout(() => {
-        if (this.promptInput && !this.editorView) {
-          this.initializeProseMirrorEditor();
-        }
+        this.ensureEditorInitialized();
       }, 100);
     }
     
@@ -206,15 +210,18 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   ngOnDestroy(): void {
     this.subscription.unsubscribe();
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
     if (this.editorView) {
-      this.editorView.destroy();
+      this.proseMirrorService.destroySimpleEditor(this.editorView);
       this.editorView = null;
     }
   }
 
   ngAfterViewInit(): void {
-    // Initialize ProseMirror editor if in editing mode
-    if (this.beatData.isEditing && this.promptInput && !this.editorView) {
+    // Initialize ProseMirror editor if expanded
+    if (!this.beatData.isCollapsed && this.promptInput && !this.editorView) {
       this.initializeProseMirrorEditor();
     }
     
@@ -246,9 +253,26 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     // Set initial content if available
     if (this.currentPrompt) {
       // Use setSimpleContent to ensure codex highlighting is processed
-      this.proseMirrorService.setSimpleContent(this.currentPrompt);
+      this.proseMirrorService.setSimpleContent(this.editorView, this.currentPrompt);
       // Ensure currentPrompt stays synchronized after setting content
       // (setSimpleContent doesn't trigger the onUpdate callback)
+    }
+    this.applyTextColorDirectly();
+  }
+
+  private ensureEditorInitialized(): void {
+    if (this.beatData.isCollapsed) {
+      return;
+    }
+
+    if (this.promptInput && !this.editorView) {
+      this.initializeProseMirrorEditor();
+    }
+
+    if (this.editorView) {
+      setTimeout(() => {
+        this.focusPromptInput();
+      }, 50);
     }
   }
 
@@ -261,45 +285,47 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     this.editorView.dispatch(tr);
   }
   
-  async startEditing(): Promise<void> {
-    this.beatData.isEditing = true;
+  async toggleCollapsed(event?: Event): Promise<void> {
+    event?.stopPropagation();
+    if (this.beatData.isCollapsed) {
+      await this.expandPrompt();
+    } else {
+      this.collapsePrompt();
+    }
+    this.contentUpdate.emit(this.beatData);
+    this.cdr.markForCheck();
+  }
+
+  private async expandPrompt(): Promise<void> {
+    if (!this.beatData.isCollapsed) {
+      this.ensureEditorInitialized();
+      return;
+    }
+
+    this.beatData.isCollapsed = false;
     this.currentPrompt = this.beatData.prompt;
     this.beatFocus.emit();
-    
-    // Restore all persisted settings when switching back to edit mode
+
     await this.restorePersistedSettings();
-    
-    // Destroy existing editor if it exists (DOM element will be recreated by *ngIf)
+
     if (this.editorView) {
-      this.editorView.destroy();
+      this.proseMirrorService.destroySimpleEditor(this.editorView);
       this.editorView = null;
     }
-    
-    // Initialize editor after DOM updates
+
     setTimeout(() => {
-      if (this.promptInput) {
-        this.initializeProseMirrorEditor();
-      }
-      
-      // Focus editor after initialization
-      setTimeout(() => {
-        if (this.editorView) {
-          this.editorView.focus();
-        }
-      }, 50);
+      this.ensureEditorInitialized();
     }, 100);
   }
-  
-  async cancelEditing(): Promise<void> {
-    this.beatData.isEditing = false;
-    this.currentPrompt = this.beatData.prompt;
-    
-    // Restore all persisted settings when canceling
-    await this.restorePersistedSettings();
-    
-    // Destroy editor when canceling
+
+  private collapsePrompt(): void {
+    if (this.beatData.isCollapsed) {
+      return;
+    }
+
+    this.beatData.isCollapsed = true;
     if (this.editorView) {
-      this.editorView.destroy();
+      this.proseMirrorService.destroySimpleEditor(this.editorView);
       this.editorView = null;
     }
   }
@@ -308,7 +334,6 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.currentPrompt.trim() || !this.selectedModel) return;
     
     this.beatData.prompt = this.currentPrompt.trim();
-    this.beatData.isEditing = false;
     this.beatData.isGenerating = true;
     this.beatData.updatedAt = new Date();
     this.beatData.wordCount = this.getActualWordCount();
@@ -387,6 +412,13 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       });
     }
   }
+
+  removeBeat(event?: Event): void {
+    event?.stopPropagation();
+    if (confirm('Remove this beat input? This will only remove the beat control, not the generated content.')) {
+      this.delete.emit(this.beatData.id);
+    }
+  }
   
   onPromptKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
@@ -396,7 +428,19 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   
   onPromptChange(): void {
-    // ProseMirror handles content changes automatically
+    // Debounce the save to prevent re-renders while typing
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
+
+    this.saveTimeout = setTimeout(() => {
+      // Update beatData with the current prompt to ensure it's persisted
+      if (this.beatData.prompt !== this.currentPrompt) {
+        this.beatData.prompt = this.currentPrompt;
+        this.beatData.updatedAt = new Date();
+        this.contentUpdate.emit(this.beatData);
+      }
+    }, 500); // Wait 500ms after user stops typing
   }
 
   onWordCountChange(): void {
@@ -739,11 +783,29 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   getShortModelName(label: string): string {
     // Create short names for favorite buttons
+    // Check more specific versions first to avoid substring matching issues
+
+    // Claude models
     if (label.includes('Claude 3.7 Sonnet') || label.includes('Claude 3.5 Sonnet v2')) return 'Claude 3.7';
+    if (label.includes('Claude Sonnet 4.5')) return 'Sonnet 4.5';
     if (label.includes('Claude Sonnet 4')) return 'Sonnet 4';
+
+    // Gemini models
     if (label.includes('Gemini 2.5 Pro')) return 'Gemini 2.5';
-    if (label.includes('Grok-3') || label.includes('Grok3')) return 'Grok3';
-    
+    if (label.includes('Gemini 2.0')) return 'Gemini 2.0';
+
+    // Grok models - check specific versions first
+    if (label.includes('Grok-3.5') || label.includes('Grok3.5')) return 'Grok 3.5';
+    if (label.includes('Grok-3') || label.includes('Grok3')) return 'Grok 3';
+
+    // DeepSeek models
+    if (label.includes('DeepSeek-R1')) return 'DeepSeek R1';
+    if (label.includes('DeepSeek-V3')) return 'DeepSeek V3';
+    if (label.includes('DeepSeek-V2')) return 'DeepSeek V2';
+
+    // Qwen models
+    if (label.includes('Qwen')) return 'Qwen';
+
     // For other models, try to extract a short name
     const parts = label.split(' ');
     if (parts.length > 2) {

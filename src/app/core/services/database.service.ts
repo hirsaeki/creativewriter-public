@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { AuthService, User } from './auth.service';
 import { SyncLoggerService } from './sync-logger.service';
+import { PouchDB } from '../../app';
 
 // Minimal static type for the PouchDB constructor when loaded via ESM
 interface PouchDBStatic {
@@ -21,6 +22,10 @@ export interface SyncStatus {
   isSync: boolean;
   lastSync?: Date;
   error?: string;
+  syncProgress?: {
+    docsProcessed: number;
+    operation: 'push' | 'pull';
+  };
 }
 
 @Injectable({
@@ -46,9 +51,12 @@ export class DatabaseService {
   public syncStatus$: Observable<SyncStatus> = this.syncStatusSubject.asObservable();
 
   constructor() {
+    // Use preloaded PouchDB from app.ts
+    this.pouchdbCtor = PouchDB as unknown as PouchDBStatic;
+
     // Initialize with default database (will be updated when user logs in)
     this.initializationPromise = this.initializeDatabase('creative-writer-stories');
-    
+
     // Subscribe to user changes to switch databases
     this.authService.currentUser$.subscribe(user => {
       this.handleUserChange(user);
@@ -60,19 +68,11 @@ export class DatabaseService {
   }
 
   private async initializeDatabase(dbName: string): Promise<void> {
-    // Ensure PouchDB ESM is loaded and plugin registered (lazy load to reduce initial bundle)
+    // PouchDB is now preloaded in app.ts, no need for dynamic imports
     if (!this.pouchdbCtor) {
-      interface PouchDBModule { default: PouchDBStatic }
-      interface PouchDBFindModule { default: unknown }
-      const [{ default: PouchDB }, { default: PouchDBFind }] = await Promise.all([
-        import('pouchdb-browser') as Promise<PouchDBModule>,
-        import('pouchdb-find') as Promise<PouchDBFindModule>
-      ]);
-      // Register find/mango plugin
-      PouchDB.plugin(PouchDBFind);
-      this.pouchdbCtor = PouchDB;
+      throw new Error('PouchDB not preloaded - check app.ts initialization');
     }
-    
+
     // Stop sync first
     await this.stopSync();
     
@@ -84,28 +84,28 @@ export class DatabaseService {
         console.warn('Error closing database:', error);
       }
     }
-    
-    // Small delay to ensure cleanup
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     this.db = new this.pouchdbCtor(dbName);
-    
-    // Create indexes for better query performance
-    try {
-      await this.db.createIndex({
-        index: { fields: ['createdAt'] }
-      });
-    } catch (err) {
-      console.warn('Could not create createdAt index:', err);
-    }
-    
-    try {
-      await this.db.createIndex({
-        index: { fields: ['id'] }
-      });
-    } catch (err) {
-      console.warn('Could not create id index:', err);
-    }
+
+    // Create comprehensive indexes for better query performance (in parallel)
+    const indexes = [
+      { fields: ['type'] },
+      { fields: ['type', 'createdAt'] },
+      { fields: ['type', 'updatedAt'] },
+      { fields: ['chapters'] },
+      { fields: ['storyId'] },
+      { fields: ['createdAt'] },
+      { fields: ['updatedAt'] },
+      { fields: ['id'] }
+    ];
+
+    // Create all indexes in parallel for faster initialization
+    await Promise.all(
+      indexes.map(indexDef =>
+        this.db!.createIndex({ index: indexDef })
+          .catch(err => console.warn(`Could not create index for ${JSON.stringify(indexDef.fields)}:`, err))
+      )
+    );
 
     // Setup sync for the new database
     await this.setupSync();
@@ -275,12 +275,12 @@ export class DatabaseService {
     this.updateSyncStatus({ isSync: false });
   }
 
-  async forcePush(): Promise<void> {
-    await this.runManualReplication('push');
+  async forcePush(): Promise<{ docsProcessed: number }> {
+    return await this.runManualReplication('push');
   }
 
-  async forcePull(): Promise<void> {
-    await this.runManualReplication('pull');
+  async forcePull(): Promise<{ docsProcessed: number }> {
+    return await this.runManualReplication('pull');
   }
 
   async compact(): Promise<void> {
@@ -294,7 +294,7 @@ export class DatabaseService {
     await this.db.destroy();
   }
 
-  private async runManualReplication(direction: 'push' | 'pull'): Promise<void> {
+  private async runManualReplication(direction: 'push' | 'pull'): Promise<{ docsProcessed: number }> {
     const user = this.authService.getCurrentUser();
     const userId = user?.username ?? 'anonymous';
 
@@ -314,18 +314,62 @@ export class DatabaseService {
       userId
     );
 
-    this.updateSyncStatus({ isSync: true, error: undefined });
+    this.updateSyncStatus({
+      isSync: true,
+      error: undefined,
+      syncProgress: { docsProcessed: 0, operation: direction }
+    });
     const startTime = Date.now();
 
+    // Set up timeout (60 seconds)
+    const timeoutMs = 60000;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let timedOut = false;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        reject(new Error('Sync operation timed out after 60 seconds'));
+      }, timeoutMs);
+    });
+
     try {
-      const result = direction === 'push'
-        ? await this.db.replicate.to(this.remoteDb)
-        : await this.db.replicate.from(this.remoteDb);
+      // Create replication with progress tracking
+      const replicationPromise = (async () => {
+        const replication = direction === 'push'
+          ? this.db!.replicate.to(this.remoteDb!)
+          : this.db!.replicate.from(this.remoteDb!);
+
+        // Track progress during replication
+        (replication as PouchDB.Replication.Replication<Record<string, unknown>>)
+          .on('change', (info) => {
+            if (info && typeof info === 'object' && 'docs' in info) {
+              const docs = info.docs as unknown[];
+              this.updateSyncStatus({
+                syncProgress: {
+                  docsProcessed: docs?.length || 0,
+                  operation: direction
+                }
+              });
+            }
+          });
+
+        return await replication;
+      })();
+
+      // Race between replication and timeout
+      const result = await Promise.race([replicationPromise, timeoutPromise]);
+
+      if (timeoutId) clearTimeout(timeoutId);
 
       const duration = Date.now() - startTime;
       const itemCount = direction === 'push' ? result.docs_written : result.docs_read;
 
-      this.updateSyncStatus({ lastSync: new Date(), error: undefined });
+      this.updateSyncStatus({
+        lastSync: new Date(),
+        error: undefined,
+        syncProgress: undefined
+      });
 
       this.syncLogger.updateLog(logId, {
         type: direction === 'push' ? 'upload' : 'download',
@@ -337,14 +381,18 @@ export class DatabaseService {
         duration,
         timestamp: new Date()
       });
+
+      return { docsProcessed: itemCount };
     } catch (error) {
+      if (timeoutId) clearTimeout(timeoutId);
+
       console.error(direction === 'push' ? 'Force push failed:' : 'Force pull failed:', error);
       const friendlyMessage = this.getFriendlySyncError(
         error,
-        direction === 'push' ? 'Manual push failed' : 'Manual pull failed'
+        timedOut ? 'Sync timed out' : (direction === 'push' ? 'Manual push failed' : 'Manual pull failed')
       );
 
-      this.updateSyncStatus({ error: friendlyMessage });
+      this.updateSyncStatus({ error: friendlyMessage, syncProgress: undefined });
       this.syncLogger.updateLog(logId, {
         type: 'error',
         status: 'error',
@@ -355,7 +403,7 @@ export class DatabaseService {
 
       throw error;
     } finally {
-      this.updateSyncStatus({ isSync: false });
+      this.updateSyncStatus({ isSync: false, syncProgress: undefined });
     }
   }
 
@@ -385,5 +433,57 @@ export class DatabaseService {
     }
 
     return fallback;
+  }
+
+  /**
+   * Get current database storage usage
+   */
+  async getDatabaseSize(): Promise<{ used: number; quota: number; percentage: number }> {
+    try {
+      if ('storage' in navigator && 'estimate' in navigator.storage) {
+        const estimate = await navigator.storage.estimate();
+        const used = estimate.usage || 0;
+        const quota = estimate.quota || 0;
+        const percentage = quota > 0 ? (used / quota) * 100 : 0;
+
+        return { used, quota, percentage };
+      }
+    } catch (error) {
+      console.warn('Could not estimate storage:', error);
+    }
+
+    return { used: 0, quota: 0, percentage: 0 };
+  }
+
+  /**
+   * Check storage health and emit warnings if needed
+   */
+  async checkStorageHealth(): Promise<{ healthy: boolean; message?: string }> {
+    const { percentage, used, quota } = await this.getDatabaseSize();
+
+    if (percentage > 90) {
+      return {
+        healthy: false,
+        message: `Storage almost full (${percentage.toFixed(1)}%)! Used ${this.formatBytes(used)} of ${this.formatBytes(quota)}. Consider cleaning up old data.`
+      };
+    } else if (percentage > 75) {
+      return {
+        healthy: false,
+        message: `Storage usage high (${percentage.toFixed(1)}%). Used ${this.formatBytes(used)} of ${this.formatBytes(quota)}.`
+      };
+    }
+
+    return { healthy: true };
+  }
+
+  /**
+   * Format bytes to human readable format
+   */
+  private formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   }
 }

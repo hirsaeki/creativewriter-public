@@ -8,6 +8,8 @@ import {
 import { NgSelectModule } from '@ng-select/ng-select';
 import { Settings } from '../../core/models/settings.interface';
 import { ModelOption } from '../../core/models/model.interface';
+import { PromptTemplateService } from '../../shared/services/prompt-template.service';
+import { inject } from '@angular/core';
 
 @Component({
   selector: 'app-prompts-settings',
@@ -191,21 +193,6 @@ import { ModelOption } from '../../core/models/model.interface';
       </ion-card-header>
       <ion-card-content>
         <ion-item>
-          <ion-label>Desired Length (words)</ion-label>
-          <ion-range
-            [(ngModel)]="settings.sceneSummaryGeneration.wordCount"
-            (ngModelChange)="settingsChange.emit()"
-            min="50"
-            max="400"
-            step="10"
-            snaps="true"
-            ticks="true"
-            slot="end">
-            <ion-label slot="start">50</ion-label>
-            <ion-label slot="end">400</ion-label>
-          </ion-range>
-        </ion-item>
-        <ion-item>
           <ion-label>Creativity (Temperature)</ion-label>
           <ion-range
             [(ngModel)]="settings.sceneSummaryGeneration.temperature"
@@ -293,7 +280,7 @@ import { ModelOption } from '../../core/models/model.interface';
           <ion-label position="stacked">
             Custom Prompt
             <p class="prompt-help">
-              Available placeholders: {{ '{' }}sceneTitle{{ '}' }}, {{ '{' }}sceneContent{{ '}' }}, {{ '{' }}customInstruction{{ '}' }}, {{ '{' }}languageInstruction{{ '}' }}, {{ '{' }}summaryWordCount{{ '}' }}
+              Available placeholders: {{ '{' }}sceneTitle{{ '}' }}, {{ '{' }}sceneContent{{ '}' }}, {{ '{' }}customInstruction{{ '}' }}, {{ '{' }}languageInstruction{{ '}' }}, {{ '{' }}truncatedNote{{ '}' }}, {{ '{' }}additionalInstructions{{ '}' }}
             </p>
           </ion-label>
           <ion-textarea
@@ -406,6 +393,8 @@ export class PromptsSettingsComponent {
   @Input() modelLoadError: string | null = null;
   
   @Output() settingsChange = new EventEmitter<void>();
+  
+  private promptTemplateService = inject(PromptTemplateService);
 
   formatContextLength(length: number): string {
     if (length >= 1000000) {
@@ -441,9 +430,15 @@ export class PromptsSettingsComponent {
     this.settingsChange.emit();
   }
 
-  resetToDefaultSummaryPrompt(): void {
-    const defaultPrompt = 'Create a summary of the following scene:\n\nTitle: {sceneTitle}\n\nContent:\n{sceneContent}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments. Aim for about {summaryWordCount} words.\n\n{languageInstruction}';
-    this.settings.sceneSummaryGeneration.customPrompt = defaultPrompt;
+  async resetToDefaultSummaryPrompt(): Promise<void> {
+    try {
+      const template = await this.promptTemplateService.getSceneSummaryTemplate();
+      this.settings.sceneSummaryGeneration.customPrompt = template;
+    } catch (error) {
+      console.error('Failed to load default scene summary prompt template', error);
+      const fallback = 'Create a summary of the following scene:\n\nTitle: {sceneTitle}\n\nContent:\n{sceneContent}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments.\n\n{languageInstruction}';
+      this.settings.sceneSummaryGeneration.customPrompt = fallback;
+    }
     this.settingsChange.emit();
   }
 

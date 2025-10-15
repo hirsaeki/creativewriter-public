@@ -43,10 +43,8 @@
             </div>
           </ng-template>
           <ng-template ng-multi-label-tmp let-items="items">
-            <div class="selected-chips">
-              <div class="selected-chip" *ngFor="let item of items">
-                {{ item.label }}
-              </div>
+            <div class="selected-text" [title]="formatSelectedItems(items)">
+              {{ formatSelectedItems(items) }}
             </div>
           </ng-template>
         </ng-select>

@@ -11,7 +11,7 @@ import {
   arrowBack, bookOutline, book, settingsOutline, statsChartOutline, statsChart,
   saveOutline, checkmarkCircleOutline, menuOutline, chevronBack, chevronForward,
   chatbubblesOutline, bugOutline, menu, close, images, documentTextOutline, heart, search,
-  listOutline, list, flaskOutline
+  listOutline, list, flaskOutline, videocamOutline
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { Story, Scene } from '../../models/story.interface';
@@ -28,6 +28,7 @@ import { BeatAIService } from '../../../shared/services/beat-ai.service';
 import { PromptManagerService } from '../../../shared/services/prompt-manager.service';
 import { ImageUploadDialogComponent, ImageInsertResult } from '../../../ui/components/image-upload-dialog.component';
 import { VideoModalComponent } from '../../../ui/components/video-modal.component';
+import { ImageViewerModalComponent } from '../../../shared/components/image-viewer-modal/image-viewer-modal.component';
 import { ImageVideoService, ImageClickEvent } from '../../../shared/services/image-video.service';
 import { VideoService } from '../../../shared/services/video.service';
 import { AppHeaderComponent, HeaderAction, BurgerMenuItem } from '../../../ui/components/app-header.component';
@@ -46,7 +47,7 @@ import { PDFExportService, PDFExportProgress } from '../../../shared/services/pd
     IonContent, IonChip, IonLabel, IonButton, IonIcon,
     IonMenu, IonSplitPane,
     StoryStructureComponent, SlashCommandDropdownComponent, ImageUploadDialogComponent,
-    VideoModalComponent, AppHeaderComponent, StoryStatsComponent, VersionTooltipComponent
+    VideoModalComponent, ImageViewerModalComponent, AppHeaderComponent, StoryStatsComponent, VersionTooltipComponent
   ],
   templateUrl: './story-editor.component.html',
   styleUrls: ['./story-editor.component.scss'],
@@ -73,6 +74,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   @ViewChild('headerTitle', { static: true }) headerTitle!: TemplateRef<unknown>;
   @ViewChild('burgerMenuFooter', { static: true }) burgerMenuFooter!: TemplateRef<unknown>;
   @ViewChild('editorContainer') editorContainer!: ElementRef<HTMLDivElement>;
+  @ViewChild('editorWrapper') editorWrapper!: ElementRef<HTMLDivElement>;
   @ViewChild(IonContent, { read: IonContent, static: false }) ionContent!: IonContent;
   private editorView: EditorView | null = null;
   private mutationObserver: MutationObserver | null = null;
@@ -102,7 +104,26 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   // Image dialog functionality
   showImageDialog = false;
   imageCursorPosition = 0;
-  
+
+  // Image viewer functionality
+  showImageViewer = false;
+  imageViewerState = {
+    imageSrc: null as string | null,
+    imageAlt: '',
+    imageTitle: '',
+    videoSrc: null as string | null,
+    videoName: null as string | null,
+    loadingVideo: false
+  };
+  videoButton = {
+    visible: false,
+    top: 0,
+    left: 0,
+    imageId: null as string | null,
+    imageAlt: '',
+    imageElement: null as HTMLImageElement | null
+  };
+
   // Video modal functionality
   showVideoModal = false;
   currentImageId: string | null = null;
@@ -127,18 +148,20 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   private touchEndY = 0;
   private minSwipeDistance = 50;
   private maxVerticalDistance = 100;
-  
+
   // Mobile keyboard handling
   private keyboardHeight = 0;
   private originalViewportHeight = 0;
   private keyboardVisible = false;
+
+  private hideVideoButtonTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     addIcons({ 
       arrowBack, bookOutline, book, settingsOutline, statsChartOutline, statsChart,
       saveOutline, checkmarkCircleOutline, menuOutline, chevronBack, chevronForward,
       chatbubblesOutline, bugOutline, menu, close, images, documentTextOutline, heart, search,
-      listOutline, list, flaskOutline
+      listOutline, list, flaskOutline, videocamOutline
     });
   }
 
@@ -161,16 +184,19 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         this.onImageClicked(event);
       })
     );
-    
-    const storyId = this.route.snapshot.paramMap.get('id');
-    const qp = this.route.snapshot.queryParamMap;
-    const preferredChapterId = qp.get('chapterId');
-    const preferredSceneId = qp.get('sceneId');
-    const highlightPhrase = qp.get('phrase');
-    if (storyId) {
-      const existingStory = await this.storyService.getStory(storyId);
-      if (existingStory) {
-        this.story = { ...existingStory };
+
+    // Subscribe to route params to handle story switching
+    this.subscription.add(
+      this.route.paramMap.subscribe(async params => {
+        const storyId = params.get('id');
+        const qp = this.route.snapshot.queryParamMap;
+        const preferredChapterId = qp.get('chapterId');
+        const preferredSceneId = qp.get('sceneId');
+        const highlightPhrase = qp.get('phrase');
+        if (storyId) {
+          const existingStory = await this.storyService.getStory(storyId);
+          if (existingStory) {
+            this.story = { ...existingStory };
         
         // Initialize prompt manager with current story
         await this.promptManager.setCurrentStory(this.story.id);
@@ -229,7 +255,9 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         // Wenn Story nicht gefunden wird, zur Übersicht zurück
         this.router.navigate(['/']);
       }
-    }
+        }
+      })
+    );
 
     // Auto-save mit optimiertem Debounce
     this.subscription.add(
@@ -290,9 +318,22 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     
     // Cleanup image click handlers
     if (this.editorContainer?.nativeElement) {
-      this.imageVideoService.removeImageClickHandlers(this.editorContainer.nativeElement);
+      const containerEl = this.editorContainer.nativeElement;
+      this.imageVideoService.removeImageClickHandlers(containerEl);
+      containerEl.removeEventListener('pointerenter', this.handleImagePointerEnter, true);
+      containerEl.removeEventListener('pointerleave', this.handleImagePointerLeave, true);
+      containerEl.removeEventListener('focusin', this.handleImageFocusIn, true);
+      containerEl.removeEventListener('focusout', this.handleImageFocusOut, true);
     }
-    
+
+    window.removeEventListener('resize', this.handleWindowViewportChange);
+    window.removeEventListener('scroll', this.handleWindowViewportChange, true);
+
+    this.cancelHideVideoButton();
+    this.videoButton.visible = false;
+    this.videoButton.imageElement = null;
+    this.videoButton.imageId = null;
+
     this.subscription.unsubscribe();
     
     // Remove touch gesture listeners
@@ -566,7 +607,12 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       {
         icon: 'list-outline',
         label: 'Outline Overview',
-        action: () => this.router.navigate(['/stories/outline', this.story.id])
+        action: () => this.router.navigate(['/stories/outline', this.story.id], {
+          queryParams: {
+            chapterId: this.activeChapterId,
+            sceneId: this.activeSceneId
+          }
+        })
       }
     ];
   }
@@ -994,8 +1040,19 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     // Set initial content if we have an active scene (skip scroll, will be done in ngOnInit)
     this.updateEditorContent(true);
     
-    // Initialize image click handlers for video modal functionality
-    this.imageVideoService.initializeImageClickHandlers(this.editorContainer.nativeElement);
+    const containerEl = this.editorContainer.nativeElement;
+
+    // Initialize image click handlers for image viewer functionality
+    this.imageVideoService.initializeImageClickHandlers(containerEl);
+
+    // Add auxiliary listeners for hovering/focusing images to surface video button
+    containerEl.addEventListener('pointerenter', this.handleImagePointerEnter, true);
+    containerEl.addEventListener('pointerleave', this.handleImagePointerLeave, true);
+    containerEl.addEventListener('focusin', this.handleImageFocusIn, true);
+    containerEl.addEventListener('focusout', this.handleImageFocusOut, true);
+
+    window.addEventListener('resize', this.handleWindowViewportChange);
+    window.addEventListener('scroll', this.handleWindowViewportChange, true);
     
     // Add click listener to hide dropdown when clicking in editor
     this.editorContainer.nativeElement.addEventListener('click', () => {
@@ -1022,6 +1079,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     if (this.editorView && this.activeScene) {
       this.proseMirrorService.setContent(this.activeScene.content || '');
       this.updateWordCount();
+      this.performHideVideoButton();
       
       // Update image video indicators after content is loaded
       setTimeout(async () => {
@@ -1508,60 +1566,270 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     this.showStoryStats = false;
   }
 
-  // Video modal methods
-  onImageClicked(event: ImageClickEvent): void {
-    console.log('Image clicked, event:', event);
-    let imageId = event.imageId;
-    
-    // If image has no ID, generate one now
+  private handleImagePointerEnter = (event: Event): void => {
+    const target = event.target as HTMLElement | null;
+    if (!target || target.tagName.toLowerCase() !== 'img') {
+      return;
+    }
+    this.showVideoActionButton(target as HTMLImageElement);
+  };
+
+  private handleImagePointerLeave = (event: Event): void => {
+    const target = event.target as HTMLElement | null;
+    if (!target || target.tagName.toLowerCase() !== 'img') {
+      return;
+    }
+    this.scheduleHideVideoButton();
+  };
+
+  private handleImageFocusIn = (event: Event): void => {
+    const target = event.target as HTMLElement | null;
+    if (!target || target.tagName.toLowerCase() !== 'img') {
+      return;
+    }
+    this.showVideoActionButton(target as HTMLImageElement);
+  };
+
+  private handleImageFocusOut = (event: Event): void => {
+    const target = event.target as HTMLElement | null;
+    if (!target || target.tagName.toLowerCase() !== 'img') {
+      return;
+    }
+    this.scheduleHideVideoButton();
+  };
+
+  private handleWindowViewportChange = (): void => {
+    if (this.videoButton.visible && this.videoButton.imageElement) {
+      this.positionVideoButton(this.videoButton.imageElement);
+    }
+  };
+
+  private showVideoActionButton(imageElement: HTMLImageElement): void {
+    this.cancelHideVideoButton();
+    this.videoButton.imageElement = imageElement;
+    this.videoButton.imageAlt = imageElement.getAttribute('alt') || 'Story image';
+    this.videoButton.imageId = imageElement.getAttribute('data-image-id');
+    this.positionVideoButton(imageElement);
+  }
+
+  private positionVideoButton(imageElement: HTMLImageElement): void {
+    if (!this.editorWrapper) {
+      return;
+    }
+
+    const wrapperRect = this.editorWrapper.nativeElement.getBoundingClientRect();
+    const imageRect = imageElement.getBoundingClientRect();
+    const offset = 8;
+    const buttonSize = 36;
+
+    const top = imageRect.top - wrapperRect.top + offset;
+    let left = imageRect.right - wrapperRect.left - buttonSize;
+
+    const minLeft = imageRect.left - wrapperRect.left + offset;
+    if (left < minLeft) {
+      left = minLeft;
+    }
+
+    this.videoButton.top = top;
+    this.videoButton.left = left;
+    this.videoButton.visible = true;
+    this.cdr.markForCheck();
+  }
+
+  private scheduleHideVideoButton(delay = 200): void {
+    this.cancelHideVideoButton();
+    this.hideVideoButtonTimeout = setTimeout(() => {
+      this.performHideVideoButton();
+    }, delay);
+  }
+
+  private cancelHideVideoButton(): void {
+    if (this.hideVideoButtonTimeout) {
+      clearTimeout(this.hideVideoButtonTimeout);
+      this.hideVideoButtonTimeout = null;
+    }
+  }
+
+  private performHideVideoButton(): void {
+    if (!this.videoButton.visible) {
+      return;
+    }
+    this.videoButton.visible = false;
+    this.videoButton.imageElement = null;
+    this.videoButton.imageId = null;
+    this.cdr.markForCheck();
+  }
+
+  private ensureImageHasId(imageElement: HTMLImageElement): string {
+    let imageId = imageElement.getAttribute('data-image-id');
     if (!imageId || imageId === 'no-id') {
       imageId = this.generateImageId();
-      
-      // Add ID to the DOM element
-      this.imageVideoService.addImageIdToElement(event.imageElement, imageId);
-      
-      // Update the ProseMirror document with the new ID
-      this.proseMirrorService.updateImageId(event.imageElement.src, imageId);
-      
-      // Mark as having unsaved changes since we modified the image
+      this.imageVideoService.addImageIdToElement(imageElement, imageId);
+      this.proseMirrorService.updateImageId(imageElement.src, imageId);
       this.hasUnsavedChanges = true;
-      this.saveSubject.next(); // Trigger auto-save
-      
-      console.log('Generated new ID for existing image:', imageId);
+      this.saveSubject.next();
     }
-    
-    console.log('Setting currentImageId to:', imageId);
+    return imageId;
+  }
+
+  onImageClicked(event: ImageClickEvent): void {
+    const imageElement = event.imageElement;
+    const imageId = event.imageId && event.imageId !== 'no-id'
+      ? event.imageId
+      : this.ensureImageHasId(imageElement);
+
     this.currentImageId = imageId;
-    
-    // Force change detection to ensure the binding is updated before showing modal
+
+    const alt = imageElement.getAttribute('alt') || 'Story image';
+    const title = imageElement.getAttribute('title') || alt;
+
+    this.imageViewerState = {
+      imageSrc: imageElement.src,
+      imageAlt: alt,
+      imageTitle: title,
+      videoSrc: null,
+      videoName: null,
+      loadingVideo: true
+    };
+
+    this.showImageViewer = true;
+    this.performHideVideoButton();
     this.cdr.markForCheck();
-    
-    console.log('After detectChanges, currentImageId is:', this.currentImageId);
+
+    void this.loadVideoForImage(imageId, imageElement);
+  }
+
+  onVideoButtonClicked(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!this.videoButton.imageElement) {
+      return;
+    }
+
+    const ensuredImageId = this.ensureImageHasId(this.videoButton.imageElement);
+    this.videoButton.imageId = ensuredImageId;
+    this.currentImageId = ensuredImageId;
+    this.showImageViewer = false;
     this.showVideoModal = true;
-    console.log('Modal visibility set to:', this.showVideoModal);
+    this.performHideVideoButton();
+    this.cdr.markForCheck();
+  }
+
+  onVideoButtonPointerEnter(): void {
+    this.cancelHideVideoButton();
+  }
+
+  onVideoButtonPointerLeave(): void {
+    this.scheduleHideVideoButton();
+  }
+
+  onVideoButtonFocus(): void {
+    this.cancelHideVideoButton();
+  }
+
+  onVideoButtonBlur(): void {
+    this.scheduleHideVideoButton();
+  }
+
+  hideVideoModal(): void {
+    this.showVideoModal = false;
+    this.currentImageId = null;
+  }
+
+  closeImageViewer(): void {
+    this.showImageViewer = false;
+    this.imageViewerState = {
+      ...this.imageViewerState,
+      loadingVideo: false
+    };
+    this.cdr.markForCheck();
+  }
+
+  manageVideoFromViewer(): void {
+    if (!this.currentImageId && this.imageViewerState.imageSrc && this.editorContainer?.nativeElement) {
+      const imageElement = this.editorContainer.nativeElement.querySelector(`img[src="${this.imageViewerState.imageSrc}"]`) as HTMLImageElement | null;
+      if (imageElement) {
+        const ensuredImageId = this.ensureImageHasId(imageElement);
+        this.currentImageId = ensuredImageId;
+        this.videoButton.imageElement = imageElement;
+        this.videoButton.imageId = ensuredImageId;
+      }
+    }
+
+    if (!this.currentImageId && this.videoButton.imageElement) {
+      this.currentImageId = this.ensureImageHasId(this.videoButton.imageElement);
+    }
+
+    if (!this.currentImageId) {
+      return;
+    }
+
+    this.showImageViewer = false;
+    this.showVideoModal = true;
+    this.cdr.markForCheck();
+  }
+
+  private async loadVideoForImage(imageId: string, imageElement?: HTMLImageElement | null): Promise<void> {
+    this.imageViewerState = {
+      ...this.imageViewerState,
+      loadingVideo: true,
+      videoSrc: null,
+      videoName: null
+    };
+    this.cdr.markForCheck();
+
+    try {
+      const video = await this.videoService.getVideoForImage(imageId);
+      if (video) {
+        this.imageViewerState = {
+          ...this.imageViewerState,
+          videoSrc: this.videoService.getVideoDataUrl(video),
+          videoName: video.name,
+          loadingVideo: false
+        };
+        if (imageElement) {
+          this.imageVideoService.addVideoIndicator(imageElement);
+        }
+      } else {
+        this.imageViewerState = {
+          ...this.imageViewerState,
+          videoSrc: null,
+          videoName: null,
+          loadingVideo: false
+        };
+      }
+    } catch (error) {
+      console.error('Error loading video for image:', error);
+      this.imageViewerState = {
+        ...this.imageViewerState,
+        videoSrc: null,
+        videoName: null,
+        loadingVideo: false
+      };
+    } finally {
+      this.cdr.markForCheck();
+    }
   }
 
   private generateImageId(): string {
     return `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
-  
-  hideVideoModal(): void {
-    this.showVideoModal = false;
-    this.currentImageId = null;
-  }
-  
+
   onVideoAssociated(event: { imageId: string; videoId: string }): void {
     console.log('Video associated with image:', event);
-    // Video has been successfully associated with the image
-    // You might want to update the UI to show that this image now has a video
-    
-    // Find the image element and add video indicator
+
     const imageElements = this.editorContainer.nativeElement.querySelectorAll(`[data-image-id="${event.imageId}"]`);
     imageElements.forEach((imgElement: Element) => {
       if (imgElement instanceof HTMLImageElement) {
         this.imageVideoService.addVideoIndicator(imgElement);
       }
     });
+
+    if (this.showImageViewer && this.currentImageId === event.imageId) {
+      const primaryImage = imageElements[0] as HTMLImageElement | undefined;
+      void this.loadVideoForImage(event.imageId, primaryImage ?? null);
+    }
   }
 
   /**

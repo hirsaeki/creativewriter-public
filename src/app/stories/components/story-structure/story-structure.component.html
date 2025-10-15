@@ -86,14 +86,14 @@
                 role="treeitem"
                 tabindex="0"
                 [attr.aria-selected]="isActiveScene(chapter.id, scene.id)"
-                [attr.aria-label]="'Scene: ' + (scene.title || 'Untitled') + '. ' + (getWordCount(scene.content)) + ' words' + (isActiveScene(chapter.id, scene.id) ? '. Currently selected' : '')">
+                [attr.aria-label]="'Scene: ' + (scene.title || 'Untitled') + '. ' + (getWordCount(scene)) + ' words' + (isActiveScene(chapter.id, scene.id) ? '. Currently selected' : '')">
                 
                 <div class="scene-content">
-                  <!-- First line: Scene title with AI button -->
+                  <!-- Scene title and actions -->
                   <div class="scene-title-row">
                     <div class="scene-title-container">
                       <div class="scene-id-display">{{ 'C' + (chapter.chapterNumber || chapter.order) + 'S' + (scene.sceneNumber || scene.order) }}</div>
-                      <div 
+                      <div
                         *ngIf="!isEditingTitle.has(scene.id)"
                         class="scene-title-display"
                         (click)="startEditingTitle(scene.id, $event)"
@@ -103,9 +103,9 @@
                         (keydown.space)="startEditingTitle(scene.id, $event)">
                         {{ scene.title || 'Scene Title' }}
                       </div>
-                      <ion-input 
+                      <ion-input
                         *ngIf="isEditingTitle.has(scene.id)"
-                        [(ngModel)]="scene.title" 
+                        [(ngModel)]="scene.title"
                         (ionBlur)="stopEditingTitle(chapter.id, scene)"
                         (keydown.enter)="stopEditingTitle(chapter.id, scene); $event.stopPropagation()"
                         (keydown.escape)="cancelEditingTitle(scene); $event.stopPropagation()"
@@ -118,54 +118,19 @@
                         #titleInput
                       ></ion-input>
                     </div>
-                    
-                    <ion-button 
-                      fill="clear" 
-                      size="small"
-                      [color]="isGeneratingTitle.has(scene.id) ? 'medium' : 'primary'"
-                      (click)="generateSceneTitle(chapter.id, scene.id, $event)"
-                      [disabled]="isGeneratingTitle.has(scene.id) || !selectedModel || !scene.content.trim()"
-                      class="ai-title-btn"
-                      [attr.aria-label]="isGeneratingTitle.has(scene.id) ? 'Title is being generated...' : 'Generate AI title for scene'"
-                      (touchstart)="$event.stopPropagation()"
-                      (touchend)="$event.stopPropagation()">
-                      <ion-icon 
-                        [name]="isGeneratingTitle.has(scene.id) ? 'time-outline' : 'sparkles-outline'" 
-                        slot="icon-only"
-                        [attr.aria-hidden]="true">
-                      </ion-icon>
-                    </ion-button>
                   </div>
-                  
-                  <!-- Second line: Word count and action buttons -->
+
+                  <!-- Word count and action buttons -->
                   <div class="scene-actions-row">
                     <ion-badge color="medium" class="word-count-badge">
-                      {{ getWordCount(scene.content) }} words
+                      {{ getWordCount(scene) }} words
                     </ion-badge>
-                    
+
                     <div class="action-buttons">
-                      <ion-button 
-                        fill="clear" 
+                      <ion-button
+                        fill="clear"
                         size="small"
-                        [color]="scene.summary ? 'success' : 'medium'"
-                        (click)="toggleSceneDetails(scene.id, $event)"
-                        class="expand-scene-btn"
-                        [attr.aria-label]="'Scene details ' + (expandedScenes.has(scene.id) ? 'collapse' : 'expand')"
-                        [attr.aria-expanded]="expandedScenes.has(scene.id)"
-                        (touchstart)="$event.stopPropagation()"
-                        (touchend)="$event.stopPropagation()">
-                        <ion-icon 
-                          [name]="expandedScenes.has(scene.id) ? 'chevron-down' : 'chevron-forward'" 
-                          slot="icon-only"
-                          [attr.aria-hidden]="true">
-                        </ion-icon>
-                      </ion-button>
-                      
-                      
-                      <ion-button 
-                        fill="clear" 
-                        size="small"
-                        color="danger" 
+                        color="danger"
                         (click)="deleteScene(chapter.id, scene.id, $event)"
                         [attr.aria-label]="'Delete scene: ' + (scene.title || 'Untitled')"
                         (touchstart)="$event.stopPropagation()"
@@ -176,95 +141,6 @@
                   </div>
                 </div>
               </ion-item>
-              
-              <div class="scene-details" *ngIf="expandedScenes.has(scene.id)">
-                <div class="scene-summary-section">
-                  <div class="summary-header">
-                    <span>Summary</span>
-                    <div class="summary-buttons">
-                      <ion-button 
-                        size="small"
-                        fill="solid"
-                        [color]="isGeneratingSummary.has(scene.id) ? 'medium' : 'success'"
-                        (click)="generateSceneSummary(chapter.id, scene.id)"
-                        [disabled]="isGeneratingSummary.has(scene.id) || !selectedModel || !scene.content.trim()"
-                        [attr.aria-label]="isGeneratingSummary.has(scene.id) ? 'Summary is being generated...' : 'Generate AI summary for scene'"
-                        (touchstart)="$event.stopPropagation()"
-                        (touchend)="$event.stopPropagation()">
-                        <ion-icon 
-                          [name]="isGeneratingSummary.has(scene.id) ? 'time-outline' : 'flash-outline'" 
-                          slot="icon-only"
-                          [attr.aria-hidden]="true">
-                        </ion-icon>
-                      </ion-button>
-                      <ion-button 
-                        *ngIf="scene.summary"
-                        size="small"
-                        fill="solid"
-                        color="danger"
-                        (click)="deleteSceneSummary(chapter.id, scene.id)"
-                        [attr.aria-label]="'Delete summary for scene'"
-                        (touchstart)="$event.stopPropagation()"
-                        (touchend)="$event.stopPropagation()">
-                        <ion-icon 
-                          name="trash" 
-                          slot="icon-only"
-                          [attr.aria-hidden]="true">
-                        </ion-icon>
-                      </ion-button>
-                    </div>
-                  </div>
-                  
-                  <div class="summary-favorites" *ngIf="summaryFavoriteModels.length > 0">
-                    <ion-icon name="star-outline" class="favorite-icon" aria-hidden="true"></ion-icon>
-                    <div class="favorite-buttons" role="list">
-                      <button *ngFor="let model of summaryFavoriteModels"
-                              type="button"
-                              class="favorite-btn"
-                              role="listitem"
-                              [class.active]="selectedModel === model.id"
-                              (click)="selectSummaryFavorite(model)"
-                              [title]="model.label">
-                        <span class="favorite-btn-content">
-                          <app-openrouter-icon *ngIf="model.provider === 'openrouter'" size="14" color="#6467f2" class="provider-icon-inline openrouter"></app-openrouter-icon>
-                          <ion-icon *ngIf="model.provider !== 'openrouter'" [name]="getProviderIcon(model.provider)" class="provider-icon-inline"></ion-icon>
-                          <span class="model-short-name">{{ getShortModelName(model.label) }}</span>
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <ion-select 
-                    [(ngModel)]="selectedModel"
-                    placeholder="Choose AI model..."
-                    interface="popover"
-                    class="model-select"
-                    aria-label="Select AI model for summary"
->
-                    <ion-select-option *ngFor="let model of availableModels" [value]="model.id">
-                      {{ model.label }}
-                    </ion-select-option>
-                  </ion-select>
-                  
-                  <ion-textarea 
-                    [(ngModel)]="scene.summary"
-                    [value]="scene.summary || ''"
-                    (ionBlur)="updateSceneSummary(chapter.id, scene.id, scene.summary || '')"
-                    (ionInput)="autoResizeTextarea($event)"
-                    [attr.data-scene-id]="scene.id"
-                    placeholder="AI-generated scene summary will be displayed here..."
-                    class="summary-textarea"
-                    [rows]="2"
-                    [autoGrow]="false"
-                    [attr.aria-label]="'Summary for scene: ' + (scene.title || 'Untitled')">
-                  </ion-textarea>
-                  
-                  <ion-chip *ngIf="scene.summaryGeneratedAt" color="medium" class="summary-info">
-                    <ion-icon name="time-outline"></ion-icon>
-                    <ion-label>{{ scene.summaryGeneratedAt | date:'short' }}</ion-label>
-                  </ion-chip>
-                </div>
-              </div>
             </ng-container>
           </ion-list>
           

@@ -191,6 +191,9 @@ export class SceneGenerationService {
       }
       let cleaned = next.trim();
 
+      // Remove any overlapping content with existing text
+      cleaned = this.removeOverlap(combined, cleaned);
+
       // Break if model returns nothing meaningful to avoid loops
       if (!cleaned || cleaned.split(/\s+/).length < 30) {
         break;
@@ -212,7 +215,12 @@ export class SceneGenerationService {
         } catch {
           break;
         }
-        const cleanedMore = more.trim();
+        let cleanedMore = more.trim();
+
+        // Remove overlap with the current chunk being built
+        const currentContext = cleaned.length > 100 ? cleaned : (combined + '\n\n' + cleaned);
+        cleanedMore = this.removeOverlap(currentContext, cleanedMore);
+
         const moreWords = this.countWords(cleanedMore);
         if (!cleanedMore || moreWords < 20) {
           break;
@@ -309,7 +317,7 @@ export class SceneGenerationService {
       storyTitle: story.title || 'Story',
       sceneFullText: sceneTail,
       wordCount: String(goalWords),
-      prompt: `Continue the same scene seamlessly without repeating sentences. Use the outline as guide. ${languageInstruction}\n\nOutline:\n${options.outline}`,
+      prompt: `Continue the same scene seamlessly. IMPORTANT: Do not repeat or rephrase the last sentences shown above. Start with completely new content that flows naturally from where the text ended. Use the outline as guide. ${languageInstruction}\n\nOutline:\n${options.outline}`,
       pointOfView,
       writingStyle
     };
@@ -343,28 +351,128 @@ export class SceneGenerationService {
     }
   }
 
+  /**
+   * Apply template placeholders with validation and error reporting.
+   * Detects unreplaced placeholders and logs warnings for debugging.
+   *
+   * @param template The template string with {placeholder} syntax
+   * @param placeholders Key-value pairs for replacement
+   * @returns Processed template with placeholders replaced
+   */
   private applyTemplatePlaceholders(template: string, placeholders: Record<string, string>): string {
+    if (!template) return '';
+
+    // Extract all placeholders from template for validation
+    const placeholderPattern = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
+    const templatePlaceholders = new Set<string>();
+    let match;
+    while ((match = placeholderPattern.exec(template)) !== null) {
+      templatePlaceholders.add(match[1]);
+    }
+
+    // Track which placeholders were replaced
+    const replacedPlaceholders = new Set<string>();
     let out = template;
+
+    // Replace each provided placeholder
     Object.entries(placeholders).forEach(([key, value]) => {
       const placeholder = `{${key}}`;
-      const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-      out = out.replace(regex, value || '');
+      // Escape special regex characters in the placeholder name for safe matching
+      const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escapedPlaceholder, 'g');
+
+      // Track if this placeholder was actually in the template
+      if (templatePlaceholders.has(key)) {
+        replacedPlaceholders.add(key);
+      }
+
+      // Replace with empty string if value is undefined/null
+      out = out.replace(regex, value ?? '');
     });
+
+    // Detect unreplaced placeholders (in template but not provided)
+    const unreplacedPlaceholders = Array.from(templatePlaceholders).filter(
+      key => !replacedPlaceholders.has(key)
+    );
+
+    // Detect unused placeholders (provided but not in template)
+    const unusedPlaceholders = Object.keys(placeholders).filter(
+      key => !templatePlaceholders.has(key)
+    );
+
+    // Log warnings for debugging (helps developers identify template issues)
+    if (unreplacedPlaceholders.length > 0) {
+      console.warn(
+        `[SceneGeneration] Template has unreplaced placeholders: ${unreplacedPlaceholders.join(', ')}`
+      );
+    }
+
+    if (unusedPlaceholders.length > 0) {
+      console.debug(
+        `[SceneGeneration] Unused placeholder values provided: ${unusedPlaceholders.join(', ')}`
+      );
+    }
+
     return out;
   }
 
+  /**
+   * Parse structured prompt with message role tags.
+   * Supports XML-style <message role="...">content</message> syntax.
+   * Falls back to treating entire prompt as user message if no tags found.
+   *
+   * @param prompt The prompt string, potentially with message tags
+   * @returns Array of messages with roles and content
+   */
   private parseStructuredPrompt(prompt: string): { role: 'system' | 'user' | 'assistant'; content: string }[] {
+    if (!prompt) {
+      console.warn('[SceneGeneration] Empty prompt provided to parseStructuredPrompt');
+      return [{ role: 'user', content: '' }];
+    }
+
     const messagePattern = /<message role="(system|user|assistant)">([\s\S]*?)<\/message>/gi;
     const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [];
     let match: RegExpExecArray | null;
+
+    // Detect potential malformed message tags
+    const openTagPattern = /<message[^>]*>/gi;
+    const closeTagPattern = /<\/message>/gi;
+    const openTags = (prompt.match(openTagPattern) || []).length;
+    const closeTags = (prompt.match(closeTagPattern) || []).length;
+
+    if (openTags !== closeTags) {
+      console.warn(
+        `[SceneGeneration] Mismatched message tags in template: ${openTags} opening tags, ${closeTags} closing tags`
+      );
+    }
+
+    // Detect message tags with invalid roles
+    const invalidRolePattern = /<message role="(?!system|user|assistant)[^"]*">/gi;
+    const invalidRoles = prompt.match(invalidRolePattern);
+    if (invalidRoles && invalidRoles.length > 0) {
+      console.warn(
+        `[SceneGeneration] Invalid message roles found in template: ${invalidRoles.join(', ')}`
+      );
+    }
+
+    // Extract valid messages
     while ((match = messagePattern.exec(prompt)) !== null) {
       const role = match[1] as 'system' | 'user' | 'assistant';
       const content = match[2].trim();
+
+      if (!content) {
+        console.warn(`[SceneGeneration] Empty content for ${role} message in template`);
+      }
+
       messages.push({ role, content });
     }
+
+    // Fallback: if no structured messages found, treat entire prompt as user message
     if (messages.length === 0) {
+      console.debug('[SceneGeneration] No structured messages found, using prompt as single user message');
       messages.push({ role: 'user', content: prompt });
     }
+
     return messages;
   }
 
@@ -415,5 +523,99 @@ export class SceneGenerationService {
 
   private generateRequestId(): string {
     return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+
+  /**
+   * Detect and remove overlapping content between existing text and new chunk.
+   * Compares last sentences of existing text with first sentences of new chunk.
+   * Returns the new chunk with duplicated sentences removed.
+   */
+  private removeOverlap(existingText: string, newChunk: string): string {
+    if (!existingText || !newChunk) return newChunk;
+
+    // Split into sentences (basic sentence boundary detection)
+    const sentencePattern = /[.!?]+[\s\n]+/;
+    const existingSentences = existingText.split(sentencePattern).map(s => s.trim()).filter(Boolean);
+    const newSentences = newChunk.split(sentencePattern).map(s => s.trim()).filter(Boolean);
+
+    if (existingSentences.length === 0 || newSentences.length === 0) return newChunk;
+
+    // Check last N sentences of existing text against first M sentences of new chunk
+    const maxCheckSentences = Math.min(5, existingSentences.length, newSentences.length);
+    let overlapCount = 0;
+
+    // Find longest overlapping sequence from the end of existing text
+    for (let i = 1; i <= maxCheckSentences; i++) {
+      const existingTail = existingSentences.slice(-i).map(this.normalizeSentence);
+      const newHead = newSentences.slice(0, i).map(this.normalizeSentence);
+
+      // Check if they match (allowing for minor variations)
+      let matches = true;
+      for (let j = 0; j < i; j++) {
+        if (!this.sentencesSimilar(existingTail[j], newHead[j])) {
+          matches = false;
+          break;
+        }
+      }
+
+      if (matches) {
+        overlapCount = i;
+      } else {
+        break; // Stop at first non-match to ensure contiguous overlap
+      }
+    }
+
+    // Remove overlapping sentences from new chunk
+    if (overlapCount > 0) {
+      const keptSentences = newSentences.slice(overlapCount);
+      return keptSentences.join('. ').trim();
+    }
+
+    return newChunk;
+  }
+
+  /**
+   * Normalize sentence for comparison (lowercase, trim, remove extra whitespace)
+   */
+  private normalizeSentence(sentence: string): string {
+    return sentence.toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * Check if two sentences are similar enough to be considered duplicates.
+   * Uses longest common substring ratio for fuzzy matching.
+   */
+  private sentencesSimilar(s1: string, s2: string, threshold = 0.85): boolean {
+    if (s1 === s2) return true;
+
+    // Calculate similarity ratio using simple character-based comparison
+    const longer = s1.length > s2.length ? s1 : s2;
+
+    if (longer.length === 0) return true;
+
+    // Simple approach: if one sentence contains most of the other, consider similar
+    const containmentRatio = this.longestCommonSubstring(s1, s2) / longer.length;
+    return containmentRatio >= threshold;
+  }
+
+  /**
+   * Find longest common substring length between two strings
+   */
+  private longestCommonSubstring(s1: string, s2: string): number {
+    const m = s1.length;
+    const n = s2.length;
+    let maxLength = 0;
+    const table: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (s1[i - 1] === s2[j - 1]) {
+          table[i][j] = table[i - 1][j - 1] + 1;
+          maxLength = Math.max(maxLength, table[i][j]);
+        }
+      }
+    }
+
+    return maxLength;
   }
 }

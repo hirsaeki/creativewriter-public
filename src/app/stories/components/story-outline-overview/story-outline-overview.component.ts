@@ -1,12 +1,12 @@
-import { Component, ChangeDetectionStrategy, OnInit, inject, computed, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnInit, inject, computed, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { 
+import {
   IonContent, IonSearchbar, IonAccordion, IonAccordionGroup, IonItem, IonLabel,
-  IonButton, IonIcon, IonChip, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
+  IonButton, IonIcon, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonTextarea, IonInput,
-  IonBadge, IonSkeletonText, IonNote, IonSpinner
+  IonBadge, IonSkeletonText, IonNote, IonSpinner, IonFab, IonFabButton
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline } from 'ionicons/icons';
@@ -18,6 +18,9 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { OpenRouterApiService } from '../../../core/services/openrouter-api.service';
 import { GoogleGeminiApiService } from '../../../core/services/google-gemini-api.service';
 import { PromptManagerService } from '../../../shared/services/prompt-manager.service';
+import { PromptTemplateService } from '../../../shared/services/prompt-template.service';
+import { StoryStatsService } from '../../services/story-stats.service';
+import { CodexContextService } from '../../../shared/services/codex-context.service';
 
 @Component({
   selector: 'app-story-outline-overview',
@@ -26,15 +29,18 @@ import { PromptManagerService } from '../../../shared/services/prompt-manager.se
     CommonModule, FormsModule,
     AppHeaderComponent, ModelSelectorComponent,
     IonContent, IonSearchbar, IonAccordion, IonAccordionGroup, IonItem, IonLabel,
-    IonButton, IonIcon, IonChip, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
+    IonButton, IonIcon, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
     IonTextarea, IonInput,
-    IonBadge, IonSkeletonText, IonNote, IonSpinner
+    IonBadge, IonSkeletonText, IonNote, IonSpinner, IonFab, IonFabButton
   ],
   templateUrl: './story-outline-overview.component.html',
   styleUrls: ['./story-outline-overview.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StoryOutlineOverviewComponent implements OnInit {
+  @ViewChild(IonContent) content!: IonContent;
+  @ViewChild('searchbar') querySearchbar?: IonSearchbar;
+
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private storyService = inject(StoryService);
@@ -42,6 +48,9 @@ export class StoryOutlineOverviewComponent implements OnInit {
   private openRouterApi = inject(OpenRouterApiService);
   private geminiApi = inject(GoogleGeminiApiService);
   private promptManager = inject(PromptManagerService);
+  private promptTemplateService = inject(PromptTemplateService);
+  private storyStats = inject(StoryStatsService);
+  private codexContextService = inject(CodexContextService);
 
   // Header config
   leftActions: HeaderAction[] = [];
@@ -51,7 +60,6 @@ export class StoryOutlineOverviewComponent implements OnInit {
   // Data
   story = signal<Story | null>(null);
   query = signal('');
-  onlyWithSummary = signal<boolean>(false);
   selectedModel = '';
 
   // UI state
@@ -64,12 +72,10 @@ export class StoryOutlineOverviewComponent implements OnInit {
     const s = this.story();
     if (!s) return [] as Chapter[];
     const q = this.query().toLowerCase().trim();
-    const onlySumm = this.onlyWithSummary();
     const chapters = Array.isArray(s.chapters) ? s.chapters : [];
     return chapters.map((ch) => ({
       ...ch,
       scenes: ch.scenes.filter(sc => {
-        if (onlySumm && !sc.summary) return false;
         if (!q) return true;
         const hay = `${ch.title}\n${sc.title}\n${sc.summary || ''}`.toLowerCase();
         return hay.includes(q);
@@ -77,8 +83,41 @@ export class StoryOutlineOverviewComponent implements OnInit {
     })).filter(ch => ch.scenes.length > 0);
   });
 
+  sceneWordCounts = computed<Record<string, number>>(() => {
+    const s = this.story();
+    if (!s) return {};
+    const counts: Record<string, number> = {};
+    for (const chapter of s.chapters ?? []) {
+      for (const scene of chapter.scenes ?? []) {
+        counts[scene.id] = this.storyStats.calculateSceneWordCount(scene);
+      }
+    }
+    return counts;
+  });
+
+  // UI state
+  toolbarVisible = signal<boolean>(false);
+
   constructor() {
     addIcons({ arrowBack, openOutline, clipboardOutline, copyOutline, refreshOutline, createOutline, saveOutline, closeOutline, flashOutline, sparklesOutline, timeOutline });
+  }
+
+  toggleToolbar(): void {
+    const next = !this.toolbarVisible();
+    this.toolbarVisible.set(next);
+    if (next) {
+      setTimeout(() => this.querySearchbar?.setFocus(), 200);
+    }
+  }
+
+  getSceneWordCount(sceneId: string): number {
+    return this.sceneWordCounts()[sceneId] ?? 0;
+  }
+
+  getSceneWordCountLabel(sceneId: string): string {
+    const count = this.getSceneWordCount(sceneId);
+    const noun = count === 1 ? 'word' : 'words';
+    return `${count} ${noun}`;
   }
 
   async ngOnInit(): Promise<void> {
@@ -87,11 +126,13 @@ export class StoryOutlineOverviewComponent implements OnInit {
       this.router.navigate(['/']);
       return;
     }
-    await this.loadStory(storyId);
+    const chapterId = this.route.snapshot.queryParamMap.get('chapterId');
+    const sceneId = this.route.snapshot.queryParamMap.get('sceneId');
+    await this.loadStory(storyId, chapterId, sceneId);
     this.setupHeader(storyId);
   }
 
-  private async loadStory(id: string) {
+  private async loadStory(id: string, chapterId: string | null = null, sceneId: string | null = null) {
     this.loading.set(true);
     try {
       const s = await this.storyService.getStory(id);
@@ -100,9 +141,18 @@ export class StoryOutlineOverviewComponent implements OnInit {
         return;
       }
       this.story.set(s);
-      // Expand all chapters by default for quick overview
-      const all = new Set<string>(s.chapters.map(c => c.id));
-      this.expanded.set(all);
+      // If we have a chapterId, only expand that chapter. Otherwise expand all chapters
+      if (chapterId) {
+        this.expanded.set(new Set([chapterId]));
+        // Schedule scroll to scene after view is ready and accordion expanded
+        if (sceneId) {
+          setTimeout(() => this.scrollToScene(sceneId), 600);
+        }
+      } else {
+        // Expand all chapters by default for quick overview
+        const all = new Set<string>(s.chapters.map(c => c.id));
+        this.expanded.set(all);
+      }
     } finally {
       this.loading.set(false);
     }
@@ -158,7 +208,6 @@ export class StoryOutlineOverviewComponent implements OnInit {
     for (const ch of s.chapters) {
       lines.push(`\n## ${ch.chapterNumber}. ${ch.title || 'Untitled Chapter'}`);
       for (const sc of ch.scenes) {
-        if (!sc.summary && this.onlyWithSummary()) continue;
         const title = `${sc.sceneNumber}. ${sc.title || 'Untitled Scene'}`;
         const summary = (sc.summary || '').trim();
         lines.push(`\n### ${title}`);
@@ -230,11 +279,11 @@ export class StoryOutlineOverviewComponent implements OnInit {
   }
 
   // AI generation states
-  private generatingSummary = new Set<string>();
-  private generatingTitle = new Set<string>();
+  private generatingSummary = signal<Set<string>>(new Set());
+  private generatingTitle = signal<Set<string>>(new Set());
 
-  isGeneratingSummary(sceneId: string): boolean { return this.generatingSummary.has(sceneId); }
-  isGeneratingTitle(sceneId: string): boolean { return this.generatingTitle.has(sceneId); }
+  isGeneratingSummary(sceneId: string): boolean { return this.generatingSummary().has(sceneId); }
+  isGeneratingTitle(sceneId: string): boolean { return this.generatingTitle().has(sceneId); }
 
   // Inline title editing state
   editingTitles: Record<string, string> = {};
@@ -288,7 +337,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
   }
 
   // --- AI Generation (reuse logic from StoryStructureComponent) ---
-  generateSceneSummary(chapterId: string, sceneId: string): void {
+  async generateSceneSummary(chapterId: string, sceneId: string): Promise<void> {
     const s = this.story();
     if (!s) return;
     const chapter = s.chapters.find(c => c.id === chapterId);
@@ -306,10 +355,14 @@ export class StoryOutlineOverviewComponent implements OnInit {
       return;
     }
 
-    this.generatingSummary.add(sceneId);
+    this.generatingSummary.update(set => new Set(set).add(sceneId));
     const timeoutId = setTimeout(() => {
-      if (this.generatingSummary.has(sceneId)) {
-        this.generatingSummary.delete(sceneId);
+      if (this.generatingSummary().has(sceneId)) {
+        this.generatingSummary.update(set => {
+          const newSet = new Set(set);
+          newSet.delete(sceneId);
+          return newSet;
+        });
         alert('Summary generation is taking too long. Please try again.');
       }
     }, 30000);
@@ -317,6 +370,9 @@ export class StoryOutlineOverviewComponent implements OnInit {
     // Clean content and build prompt
     let sceneContent = this.removeEmbeddedImages(scene.content);
     sceneContent = this.promptManager.extractPlainTextFromHtml(sceneContent);
+    const sceneWordCount = this.getSceneWordCount(sceneId) || this.storyStats.calculateSceneWordCount(scene);
+    const minimumSummaryWords = this.calculateSummaryMinimumWords(sceneWordCount);
+    const wordCountInstruction = `Aim for around ${minimumSummaryWords} words.`;
     const maxContentLength = 200000;
     let truncated = false;
     if (sceneContent.length > maxContentLength) { sceneContent = sceneContent.slice(0, maxContentLength); truncated = true; }
@@ -332,23 +388,72 @@ export class StoryOutlineOverviewComponent implements OnInit {
       }
     })();
 
-    const desiredWordCount = Math.max(20, Math.min(1000, settings.sceneSummaryGeneration.wordCount || 120));
-    const wordCountInstruction = `Aim for about ${desiredWordCount} words.`;
+    const truncatedNote = truncated ? '\n\n[Note: Content was truncated as it was too long]' : '';
+    const customInstructionRaw = settings.sceneSummaryGeneration.customInstruction ?? '';
+    const customInstructionPresent = customInstructionRaw.trim().length > 0;
+    const additionalInstructionsXml = customInstructionPresent
+      ? `      <customInstruction>${this.escapeXml(customInstructionRaw)}</customInstruction>`
+      : '';
+    const codexPromptContext = [scene.title || '', customInstructionRaw.trim()].filter(Boolean).join('\n');
+
+    let codexEntriesRaw = '';
+    try {
+      const codexContext = await this.codexContextService.buildCodexXml(
+        s.id,
+        sceneContent,
+        codexPromptContext
+      );
+      codexEntriesRaw = codexContext.xml;
+    } catch (error) {
+      console.error('Failed to build codex context for scene summary', error);
+    }
+
+    const codexEntriesForTemplate = codexEntriesRaw
+      ? this.indentXmlBlock(codexEntriesRaw, '      ')
+      : '      <codex />';
+    const codexEntriesForCustomPrompt = codexEntriesRaw || '<codex />';
+    const languageInstructionXml = `<languageRequirement>${this.escapeXml(languageInstruction)}</languageRequirement>`;
+    const lengthRequirementXml = `<lengthRequirement>${this.escapeXml(wordCountInstruction)}</lengthRequirement>`;
+    const redundancyNote = 'Do not repeat information already captured in the codex context.';
 
     let prompt: string;
     if (settings.sceneSummaryGeneration.useCustomPrompt) {
       prompt = settings.sceneSummaryGeneration.customPrompt
         .replace(/{sceneTitle}/g, scene.title || 'Untitled')
-        .replace(/{sceneContent}/g, sceneContent + (truncated ? '\n\n[Note: Content was truncated as it was too long]' : ''))
-        .replace(/{customInstruction}/g, settings.sceneSummaryGeneration.customInstruction || '')
+        .replace(/{sceneContent}/g, sceneContent + truncatedNote)
+        .replace(/{customInstruction}/g, customInstructionRaw)
+        .replace(/{customInstructionXml}/g, additionalInstructionsXml.trim())
+        .replace(/{languageInstructionXml}/g, languageInstructionXml)
         .replace(/{languageInstruction}/g, languageInstruction)
-        .replace(/{summaryWordCount}/g, String(desiredWordCount));
+        .replace(/{summaryWordCount}/g, minimumSummaryWords.toString())
+        .replace(/{lengthRequirement}/g, wordCountInstruction)
+        .replace(/{codexEntries}/g, codexEntriesForCustomPrompt);
       if (!prompt.includes(languageInstruction)) prompt += `\n\n${languageInstruction}`;
-      if (!/\bword(s)?\b/i.test(prompt)) prompt += `\n\n${wordCountInstruction}`;
+      if (!prompt.includes(redundancyNote)) prompt += `\n\n${redundancyNote}`;
+      if (!prompt.includes(wordCountInstruction)) prompt += `\n\n${wordCountInstruction}`;
     } else {
-      prompt = `Create a summary of the following scene:\n\nTitle: ${scene.title || 'Untitled'}\n\nContent:\n${sceneContent}${truncated ? '\n\n[Note: Content was truncated as it was too long]' : ''}\n\nWrite a focused, comprehensive summary that captures the most important plot points and character developments. ${wordCountInstruction}`;
-      if (settings.sceneSummaryGeneration.customInstruction) prompt += `\n\nZusätzliche Anweisungen: ${settings.sceneSummaryGeneration.customInstruction}`;
-      prompt += `\n\n${languageInstruction}`;
+      try {
+        const template = await this.promptTemplateService.getSceneSummaryTemplate();
+        prompt = template
+          .replace(/\{sceneTitle\}/g, this.escapeXml(scene.title || 'Untitled'))
+          .replace(/\{sceneContent\}/g, sceneContent)
+          .replace(/\{truncatedNote\}/g, truncatedNote)
+          .replace(/\{codexEntries\}/g, codexEntriesForTemplate)
+          .replace(/\{languageInstruction\}/g, languageInstructionXml)
+          .replace(/\{lengthRequirement\}/g, lengthRequirementXml)
+          .replace(/\{additionalInstructions\}/g, additionalInstructionsXml);
+        prompt = prompt.replace(/\{summaryWordCount\}/g, minimumSummaryWords.toString());
+      } catch (error) {
+        console.error('Failed to load default scene summary template', error);
+        clearTimeout(timeoutId);
+        this.generatingSummary.update(set => {
+          const newSet = new Set(set);
+          newSet.delete(sceneId);
+          return newSet;
+        });
+        alert('Failed to load the scene summary prompt template. Please try again later or configure a custom prompt.');
+        return;
+      }
     }
 
     let provider: string | null = null; let actualModelId: string | null = null;
@@ -371,7 +476,11 @@ export class StoryOutlineOverviewComponent implements OnInit {
       await this.storyService.updateScene(current.id, chapterId, sceneId, { summary, summaryGeneratedAt: new Date() });
       this.promptManager.refresh();
       clearTimeout(timeoutId);
-      this.generatingSummary.delete(sceneId);
+      this.generatingSummary.update(set => {
+        const newSet = new Set(set);
+        newSet.delete(sceneId);
+        return newSet;
+      });
     };
 
     if (useGemini) {
@@ -385,7 +494,11 @@ export class StoryOutlineOverviewComponent implements OnInit {
           error: (error) => {
             console.error('Error generating scene summary:', error);
             clearTimeout(timeoutId);
-            this.generatingSummary.delete(sceneId);
+            this.generatingSummary.update(set => {
+              const newSet = new Set(set);
+              newSet.delete(sceneId);
+              return newSet;
+            });
             alert(this.describeGeminiError(error));
           }
         });
@@ -401,7 +514,11 @@ export class StoryOutlineOverviewComponent implements OnInit {
           error: (error) => {
             console.error('Error generating scene summary:', error);
             clearTimeout(timeoutId);
-            this.generatingSummary.delete(sceneId);
+            this.generatingSummary.update(set => {
+              const newSet = new Set(set);
+              newSet.delete(sceneId);
+              return newSet;
+            });
             alert(this.describeOpenRouterError(error));
           }
         });
@@ -427,10 +544,14 @@ export class StoryOutlineOverviewComponent implements OnInit {
       return;
     }
 
-    this.generatingTitle.add(sceneId);
+    this.generatingTitle.update(set => new Set(set).add(sceneId));
     const timeoutId = setTimeout(() => {
-      if (this.generatingTitle.has(sceneId)) {
-        this.generatingTitle.delete(sceneId);
+      if (this.generatingTitle().has(sceneId)) {
+        this.generatingTitle.update(set => {
+          const newSet = new Set(set);
+          newSet.delete(sceneId);
+          return newSet;
+        });
         alert('Title generation is taking too long. Please try again.');
       }
     }, 30000);
@@ -484,7 +605,11 @@ export class StoryOutlineOverviewComponent implements OnInit {
       await this.storyService.updateScene(current.id, chapterId, sceneId, { title });
       this.promptManager.refresh();
       clearTimeout(timeoutId);
-      this.generatingTitle.delete(sceneId);
+      this.generatingTitle.update(set => {
+        const newSet = new Set(set);
+        newSet.delete(sceneId);
+        return newSet;
+      });
     };
 
     if (useGemini) {
@@ -498,7 +623,11 @@ export class StoryOutlineOverviewComponent implements OnInit {
           error: (error) => {
             console.error('Error generating scene title:', error);
             clearTimeout(timeoutId);
-            this.generatingTitle.delete(sceneId);
+            this.generatingTitle.update(set => {
+              const newSet = new Set(set);
+              newSet.delete(sceneId);
+              return newSet;
+            });
             alert(this.describeGeminiError(error));
           }
         });
@@ -512,7 +641,11 @@ export class StoryOutlineOverviewComponent implements OnInit {
           error: (error) => {
             console.error('Error generating scene title:', error);
             clearTimeout(timeoutId);
-            this.generatingTitle.delete(sceneId);
+            this.generatingTitle.update(set => {
+              const newSet = new Set(set);
+              newSet.delete(sceneId);
+              return newSet;
+            });
             alert(this.describeOpenRouterError(error));
           }
         });
@@ -595,6 +728,67 @@ export class StoryOutlineOverviewComponent implements OnInit {
       console.error('Failed to save chapter title', e);
     } finally {
       this.savingChapterTitleSet.delete(chapterId);
+    }
+  }
+
+  // TrackBy functions to preserve accordion state during updates
+  trackChapterById(index: number, chapter: Chapter): string {
+    return chapter.id;
+  }
+
+  trackSceneById(index: number, scene: { id: string }): string {
+    return scene.id;
+  }
+
+  private indentXmlBlock(xml: string, indentation = '    '): string {
+    if (!xml) return '';
+    return xml
+      .split('\n')
+      .map(line => line ? `${indentation}${line}` : line)
+      .join('\n');
+  }
+
+  private escapeXml(value: string | unknown): string {
+    const str = String(value ?? '');
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  private calculateSummaryMinimumWords(sceneWordCount: number): number {
+    const baseMinimum = 120;
+    if (sceneWordCount <= 2000) return baseMinimum;
+    const extraWords = sceneWordCount - 2000;
+    const increments = Math.ceil(extraWords / 500);
+    return baseMinimum + increments * 25;
+  }
+
+  private async scrollToScene(sceneId: string): Promise<void> {
+    const element = document.getElementById(`scene-${sceneId}`);
+    if (element && this.content) {
+      try {
+        // Get element position relative to the page
+        const rect = element.getBoundingClientRect();
+        const scrollElement = await this.content.getScrollElement();
+        const scrollTop = scrollElement.scrollTop;
+
+        // Calculate absolute Y position
+        const yPosition = rect.top + scrollTop - 100; // 100px offset from top
+
+        // Use Ionic's scrollToPoint for mobile compatibility
+        await this.content.scrollToPoint(0, yPosition, 500);
+
+        // Add a highlight effect
+        element.classList.add('highlight');
+        setTimeout(() => element.classList.remove('highlight'), 2000);
+      } catch (error) {
+        console.error('Error scrolling to scene:', error);
+        // Fallback to standard scrollIntoView
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
   }
 }

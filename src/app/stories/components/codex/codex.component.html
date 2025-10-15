@@ -96,9 +96,6 @@
                                   <ion-icon name="person"></ion-icon>
                                   <ion-label>{{ entry.metadata?.['storyRole'] }}</ion-label>
                                 </ion-chip>
-                                <ion-chip *ngFor="let field of getCustomFields(entry)" color="secondary">
-                                  <ion-label>{{ field.name }}: {{ getFieldValuePreview(field.value) }}</ion-label>
-                                </ion-chip>
                                 <ion-chip *ngFor="let tag of entry.tags" color="medium">
                                   <ion-icon name="pricetag"></ion-icon>
                                   <ion-label>{{ tag }}</ion-label>
@@ -155,9 +152,6 @@
                                     <ion-icon name="person"></ion-icon>
                                     <ion-label>{{ entry.metadata?.['storyRole'] }}</ion-label>
                                   </ion-chip>
-                                  <ion-chip *ngFor="let field of getCustomFields(entry)" color="secondary">
-                                    <ion-label>{{ field.name }}: {{ getFieldValuePreview(field.value) }}</ion-label>
-                                  </ion-chip>
                                   <ion-chip *ngFor="let tag of entry.tags" color="medium">
                                     <ion-icon name="pricetag"></ion-icon>
                                     <ion-label>{{ tag }}</ion-label>
@@ -192,19 +186,20 @@
       <!-- Entry Modal -->
       <ion-modal [isOpen]="!!selectedEntry()" (didDismiss)="closeEntryModal()" class="entry-modal">
         <ng-template>
-          <ion-header>
-            <ion-toolbar>
-              <ion-title>{{ editingEntry.title || 'Edit Entry' }}</ion-title>
-              <ion-buttons slot="end">
+          <div class="entry-modal-page ion-page">
+            <ion-header>
+              <ion-toolbar>
+                <ion-title>{{ editingEntry.title || 'Edit Entry' }}</ion-title>
+                <ion-buttons slot="end">
                 <ion-button (click)="closeEntryModal()">
                   <ion-icon name="close" slot="icon-only"></ion-icon>
                 </ion-button>
               </ion-buttons>
             </ion-toolbar>
           </ion-header>
-          
-          <ion-content class="entry-modal-content">
-            <div class="modal-form-container">
+            
+            <ion-content class="entry-modal-content">
+              <div class="modal-form-container">
               <!-- Basic Information Section -->
               <div class="form-section">
                 <h3 class="section-title">Basic Information</h3>
@@ -350,14 +345,13 @@
                     </div>
                     <ion-item lines="none" class="form-item">
                       <ion-label position="stacked">Field Value</ion-label>
-                      <ion-textarea 
-                        [(ngModel)]="field.value" 
-                        placeholder="Enter field value..."
-                        rows="3"
-                        [autoGrow]="true"
-                        class="scrollable-textarea"
-                        (ionInput)="onTextareaInput($event)">
-                      </ion-textarea>
+                    <ion-textarea 
+                      [(ngModel)]="field.value" 
+                      placeholder="Enter field value..."
+                      rows="3"
+                      [autoGrow]="true"
+                      class="scrollable-textarea">
+                    </ion-textarea>
                     </ion-item>
                   </div>
                   
@@ -372,14 +366,13 @@
                     </ion-item>
                     <ion-item lines="none" class="form-item">
                       <ion-label position="stacked">Field Value</ion-label>
-                      <ion-textarea 
-                        [(ngModel)]="newCustomFieldValue" 
-                        placeholder="Enter field value..."
-                        rows="3"
-                        [autoGrow]="true"
-                        class="scrollable-textarea"
-                        (ionInput)="onTextareaInput($event)">
-                      </ion-textarea>
+                    <ion-textarea 
+                      [(ngModel)]="newCustomFieldValue" 
+                      placeholder="Enter field value..."
+                      rows="3"
+                      [autoGrow]="true"
+                      class="scrollable-textarea">
+                    </ion-textarea>
                     </ion-item>
                   </div>
                 </div>
@@ -397,14 +390,15 @@
                       placeholder="Description, details, notes..."
                       rows="8"
                       [autoGrow]="true"
-                      class="content-textarea scrollable-textarea"
-                      (ionInput)="onTextareaInput($event)">
+                      class="content-textarea scrollable-textarea">
                     </ion-textarea>
                   </ion-item>
                 </div>
               </div>
                 
-              <!-- Action Buttons -->
+              </div>
+            </ion-content>
+            <ion-footer class="entry-modal-footer">
               <div class="modal-actions">
                 <ion-button (click)="deleteEntry()" fill="outline" color="danger" size="default">
                   <ion-icon name="trash" slot="start"></ion-icon>
@@ -415,8 +409,8 @@
                   Save
                 </ion-button>
               </div>
-            </div>
-          </ion-content>
+            </ion-footer>
+          </div>
         </ng-template>
       </ion-modal>
 
@@ -467,8 +461,7 @@
                     placeholder="Description..."
                     rows="3"
                     [autoGrow]="true"
-                    class="scrollable-textarea"
-                    (ionInput)="onTextareaInput($event)">
+                    class="scrollable-textarea">
                   </ion-textarea>
                 </ion-item>
               </ion-card-content>
