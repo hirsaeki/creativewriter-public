@@ -1,4 +1,5 @@
-import { Component, Input, Output, EventEmitter, inject, OnInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, inject, OnInit, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -445,7 +446,7 @@ interface SceneContext {
     }
   `]
 })
-export class AIRewriteModalComponent implements OnInit {
+export class AIRewriteModalComponent implements OnInit, OnDestroy {
   @Input() selectedText = '';
   @Input() storyId = '';
   @Input() currentChapterId = '';
@@ -459,6 +460,7 @@ export class AIRewriteModalComponent implements OnInit {
   private settingsService = inject(SettingsService);
   private aiLogger = inject(AIRequestLoggerService);
   private modelService = inject(ModelService);
+  private rewriteSubscription?: Subscription;
 
   customPrompt = '';
   rewrittenText = '';
@@ -564,7 +566,7 @@ export class AIRewriteModalComponent implements OnInit {
 
       // Call AI directly without the beat generation template
       let accumulatedResponse = '';
-      this.callAIDirectly(
+      this.rewriteSubscription = this.callAIDirectly(
         fullPrompt,
         beatId,
         { wordCount: Math.max(50, Math.ceil(this.selectedText.length * 1.2)) }
@@ -615,8 +617,13 @@ export class AIRewriteModalComponent implements OnInit {
   }
 
   dismiss() {
+    this.rewriteSubscription?.unsubscribe();
     this.dismissed.emit();
     this.modalController.dismiss();
+  }
+
+  ngOnDestroy(): void {
+    this.rewriteSubscription?.unsubscribe();
   }
 
   // Context management methods (copied from Scene Chat)

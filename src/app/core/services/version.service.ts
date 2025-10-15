@@ -26,7 +26,9 @@ export class VersionService {
   }
 
   private loadVersion(): void {
-    this.http.get<VersionInfo>('/assets/version.json')
+    // Add cache-busting parameter to ensure we always get the latest version
+    const cacheBuster = new Date().getTime();
+    this.http.get<VersionInfo>(`/assets/version.json?t=${cacheBuster}`)
       .pipe(
         catchError(() => of({
           version: '0.0.0',

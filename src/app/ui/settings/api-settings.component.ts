@@ -1,4 +1,5 @@
-import { Component, Input, Output, EventEmitter, inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, inject, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { 
@@ -886,10 +887,11 @@ import { OllamaIconComponent } from '../icons/ollama-icon.component';
     }
   `]
 })
-export class ApiSettingsComponent {
+export class ApiSettingsComponent implements OnDestroy {
   private ollamaApiService = inject(OllamaApiService);
   private claudeApiService = inject(ClaudeApiService);
   private modelService = inject(ModelService);
+  private subscriptions = new Subscription();
 
   @Input() settings!: Settings;
   @Input() combinedModels: ModelOption[] = [];
@@ -923,18 +925,22 @@ export class ApiSettingsComponent {
   }
 
   loadCombinedModels(): void {
-    this.modelService.getCombinedModels().subscribe({
-      next: (models) => {
-        this.modelsLoaded.emit(models);
-      },
-      error: (error) => {
-        console.error('Failed to load combined models:', error);
-      }
-    });
+    this.subscriptions.add(
+      this.modelService.getCombinedModels().subscribe({
+        next: (models) => {
+          this.modelsLoaded.emit(models);
+        },
+        error: (error) => {
+          console.error('Failed to load combined models:', error);
+        }
+      })
+    );
   }
 
   loadReplicateModels(): void {
-    this.modelService.loadReplicateModels().subscribe();
+    this.subscriptions.add(
+      this.modelService.loadReplicateModels().subscribe()
+    );
   }
 
   onGlobalModelChange(): void {
@@ -957,92 +963,96 @@ export class ApiSettingsComponent {
 
   onApiKeyChange(provider: 'openRouter' | 'replicate' | 'googleGemini' | 'claude'): void {
     this.settingsChange.emit();
-    
+
     // Auto-load models when API key is entered and provider is enabled
     if (provider === 'openRouter' && this.settings.openRouter.enabled && this.settings.openRouter.apiKey) {
-      this.modelService.loadOpenRouterModels().subscribe();
+      this.subscriptions.add(this.modelService.loadOpenRouterModels().subscribe());
     } else if (provider === 'replicate' && this.settings.replicate.enabled && this.settings.replicate.apiKey) {
-      this.modelService.loadReplicateModels().subscribe();
+      this.subscriptions.add(this.modelService.loadReplicateModels().subscribe());
     } else if (provider === 'googleGemini' && this.settings.googleGemini.enabled && this.settings.googleGemini.apiKey) {
-      this.modelService.loadGeminiModels().subscribe();
+      this.subscriptions.add(this.modelService.loadGeminiModels().subscribe());
     } else if (provider === 'claude' && this.settings.claude.enabled && this.settings.claude.apiKey) {
-      this.modelService.loadClaudeModels().subscribe();
+      this.subscriptions.add(this.modelService.loadClaudeModels().subscribe());
     }
   }
   
   onOllamaUrlChange(): void {
     this.settingsChange.emit();
     this.ollamaConnectionStatus = null; // Reset connection status when URL changes
-    
+
     // Auto-load models when URL is entered and provider is enabled
     if (this.settings.ollama.enabled && this.settings.ollama.baseUrl) {
-      this.modelService.loadOllamaModels().subscribe();
+      this.subscriptions.add(this.modelService.loadOllamaModels().subscribe());
     }
   }
   
   onProviderToggle(provider: 'openRouter' | 'replicate' | 'googleGemini' | 'ollama' | 'claude'): void {
     this.settingsChange.emit();
-    
+
     // Load models when provider is enabled and has credentials
     if (provider === 'openRouter' && this.settings.openRouter.enabled && this.settings.openRouter.apiKey) {
-      this.modelService.loadOpenRouterModels().subscribe();
+      this.subscriptions.add(this.modelService.loadOpenRouterModels().subscribe());
     } else if (provider === 'replicate' && this.settings.replicate.enabled && this.settings.replicate.apiKey) {
-      this.modelService.loadReplicateModels().subscribe();
+      this.subscriptions.add(this.modelService.loadReplicateModels().subscribe());
     } else if (provider === 'googleGemini' && this.settings.googleGemini.enabled && this.settings.googleGemini.apiKey) {
-      this.modelService.loadGeminiModels().subscribe();
+      this.subscriptions.add(this.modelService.loadGeminiModels().subscribe());
     } else if (provider === 'ollama' && this.settings.ollama.enabled && this.settings.ollama.baseUrl) {
-      this.modelService.loadOllamaModels().subscribe();
+      this.subscriptions.add(this.modelService.loadOllamaModels().subscribe());
       this.ollamaConnectionStatus = null; // Reset connection status
     } else if (provider === 'claude' && this.settings.claude.enabled && this.settings.claude.apiKey) {
-      this.modelService.loadClaudeModels().subscribe();
+      this.subscriptions.add(this.modelService.loadClaudeModels().subscribe());
       this.claudeConnectionStatus = null; // Reset connection status
     }
   }
   
   testOllamaConnection(): void {
     if (!this.settings.ollama.baseUrl) return;
-    
+
     this.testingOllamaConnection = true;
     this.ollamaConnectionStatus = null;
-    
-    this.ollamaApiService.testConnection().subscribe({
-      next: () => {
-        this.testingOllamaConnection = false;
-        this.ollamaConnectionStatus = 'success';
-        // Auto-load models on successful connection
-        if (this.settings.ollama.enabled) {
-          this.modelService.loadOllamaModels().subscribe();
+
+    this.subscriptions.add(
+      this.ollamaApiService.testConnection().subscribe({
+        next: () => {
+          this.testingOllamaConnection = false;
+          this.ollamaConnectionStatus = 'success';
+          // Auto-load models on successful connection
+          if (this.settings.ollama.enabled) {
+            this.subscriptions.add(this.modelService.loadOllamaModels().subscribe());
+          }
+        },
+        error: (error) => {
+          this.testingOllamaConnection = false;
+          this.ollamaConnectionStatus = 'error';
+          console.error('Ollama connection test failed:', error);
         }
-      },
-      error: (error) => {
-        this.testingOllamaConnection = false;
-        this.ollamaConnectionStatus = 'error';
-        console.error('Ollama connection test failed:', error);
-      }
-    });
+      })
+    );
   }
 
   testClaudeConnection(): void {
     if (!this.settings.claude.apiKey) return;
-    
+
     this.testingClaudeConnection = true;
     this.claudeConnectionStatus = null;
-    
-    this.claudeApiService.testConnection().subscribe({
-      next: (success) => {
-        this.testingClaudeConnection = false;
-        this.claudeConnectionStatus = success ? 'success' : 'error';
-        // Auto-load models on successful connection
-        if (success && this.settings.claude.enabled) {
-          this.modelService.loadClaudeModels().subscribe();
+
+    this.subscriptions.add(
+      this.claudeApiService.testConnection().subscribe({
+        next: (success) => {
+          this.testingClaudeConnection = false;
+          this.claudeConnectionStatus = success ? 'success' : 'error';
+          // Auto-load models on successful connection
+          if (success && this.settings.claude.enabled) {
+            this.subscriptions.add(this.modelService.loadClaudeModels().subscribe());
+          }
+        },
+        error: (error) => {
+          this.testingClaudeConnection = false;
+          this.claudeConnectionStatus = 'error';
+          console.error('Claude connection test failed:', error);
         }
-      },
-      error: (error) => {
-        this.testingClaudeConnection = false;
-        this.claudeConnectionStatus = 'error';
-        console.error('Claude connection test failed:', error);
-      }
-    });
+      })
+    );
   }
 
   getProviderIcon(provider: string): string {
@@ -1077,5 +1087,9 @@ export class ApiSettingsComponent {
       default:
         return 'AI Provider';
     }
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
   }
 }

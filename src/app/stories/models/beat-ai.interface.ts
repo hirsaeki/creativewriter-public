@@ -3,7 +3,7 @@ export interface BeatAI {
   prompt: string;
   generatedContent: string;
   isGenerating: boolean;
-  isEditing: boolean;
+  isCollapsed: boolean;
   createdAt: Date;
   updatedAt: Date;
   wordCount?: number;

@@ -8,7 +8,7 @@ import {
   IonChip, IonLabel
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, sparklesOutline } from 'ionicons/icons';
+import { arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, sparklesOutline, bug } from 'ionicons/icons';
 import { SettingsService } from '../core/services/settings.service';
 import { ModelService } from '../core/services/model.service';
 import { Settings } from '../core/models/settings.interface';
@@ -21,7 +21,6 @@ import { ApiSettingsComponent } from '../ui/settings/api-settings.component';
 import { UiSettingsComponent } from '../ui/settings/ui-settings.component';
 import { PromptsSettingsComponent } from '../ui/settings/prompts-settings.component';
 import { SceneGenerationSettingsComponent } from '../ui/settings/scene-generation-settings.component';
-import { ModelFavoritesSettingsComponent } from '../ui/settings/model-favorites-settings/model-favorites-settings.component';
 
 @Component({
   selector: 'app-settings',
@@ -31,7 +30,7 @@ import { ModelFavoritesSettingsComponent } from '../ui/settings/model-favorites-
     IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonChip, IonLabel,
     SettingsTabsComponent, SettingsContentComponent, DatabaseBackupComponent,
-    ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent, SceneGenerationSettingsComponent, ModelFavoritesSettingsComponent
+    ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent, SceneGenerationSettingsComponent
   ],
   template: `
     <div class="ion-page">
@@ -78,19 +77,6 @@ import { ModelFavoritesSettingsComponent } from '../ui/settings/model-favorites-
               (settingsChange)="onSettingsChange()"
               (modelsLoaded)="onModelsLoaded($event)">
             </app-api-settings>
-            <app-model-favorites-settings
-              [favoriteIds]="settings.favoriteModelLists?.rewrite || []"
-              [combinedModels]="combinedModels"
-              [loadingModels]="loadingModels"
-              [modelLoadError]="modelLoadError"
-              cardTitle="Rewrite Model Favorites"
-              heading="Rewrite Quick Picks"
-              subheading="Choose up to 6 models to surface as quick actions in the rewrite dialog."
-              description="Configure which models appear as quick-select favorites when rewriting text."
-              emptyState="No rewrite favorites selected yet. Load models to add quick access options."
-              infoNote="Enable at least one AI provider and load models to populate this list."
-              (favoriteIdsChange)="onFavoriteModelsChange('rewrite', $event)">
-            </app-model-favorites-settings>
           </div>
           
           <!-- Appearance Tab -->
@@ -138,6 +124,14 @@ import { ModelFavoritesSettingsComponent } from '../ui/settings/model-favorites-
           <!-- Backup & Restore Tab -->
           <div *ngSwitchCase="'backup'">
             <app-database-backup></app-database-backup>
+
+            <!-- Mobile Debug Console Link -->
+            <div style="margin-top: 2rem; padding: 0 1rem;">
+              <ion-button expand="block" fill="outline" color="medium" (click)="goToMobileDebug()">
+                <ion-icon name="bug" slot="start"></ion-icon>
+                Mobile Debug Console
+              </ion-button>
+            </div>
           </div>
         </div>
 
@@ -899,7 +893,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   constructor() {
     this.settings = this.settingsService.getSettings();
     // Register Ionic icons
-    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, sparklesOutline });
+    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, sparklesOutline, bug });
   }
 
   ngOnInit(): void {
@@ -1039,6 +1033,20 @@ export class SettingsComponent implements OnInit, OnDestroy {
       // Clear preview background
       this.backgroundService.clearPreviewBackground();
       this.router.navigate(['/logs']);
+    }
+  }
+
+  goToMobileDebug(): void {
+    if (this.hasUnsavedChanges) {
+      if (confirm('You have unsaved changes. Do you really want to leave the page?')) {
+        // Clear preview background since we're discarding changes
+        this.backgroundService.clearPreviewBackground();
+        this.router.navigate(['/mobile-debug']);
+      }
+    } else {
+      // Clear preview background
+      this.backgroundService.clearPreviewBackground();
+      this.router.navigate(['/mobile-debug']);
     }
   }
 

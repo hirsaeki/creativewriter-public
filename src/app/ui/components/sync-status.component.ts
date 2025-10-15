@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, Input, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subject, takeUntil } from 'rxjs';
+import { ToastController } from '@ionic/angular';
 import { DatabaseService, SyncStatus } from '../../core/services/database.service';
 
 
@@ -133,15 +134,16 @@ import { DatabaseService, SyncStatus } from '../../core/services/database.servic
 })
 export class SyncStatusComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  
+
   @Input() showActions = false;
-  
+
   syncStatus: SyncStatus = {
     isOnline: navigator.onLine,
     isSync: false
   };
 
   private readonly databaseService = inject(DatabaseService);
+  private readonly toastController = inject(ToastController);
 
   ngOnInit() {
     this.databaseService.syncStatus$
@@ -177,8 +179,8 @@ export class SyncStatusComponent implements OnInit, OnDestroy {
       if (errorText.includes('not reachable') || errorText.includes('connection')) {
         return 'DB not reachable';
       }
-      if (errorText.includes('timeout')) {
-        return 'Connection timeout';
+      if (errorText.includes('timeout') || errorText.includes('timed out')) {
+        return 'Sync timed out';
       }
       if (errorText.includes('auth')) {
         return 'Login failed';
@@ -186,15 +188,22 @@ export class SyncStatusComponent implements OnInit, OnDestroy {
       // Generic truncation for other errors
       return errorText.length > 30 ? `Error: ${errorText.substring(0, 27)}...` : `Error: ${errorText}`;
     }
-    if (this.syncStatus.isSync) return 'Syncing...';
+    if (this.syncStatus.isSync) {
+      // Show progress if available
+      if (this.syncStatus.syncProgress && this.syncStatus.syncProgress.docsProcessed > 0) {
+        const op = this.syncStatus.syncProgress.operation === 'push' ? 'Pushing' : 'Pulling';
+        return `${op} (${this.syncStatus.syncProgress.docsProcessed} docs)`;
+      }
+      return 'Syncing...';
+    }
     if (!this.syncStatus.isOnline) return 'Offline';
-    
+
     const lastSync = this.syncStatus.lastSync;
     if (lastSync) {
       const timeAgo = this.getTimeAgo(lastSync);
       return `Synced (${timeAgo})`;
     }
-    
+
     return 'Online';
   }
 
@@ -219,17 +228,49 @@ export class SyncStatusComponent implements OnInit, OnDestroy {
 
   async forcePush() {
     try {
-      await this.databaseService.forcePush();
+      const result = await this.databaseService.forcePush();
+      await this.showToast(
+        `✓ Push completed (${result.docsProcessed} ${result.docsProcessed === 1 ? 'doc' : 'docs'})`,
+        'success'
+      );
     } catch (error) {
       console.error('Force push failed:', error);
+      await this.showToast(
+        `✗ Push failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'danger'
+      );
     }
   }
 
   async forcePull() {
     try {
-      await this.databaseService.forcePull();
+      const result = await this.databaseService.forcePull();
+      await this.showToast(
+        `✓ Pull completed (${result.docsProcessed} ${result.docsProcessed === 1 ? 'doc' : 'docs'})`,
+        'success'
+      );
     } catch (error) {
       console.error('Force pull failed:', error);
+      await this.showToast(
+        `✗ Pull failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'danger'
+      );
     }
+  }
+
+  private async showToast(message: string, color: 'success' | 'danger') {
+    const toast = await this.toastController.create({
+      message,
+      duration: 3000,
+      position: 'bottom',
+      color,
+      buttons: [
+        {
+          text: 'Dismiss',
+          role: 'cancel'
+        }
+      ]
+    });
+    await toast.present();
   }
 }

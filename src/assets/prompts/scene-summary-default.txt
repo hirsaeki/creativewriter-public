@@ -1,0 +1,24 @@
+<messages>
+<message role="system">You are an expert story analyst who creates concise, structured summaries to support narrative continuation.</message>
+<message role="user">
+<sceneSummaryRequest>
+  <metadata>
+    <title>{sceneTitle}</title>
+  </metadata>
+  <context>
+    <scene><![CDATA[{sceneContent}{truncatedNote}]]></scene>
+    <codexContext>
+{codexEntries}
+    </codexContext>
+  </context>
+  <instructions>
+    {languageInstruction}
+    <focus>Important: Structure the summary so it can be used as context for an AI that continues the story.</focus>
+    {lengthRequirement}
+    <redundancy>Do not repeat information already captured in the codex context.</redundancy>
+    <responseFormat>Answer only with the summary.</responseFormat>
+{additionalInstructions}
+  </instructions>
+</sceneSummaryRequest>
+</message>
+</messages>

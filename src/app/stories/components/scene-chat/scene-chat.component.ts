@@ -6,7 +6,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { 
   IonContent, IonFooter, IonItem, IonLabel, IonTextarea, IonList,
   IonChip, IonAvatar, IonSearchbar, IonModal, IonCheckbox, IonItemDivider,
-  IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader
+  IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader, IonSpinner
 } from '@ionic/angular/standalone';
 import { AlertController } from '@ionic/angular';
 import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
@@ -64,6 +64,59 @@ interface PresetPrompt {
   icon: string;
 }
 
+interface CodexEntryPreview {
+  name: string;
+  description: string;
+  role?: StoryRole;
+  tags: string[];
+  fields: Record<string, string>;
+  selected: boolean;
+}
+
+const CHARACTER_FIELD_ORDER: string[] = [
+  'Description',
+  'Physical Appearance',
+  'Personality',
+  'Backstory',
+  'Relationships',
+  'History with Protagonist',
+  'Motivations & Goals',
+  'Skills & Abilities',
+  'Current Status',
+  'Plot Hooks'
+];
+
+const LOCATION_FIELD_ORDER: string[] = [
+  'Description',
+  'Overview',
+  'Sensory Details',
+  'Key Features',
+  'History & Lore',
+  'Story Significance',
+  'Mood & Atmosphere',
+  'Notable Characters',
+  'Plot Hooks'
+];
+
+const OBJECT_FIELD_ORDER: string[] = [
+  'Description',
+  'Physical Description',
+  'Origin & Backstory',
+  'Owner or Custodian',
+  'Abilities & Properties',
+  'Story Significance',
+  'Current Status or Location',
+  'Plot Hooks'
+];
+
+interface ParsedExtractionEntry {
+  name: string;
+  tags: string[];
+  role?: StoryRole;
+  fields: Record<string, string>;
+  rawBlock: string;
+}
+
 @Component({
   selector: 'app-scene-chat',
   standalone: true,
@@ -71,7 +124,7 @@ interface PresetPrompt {
     CommonModule, FormsModule, NgSelectModule, AppHeaderComponent,
     IonContent, IonFooter, IonItem, IonLabel, IonTextarea, IonList,
     IonChip, IonAvatar, IonSearchbar, IonModal, IonCheckbox, IonItemDivider,
-    IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader,
+    IonButton, IonIcon, IonButtons, IonToolbar, IonTitle, IonHeader, IonSpinner,
     OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent
   ],
   templateUrl: './scene-chat.component.html',
@@ -133,6 +186,14 @@ export class SceneChatComponent implements OnInit, OnDestroy {
   showHistoryList = false;
   histories: ChatHistoryDoc[] = [];
 
+  // Codex review modal state
+  showCodexReviewModal = false;
+  codexReviewEntries: CodexEntryPreview[] = [];
+  codexReviewExtractionType: 'characters' | 'locations' | 'objects' | null = null;
+  isSavingCodexEntries = false;
+  codexReviewError = '';
+  private customFieldIdCounter = 0;
+
   constructor() {
     addIcons({ 
       arrowBack, sendOutline, peopleOutline, documentTextOutline, 
@@ -173,6 +234,19 @@ export class SceneChatComponent implements OnInit, OnDestroy {
     this.editingIndex = -1;
     this.editingExtractionType = undefined;
     this.currentMessage = '';
+
+    // Trigger blur to close keyboard
+    if (this.messageInput) {
+      try {
+        const ionTextarea = this.messageInput as unknown as {
+          getInputElement?: () => Promise<HTMLTextAreaElement>
+        };
+        ionTextarea.getInputElement?.().then(el => el?.blur()).catch(() => void 0);
+      } catch {
+        void 0;
+      }
+    }
+
     this.cdr.markForCheck();
   }
 
@@ -225,13 +299,22 @@ export class SceneChatComponent implements OnInit, OnDestroy {
         contextText += `Previous chat history:\n${chatHistory}\n\n`;
       }
 
+      const languageInstruction = this.getLanguageInstruction();
+
       // Build prompt based on type
       if (extractionType) {
         // Use the extraction prompt directly
         prompt = `${contextText}${userMessage}`;
+        if (languageInstruction) {
+          prompt += `\n\n${languageInstruction}`;
+        }
       } else {
         // For normal chat, just add the user's question
-        prompt = `${contextText}User Question: ${userMessage}\n\nPlease answer helpfully and creatively based on the given context and previous conversation.`;
+        prompt = `${contextText}User Question: ${userMessage}\n\n`;
+        if (languageInstruction) {
+          prompt += `${languageInstruction}\n`;
+        }
+        prompt += 'Please answer helpfully and creatively based on the given context and previous conversation.';
       }
 
       // Call AI directly without the beat generation template
@@ -359,7 +442,19 @@ export class SceneChatComponent implements OnInit, OnDestroy {
 
     const userMessage = this.currentMessage;
     this.currentMessage = '';
-    
+
+    // Blur the input to dismiss keyboard
+    if (this.messageInput) {
+      try {
+        const ionTextarea = this.messageInput as unknown as {
+          getInputElement?: () => Promise<HTMLTextAreaElement>
+        };
+        ionTextarea.getInputElement?.().then(el => el?.blur()).catch(() => void 0);
+      } catch {
+        void 0;
+      }
+    }
+
     // If editing, revert history to just before the edited message
     let effectiveExtractionType: 'characters' | 'locations' | 'objects' | undefined = extractionType;
     if (this.isEditing) {
@@ -567,13 +662,18 @@ export class SceneChatComponent implements OnInit, OnDestroy {
 
   onInputFocus() {
     this.keyboardVisible = true;
+    // Use longer timeout to allow keyboard to fully appear
     setTimeout(() => {
       this.scrollToBottom();
-    }, 300);
+    }, 400);
   }
 
   onInputBlur() {
-    this.keyboardVisible = false;
+    // Add slight delay to ensure keyboard is fully closed before resetting
+    setTimeout(() => {
+      this.keyboardVisible = false;
+      this.cdr.markForCheck();
+    }, 100);
   }
 
   private extractFullTextFromScene(scene: Scene): string {
@@ -634,15 +734,24 @@ export class SceneChatComponent implements OnInit, OnDestroy {
         description: 'Extract all characters from selected scenes',
         extractionType: 'characters',
         icon: 'person-outline',
-        prompt: `Please analyze the following scenes and extract all characters. For each character provide the following information:
+        prompt: `Analyze the provided scenes and identify every distinct character that appears or is referenced. For each character, fill out the template below. Keep the field labels exactly as written (in English). If a detail is unknown, write "Unknown" instead of inventing information. Fill every field value in the story's language and keep sentences concise.
 
 **Name:** [Character name]
-**Role:** [Main character/Supporting character/Background character]
-**Description:** [Physical description, personality, important traits]
-**Relationships:** [Relationships to other characters]
-**Motivation:** [What drives the character]
+**Story Role:** [Protagonist | Antagonist | Supporting Character | Love Interest | Background Character | Unknown]
+**Tags:** [Comma-separated keywords used only to identify the character inside beat prompts, written in the story's language]
+**Description:** [...]
 
-Structure the answer clearly separated by characters.`
+**Physical Appearance:** [...]
+**Personality:** [...]
+**Backstory:** [...]
+**Relationships:** [...]
+**History with Protagonist:** [...]
+**Motivations & Goals:** [...]
+**Skills & Abilities:** [...]
+**Current Status:** [...]
+**Plot Hooks:** [...]
+
+Separate each character block with a blank line.`
       },
       {
         id: 'extract-locations',
@@ -650,15 +759,23 @@ Structure the answer clearly separated by characters.`
         description: 'Extract all locations and places from scenes',
         extractionType: 'locations',
         icon: 'location-outline',
-        prompt: `Please analyze the following scenes and extract all places and locations. For each location provide the following information:
+        prompt: `Analyze the scenes and document every distinct setting or location that appears or is mentioned. For each location, fill out the template below. Keep the field labels exactly as written (in English). If information is missing, answer with "Unknown". Fill every field value in the story's language and stay concise.
 
 **Name:** [Location name]
-**Type:** [City, Building, Room, Landscape, etc.]
-**Description:** [Physical description, atmosphere, important details]
-**Significance:** [Why is this location important for the story]
-**Mood:** [What mood/atmosphere prevails here]
+**Location Type:** [City, Ship, Tavern, Space Station, etc.]
+**Tags:** [Comma-separated keywords used only to identify this location inside beat prompts, written in the story's language]
+**Description:** [...]
 
-Strukturiere die Antwort klar nach Orten getrennt.`
+**Overview:** [...]
+**Sensory Details:** [...]
+**Key Features:** [...]
+**History & Lore:** [...]
+**Story Significance:** [...]
+**Mood & Atmosphere:** [...]
+**Notable Characters:** [...]
+**Plot Hooks:** [...]
+
+Separate each location block with a blank line.`
       },
       {
         id: 'extract-objects',
@@ -666,16 +783,22 @@ Strukturiere die Antwort klar nach Orten getrennt.`
         description: 'Extract important objects and items',
         extractionType: 'objects',
         icon: 'cube-outline',
-        prompt: `Please analyze the following scenes and extract all important items and objects. For each object provide the following information:
+        prompt: `Analyze the scenes and capture every significant item, artifact, or object. For each one, complete the template below. Keep the field labels exactly as written (in English). When details are missing, respond with "Unknown". Fill every field value in the story's language and keep sentences concise.
 
 **Name:** [Object name]
-**Type:** [Weapon, Tool, Jewelry, Document, etc.]
-**Description:** [Physical description, material, appearance]
-**Significance:** [Why is this object important]
-**Owner:** [Who owns the object]
-**Properties:** [Special abilities or characteristics]
+**Object Type:** [Weapon, Relic, Document, Tool, etc.]
+**Tags:** [Comma-separated keywords used only to identify this object inside beat prompts, written in the story's language]
+**Description:** [...]
 
-Strukturiere die Antwort klar nach Gegenständen getrennt.`
+**Physical Description:** [...]
+**Origin & Backstory:** [...]
+**Owner or Custodian:** [...]
+**Abilities & Properties:** [...]
+**Story Significance:** [...]
+**Current Status or Location:** [...]
+**Plot Hooks:** [...]
+
+Separate each object block with a blank line.`
       }
     ];
   }
@@ -699,60 +822,176 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
     }
   }
 
-  async addToCodex(message: ChatMessage) {
+  addToCodex(message: ChatMessage): void {
     if (!message.extractionType || !this.story) return;
 
+    const entries = this.parseExtractionResponse(message.content, message.extractionType);
+
+    if (entries.length === 0) {
+      this.messages.push({
+        role: 'assistant',
+        content: '⚠️ No structured entries detected to add to Codex. Please adjust the extraction prompt and try again.',
+        timestamp: new Date()
+      });
+      this.cdr.markForCheck();
+      this.scrollToBottom();
+      return;
+    }
+
+    this.codexReviewEntries = entries.map(entry => ({
+      name: entry.name,
+      description: entry.fields['Description'] || entry.rawBlock,
+      role: entry.role,
+      tags: entry.tags,
+      fields: entry.fields,
+      selected: true
+    }));
+    this.codexReviewExtractionType = message.extractionType;
+    this.codexReviewError = '';
+    this.showCodexReviewModal = true;
+    this.cdr.markForCheck();
+  }
+
+  areAllCodexEntriesSelected(): boolean {
+    return this.codexReviewEntries.length > 0 && this.codexReviewEntries.every(entry => entry.selected);
+  }
+
+  getSelectedCodexEntriesCount(): number {
+    return this.codexReviewEntries.filter(entry => entry.selected).length;
+  }
+
+  toggleSelectAllCodexEntries(selectAll: boolean): void {
+    if (this.isSavingCodexEntries || this.codexReviewEntries.length === 0) return;
+    this.codexReviewEntries = this.codexReviewEntries.map(entry => ({
+      ...entry,
+      selected: selectAll
+    }));
+    if (selectAll && this.codexReviewError) {
+      this.codexReviewError = '';
+    }
+    this.cdr.markForCheck();
+  }
+
+  onCodexEntrySelectionChanged(): void {
+    if (this.codexReviewError && this.getSelectedCodexEntriesCount() > 0) {
+      this.codexReviewError = '';
+    }
+    this.cdr.markForCheck();
+  }
+
+  dismissCodexReviewModal(): void {
+    if (this.isSavingCodexEntries) return;
+    this.showCodexReviewModal = false;
+    this.cdr.markForCheck();
+  }
+
+  handleCodexReviewDismiss(): void {
+    if (this.isSavingCodexEntries) return;
+    this.resetCodexReviewState();
+    this.cdr.markForCheck();
+  }
+
+  async confirmCodexReviewAdd(): Promise<void> {
+    if (this.isSavingCodexEntries || !this.story || !this.codexReviewExtractionType) return;
+
+    const selectedEntries = this.codexReviewEntries.filter(entry => entry.selected);
+
+    if (selectedEntries.length === 0) {
+      this.codexReviewError = 'Select at least one entry to continue.';
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.isSavingCodexEntries = true;
+    this.codexReviewError = '';
+    this.cdr.markForCheck();
+
     try {
-      // Get or create codex
       const codex = await this.codexService.getOrCreateCodex(this.story.id);
-      
-      // Find the appropriate category
-      const categoryName = this.getCategoryName(message.extractionType);
+      const categoryName = this.getCategoryName(this.codexReviewExtractionType);
       const category = codex.categories.find(c => c.title === categoryName);
-      
+
       if (!category) {
-        console.error(`Category ${categoryName} not found`);
-        return;
+        throw new Error(`Category ${categoryName} not found`);
       }
 
-      // Parse the AI response to extract entries
-      const entries = this.parseExtractionResponse(message.content, message.extractionType);
-      
-      // Add each entry to the codex
-      for (const entry of entries) {
+      for (const entry of selectedEntries) {
+        const { content, metadata } = this.buildCodexEntryPayload(entry, this.codexReviewExtractionType);
         await this.codexService.addEntry(this.story.id, category.id, {
           title: entry.name,
-          content: entry.description,
-          tags: entry.tags || [],
-          storyRole: message.extractionType === 'characters' ? (entry.role as StoryRole) : undefined
+          content,
+          tags: entry.tags,
+          metadata,
+          storyRole: this.codexReviewExtractionType === 'characters' ? entry.role : undefined
         });
       }
 
-      // Show success message
       this.messages.push({
         role: 'assistant',
-        content: `✅ ${entries.length} ${this.getExtractionTypeLabel(message.extractionType)} successfully added to Codex!`,
+        content: `✅ ${selectedEntries.length} ${this.getExtractionTypeLabel(this.codexReviewExtractionType)} added to Codex.`,
         timestamp: new Date()
       });
-      
+      this.cdr.markForCheck();
       this.scrollToBottom();
+
+      this.isSavingCodexEntries = false;
+      this.dismissCodexReviewModal();
     } catch (error) {
       console.error('Error adding to codex:', error);
-      this.messages.push({
-        role: 'assistant',
-        content: '❌ Error adding to codex. Please try again.',
-        timestamp: new Date()
-      });
-      this.scrollToBottom();
+      this.codexReviewError = '❌ Error adding to Codex. Please try again.';
+      this.isSavingCodexEntries = false;
+      this.cdr.markForCheck();
     }
   }
 
-  private getExtractionTypeLabel(type: 'characters' | 'locations' | 'objects'): string {
+  getFieldNamesForReview(entry: CodexEntryPreview): string[] {
+    const type = this.codexReviewExtractionType;
+    const orderedFields = type ? this.getFieldOrder(type) : [];
+    const primaryOrder = orderedFields.filter(name => name !== 'Description' && this.hasFieldValue(entry, name));
+
+    const additional = Object.keys(entry.fields)
+      .filter(name => name !== 'Description' && !orderedFields.includes(name) && this.hasFieldValue(entry, name));
+
+    return [...primaryOrder, ...additional];
+  }
+
+  private hasFieldValue(entry: CodexEntryPreview, name: string): boolean {
+    const value = entry.fields[name];
+    if (!value) return false;
+    const trimmed = value.trim();
+    return trimmed.length > 0 && trimmed.toLowerCase() !== 'unknown';
+  }
+
+  private resetCodexReviewState(): void {
+    this.codexReviewEntries = [];
+    this.codexReviewExtractionType = null;
+    this.codexReviewError = '';
+  }
+
+  getExtractionTypeLabel(type: 'characters' | 'locations' | 'objects'): string {
     switch (type) {
       case 'characters': return 'Characters';
       case 'locations': return 'Locations';
       case 'objects': return 'Objects';
       default: return 'Entries';
+    }
+  }
+
+  private getLanguageInstruction(): string {
+    const language = this.story?.settings?.language;
+    switch (language) {
+      case 'de':
+        return 'Antworten Sie auf Deutsch.';
+      case 'fr':
+        return 'Répondez en français.';
+      case 'es':
+        return 'Responda en español.';
+      case 'en':
+        return 'Respond in English.';
+      case 'custom':
+        return 'Respond in the same language as the provided story context.';
+      default:
+        return 'Use the story\'s language for your response.';
     }
   }
 
@@ -1042,44 +1281,230 @@ Strukturiere die Antwort klar nach Gegenständen getrennt.`
     });
   }
 
-  private parseExtractionResponse(content: string, type: 'characters' | 'locations' | 'objects'): {name: string; description?: string; role?: string; tags?: string[]}[] {
-    const entries: {name: string; description?: string; role?: string; tags?: string[]}[] = [];
-    
-    // Simple parsing - look for **Name:** patterns
+  private parseExtractionResponse(content: string, type: 'characters' | 'locations' | 'objects'): ParsedExtractionEntry[] {
+    const entries: ParsedExtractionEntry[] = [];
+
     const nameRegex = /\*\*Name:\*\*\s*([^\n]+)/g;
-    let match;
-    
+    let match: RegExpExecArray | null;
+
     while ((match = nameRegex.exec(content)) !== null) {
       const name = match[1].trim();
-      if (name) {
-        // Extract description (text between this name and next name or end)
-        const startIndex = match.index + match[0].length;
-        const nextNameIndex = content.indexOf('**Name:**', startIndex);
-        const endIndex = nextNameIndex !== -1 ? nextNameIndex : content.length;
-        const description = content.substring(startIndex, endIndex).trim();
-        
-        // Basic role extraction for characters
-        let role = '';
-        if (type === 'characters') {
-          if (description.toLowerCase().includes('hauptcharakter') || description.toLowerCase().includes('protagonist')) {
-            role = 'Protagonist';
-          } else if (description.toLowerCase().includes('nebencharakter')) {
-            role = 'Nebencharakter';
-          } else if (description.toLowerCase().includes('hintergrundcharakter')) {
-            role = 'Hintergrundcharakter';
-          }
-        }
-        
-        entries.push({
-          name,
-          description,
-          role,
-          tags: []
-        });
+      if (!name) continue;
+
+      const startIndex = match.index + match[0].length;
+      const nextMatchIndex = content.indexOf('**Name:**', startIndex);
+      const endIndex = nextMatchIndex !== -1 ? nextMatchIndex : content.length;
+      const rawBlock = content.substring(startIndex, endIndex).trim();
+
+      const { fields, tags, role } = this.extractFieldsFromBlock(rawBlock, type);
+
+      entries.push({
+        name,
+        tags,
+        role,
+        fields,
+        rawBlock
+      });
+    }
+
+    return entries;
+  }
+
+  private extractFieldsFromBlock(block: string, type: 'characters' | 'locations' | 'objects') {
+    const fields: Record<string, string> = {};
+    let tags: string[] = [];
+    let role: StoryRole | undefined;
+
+    const fieldRegex = /\*\*([^*:]+):\*\*\s*([\s\S]*?)(?=\n\*\*[^*\n]+:\*\*|\s*$)/g;
+    let fieldMatch: RegExpExecArray | null;
+
+    const recognizedFields = this.buildFieldLabelMap(type);
+
+    while ((fieldMatch = fieldRegex.exec(block)) !== null) {
+      const rawLabel = fieldMatch[1].trim();
+      const rawValue = this.sanitizeFieldValue(fieldMatch[2]);
+      if (!rawLabel) continue;
+
+      const normalizedKey = this.normalizeFieldKey(rawLabel);
+
+      if (normalizedKey === 'tags') {
+        tags = rawValue
+          .split(/[,;|]/)
+          .map(tag => tag.trim())
+          .filter(tag => tag.length > 0);
+        continue;
+      }
+
+      if (normalizedKey === 'story role' || normalizedKey === 'role') {
+        role = this.normalizeStoryRole(rawValue);
+        continue;
+      }
+
+      const label = recognizedFields.get(normalizedKey) ?? rawLabel;
+
+      if (!rawValue) continue;
+
+      fields[label] = rawValue;
+    }
+
+    if (type === 'characters' && !role) {
+      const lowerBlock = block.toLowerCase();
+      if (lowerBlock.includes('protagonist')) role = 'Protagonist';
+      else if (lowerBlock.includes('antagonist')) role = 'Antagonist';
+      else if (lowerBlock.includes('love interest')) role = 'Love Interest';
+      else if (lowerBlock.includes('supporting')) role = 'Supporting Character';
+      else if (lowerBlock.includes('background')) role = 'Background Character';
+    }
+
+    return { fields, tags, role };
+  }
+
+  private sanitizeFieldValue(value: string): string {
+    return (value || '')
+      .replace(/\r/g, '')
+      .trim();
+  }
+
+  private buildFieldLabelMap(type: 'characters' | 'locations' | 'objects'): Map<string, string> {
+    const map = new Map<string, string>();
+    const addToMap = (label: string) => {
+      map.set(this.normalizeFieldKey(label), label);
+    };
+
+    this.getFieldOrder(type).forEach(addToMap);
+
+    return map;
+  }
+
+  private normalizeFieldKey(label: string): string {
+    return label
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private normalizeStoryRole(rawRole: string): StoryRole | undefined {
+    const normalized = rawRole.trim().toLowerCase();
+    if (!normalized) return undefined;
+
+    const map: Record<string, StoryRole> = {
+      protagonist: 'Protagonist',
+      'main character': 'Protagonist',
+      hauptcharakter: 'Protagonist',
+      held: 'Protagonist',
+      antagonist: 'Antagonist',
+      gegenspieler: 'Antagonist',
+      'supporting character': 'Supporting Character',
+      nebencharakter: 'Supporting Character',
+      'secondary character': 'Supporting Character',
+      'love interest': 'Love Interest',
+      'romantic interest': 'Love Interest',
+      'background character': 'Background Character',
+      hintergrundcharakter: 'Background Character'
+    };
+
+    if (normalized in map) {
+      return map[normalized];
+    }
+
+    if (normalized.includes('protagonist')) return 'Protagonist';
+    if (normalized.includes('antagonist')) return 'Antagonist';
+    if (normalized.includes('support')) return 'Supporting Character';
+    if (normalized.includes('love')) return 'Love Interest';
+    if (normalized.includes('background') || normalized.includes('ensemble')) return 'Background Character';
+
+    return undefined;
+  }
+
+  private getFieldOrder(type: 'characters' | 'locations' | 'objects'): string[] {
+    switch (type) {
+      case 'characters':
+        return CHARACTER_FIELD_ORDER;
+      case 'locations':
+        return LOCATION_FIELD_ORDER;
+      case 'objects':
+        return OBJECT_FIELD_ORDER;
+      default:
+        return [];
+    }
+  }
+
+  private buildCodexEntryPayload(entry: CodexEntryPreview, type: 'characters' | 'locations' | 'objects'): { content: string; metadata: Record<string, unknown> } {
+    const fieldOrder = this.getFieldOrder(type);
+    const description = this.getEntryDescription(entry, fieldOrder);
+    const customFields = this.buildCustomFields(fieldOrder, entry.fields);
+    const metadata: Record<string, unknown> = {};
+
+    if (customFields.length > 0) {
+      metadata['customFields'] = customFields;
+    }
+
+    if (type === 'characters' && entry.role) {
+      metadata['storyRole'] = entry.role;
+    }
+
+    return { content: description, metadata };
+  }
+
+  private getEntryDescription(entry: CodexEntryPreview, fieldOrder: string[]): string {
+    const description = entry.fields['Description']?.trim();
+    if (description && description.length > 0) {
+      return description;
+    }
+
+    for (const fieldName of fieldOrder) {
+      if (fieldName === 'Description') continue;
+      const value = entry.fields[fieldName];
+      if (value && value.trim().length > 0 && value.trim().toLowerCase() !== 'unknown') {
+        return value.trim();
       }
     }
-    
-    return entries;
+
+    return entry.description || '';
+  }
+
+  private buildCustomFields(fieldOrder: string[], fields: Record<string, string>): { id: string; name: string; value: string }[] {
+    const customFields: { id: string; name: string; value: string }[] = [];
+    const used = new Set<string>();
+
+    const addField = (name: string) => {
+      const value = fields[name];
+      if (!value) return;
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      customFields.push({
+        id: this.generateCustomFieldId(),
+        name,
+        value: trimmed
+      });
+      used.add(name);
+    };
+
+    fieldOrder.forEach(fieldName => {
+      if (fieldName === 'Description') return;
+      addField(fieldName);
+    });
+
+    Object.entries(fields).forEach(([name, value]) => {
+      if (name === 'Description' || used.has(name)) return;
+      if (!value) return;
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      customFields.push({
+        id: this.generateCustomFieldId(),
+        name,
+        value: trimmed
+      });
+    });
+
+    return customFields;
+  }
+
+  private generateCustomFieldId(): string {
+    this.customFieldIdCounter += 1;
+    return `cf-${Date.now()}-${this.customFieldIdCounter}`;
   }
 
   async copyToClipboard(text: string, event: Event): Promise<void> {

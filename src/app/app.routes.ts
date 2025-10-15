@@ -28,6 +28,10 @@ export const routes: Routes = [
     redirectTo: 'logs'
   },
   {
+    path: 'mobile-debug',
+    loadComponent: () => import('./shared/components/mobile-debug/mobile-debug.component').then(m => m.MobileDebugComponent)
+  },
+  {
     path: '**',
     redirectTo: ''
   }

@@ -181,6 +181,90 @@
   </ion-footer>
 </div>
 
+<!-- Codex Review Modal -->
+<ion-modal 
+  [isOpen]="showCodexReviewModal"
+  [backdropDismiss]="!isSavingCodexEntries"
+  (didDismiss)="handleCodexReviewDismiss()">
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>Review Codex Entries</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="dismissCodexReviewModal()" [disabled]="isSavingCodexEntries">
+            <ion-icon name="close-outline" slot="icon-only"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content>
+      <div class="codex-review-content" *ngIf="codexReviewEntries.length > 0; else codexReviewEmpty">
+        <div class="codex-review-actions">
+          <ion-button size="small" fill="clear" (click)="toggleSelectAllCodexEntries(true)" [disabled]="isSavingCodexEntries || areAllCodexEntriesSelected()">
+            Select all
+          </ion-button>
+          <ion-button size="small" fill="clear" (click)="toggleSelectAllCodexEntries(false)" [disabled]="isSavingCodexEntries || getSelectedCodexEntriesCount() === 0">
+            Clear
+          </ion-button>
+          <ion-button size="small"
+                      color="primary"
+                      fill="solid"
+                      class="codex-review-confirm"
+                      (click)="confirmCodexReviewAdd()"
+                      [disabled]="isSavingCodexEntries || codexReviewEntries.length === 0">
+            <ion-spinner slot="start" *ngIf="isSavingCodexEntries"></ion-spinner>
+            Add Selected
+          </ion-button>
+        </div>
+        <ion-list>
+          <ion-item *ngFor="let entry of codexReviewEntries">
+            <ion-checkbox 
+              slot="start" 
+              [(ngModel)]="entry.selected" 
+              (ionChange)="onCodexEntrySelectionChanged()" 
+              [disabled]="isSavingCodexEntries">
+            </ion-checkbox>
+            <ion-label>
+              <div class="codex-entry-header">
+                <h3>{{ entry.name }}</h3>
+                <ion-chip *ngIf="entry.role" color="primary">{{ entry.role }}</ion-chip>
+              </div>
+              <div class="codex-entry-description" [innerHTML]="formatMessage(entry.description || 'No description provided.')"></div>
+              <div class="codex-entry-fields" *ngIf="getFieldNamesForReview(entry).length > 0">
+                <div class="codex-entry-field" *ngFor="let fieldName of getFieldNamesForReview(entry)">
+                  <span class="field-name">{{ fieldName }}:</span>
+                  <span class="field-value" [innerHTML]="formatMessage(entry.fields[fieldName])"></span>
+                </div>
+              </div>
+              <div class="codex-entry-tags" *ngIf="entry.tags.length > 0">
+                <ion-chip *ngFor="let tag of entry.tags" color="medium">{{ tag }}</ion-chip>
+              </div>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </div>
+      <ng-template #codexReviewEmpty>
+        <div class="codex-review-empty">
+          <p>No entries detected. Try running the extraction again.</p>
+        </div>
+      </ng-template>
+    </ion-content>
+    <ion-footer>
+      <div class="codex-review-footer">
+        <div class="codex-review-meta">
+          <span>{{ getSelectedCodexEntriesCount() }} of {{ codexReviewEntries.length }} selected</span>
+          <span *ngIf="codexReviewExtractionType">Category: {{ getExtractionTypeLabel(codexReviewExtractionType) }}</span>
+        </div>
+        <div class="codex-review-error" *ngIf="codexReviewError">{{ codexReviewError }}</div>
+        <ion-button expand="block" (click)="confirmCodexReviewAdd()" [disabled]="isSavingCodexEntries || codexReviewEntries.length === 0">
+          <ion-spinner slot="start" *ngIf="isSavingCodexEntries"></ion-spinner>
+          Add to Codex
+        </ion-button>
+      </div>
+    </ion-footer>
+  </ng-template>
+</ion-modal>
+
 <!-- History List Modal -->
 <ion-modal [isOpen]="showHistoryList" (didDismiss)="showHistoryList = false">
   <ng-template>

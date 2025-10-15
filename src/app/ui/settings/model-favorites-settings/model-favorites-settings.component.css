@@ -80,19 +80,13 @@ ion-card {
   color: #94a3b8;
 }
 
-.selected-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.selected-chip {
-  background: rgba(71, 118, 230, 0.2);
-  border: 1px solid rgba(139, 180, 248, 0.3);
-  border-radius: 6px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.85rem;
+.selected-text {
   color: #e0e0e0;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.25rem 0;
 }
 
 .loading-state {

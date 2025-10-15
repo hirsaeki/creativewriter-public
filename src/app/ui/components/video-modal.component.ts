@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnInit, OnDestroy, OnChanges, SimpleChanges, ViewChild, ElementRef, inject } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, OnDestroy, OnChanges, SimpleChanges, ViewChild, ElementRef, inject, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { VideoService } from '../../shared/services/video.service';
@@ -401,6 +401,8 @@ export class VideoModalComponent implements OnInit, OnDestroy, OnChanges {
   @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
 
   private videoService = inject(VideoService);
+  private cdr = inject(ChangeDetectorRef);
+  private zone = inject(NgZone);
 
   // State
   currentVideo: StoredVideo | null = null;
@@ -457,12 +459,17 @@ export class VideoModalComponent implements OnInit, OnDestroy, OnChanges {
 
     try {
       console.log('Loading video for image ID:', this.imageId);
-      this.currentVideo = await this.videoService.getVideoForImage(this.imageId);
-      this.hasVideo = !!this.currentVideo;
+      const video = await this.videoService.getVideoForImage(this.imageId);
+      this.applyChanges(() => {
+        this.currentVideo = video;
+        this.hasVideo = !!video;
+      });
       console.log('Found video for image:', !!this.currentVideo, this.currentVideo);
     } catch (error) {
       console.error('Error loading video:', error);
-      this.hasVideo = false;
+      this.applyChanges(() => {
+        this.hasVideo = false;
+      });
     }
   }
 
@@ -506,19 +513,33 @@ export class VideoModalComponent implements OnInit, OnDestroy, OnChanges {
       return;
     }
 
-    this.uploadedFile = file;
-    
-    // Create preview
+    this.applyChanges(() => {
+      this.uploadedFile = file;
+    });
+
     const reader = new FileReader();
     reader.onload = (e) => {
-      this.uploadPreview = e.target?.result as string;
+      const result = e.target?.result as string;
+      this.applyChanges(() => {
+        this.uploadPreview = result;
+      });
+    };
+    reader.onerror = () => {
+      console.error('Failed to read selected video file');
+      this.applyChanges(() => {
+        this.uploadPreview = null;
+        this.uploadedFile = null;
+      });
+      alert('Could not read the selected video. Please try again.');
     };
     reader.readAsDataURL(file);
   }
 
   removeUploadPreview(): void {
-    this.uploadedFile = null;
-    this.uploadPreview = null;
+    this.applyChanges(() => {
+      this.uploadedFile = null;
+      this.uploadPreview = null;
+    });
     if (this.fileInput) {
       this.fileInput.nativeElement.value = '';
     }
@@ -527,7 +548,9 @@ export class VideoModalComponent implements OnInit, OnDestroy, OnChanges {
   async saveVideo(): Promise<void> {
     if (!this.uploadedFile || !this.imageId) return;
 
-    this.isProcessing = true;
+    this.applyChanges(() => {
+      this.isProcessing = true;
+    });
 
     try {
       const videoId = await this.videoService.uploadVideo(this.uploadedFile);
@@ -536,8 +559,10 @@ export class VideoModalComponent implements OnInit, OnDestroy, OnChanges {
       if (success) {
         this.videoAssociated.emit({ imageId: this.imageId, videoId });
         await this.loadVideoForImage();
-        this.cleanupUpload();
-        this.isUploading = false;
+        this.applyChanges(() => {
+          this.cleanupUpload();
+          this.isUploading = false;
+        });
       } else {
         throw new Error('Error linking image and video');
       }
@@ -545,17 +570,23 @@ export class VideoModalComponent implements OnInit, OnDestroy, OnChanges {
       console.error('Error saving video:', error);
       alert('Error saving video. Please try again.');
     } finally {
-      this.isProcessing = false;
+      this.applyChanges(() => {
+        this.isProcessing = false;
+      });
     }
   }
 
   startUpload(): void {
-    this.isUploading = true;
+    this.applyChanges(() => {
+      this.isUploading = true;
+    });
   }
 
   cancelUpload(): void {
-    this.cleanupUpload();
-    this.isUploading = false;
+    this.applyChanges(() => {
+      this.cleanupUpload();
+      this.isUploading = false;
+    });
   }
 
   async removeVideo(): Promise<void> {
@@ -566,8 +597,10 @@ export class VideoModalComponent implements OnInit, OnDestroy, OnChanges {
 
     try {
       await this.videoService.removeImageVideoAssociation(this.imageId);
-      this.currentVideo = null;
-      this.hasVideo = false;
+      this.applyChanges(() => {
+        this.currentVideo = null;
+        this.hasVideo = false;
+      });
     } catch (error) {
       console.error('Error removing association:', error);
       alert('Error removing association.');
@@ -576,8 +609,10 @@ export class VideoModalComponent implements OnInit, OnDestroy, OnChanges {
 
   closeModal(): void {
     this.pauseVideo();
-    this.cleanupUpload();
-    this.isUploading = false;
+    this.applyChanges(() => {
+      this.cleanupUpload();
+      this.isUploading = false;
+    });
     this.closed.emit();
   }
 
@@ -611,13 +646,15 @@ export class VideoModalComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   private resetModalState(): void {
-    this.currentVideo = null;
-    this.hasVideo = false;
-    this.isUploading = false;
-    this.isProcessing = false;
-    this.isDragging = false;
-    this.uploadedFile = null;
-    this.uploadPreview = null;
+    this.applyChanges(() => {
+      this.currentVideo = null;
+      this.hasVideo = false;
+      this.isUploading = false;
+      this.isProcessing = false;
+      this.isDragging = false;
+      this.uploadedFile = null;
+      this.uploadPreview = null;
+    });
     if (this.fileInput) {
       this.fileInput.nativeElement.value = '';
     }
@@ -631,5 +668,12 @@ export class VideoModalComponent implements OnInit, OnDestroy, OnChanges {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  private applyChanges(mutator: () => void): void {
+    this.zone.run(() => {
+      mutator();
+      this.cdr.markForCheck();
+    });
   }
 }

@@ -255,7 +255,13 @@ ion-button[fill="outline"] {
       background: rgba(0, 0, 0, 0.8);
       backdrop-filter: blur(8px);
     }
-    
+
+    .entry-modal-page {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
     .entry-modal ion-header {
       background: transparent !important;
       --background: transparent !important;
@@ -328,7 +334,7 @@ ion-button[fill="outline"] {
     }
 
     .form-section:last-of-type {
-      margin-bottom: 80px; /* Space for sticky action buttons */
+      margin-bottom: 24px;
     }
 
     .section-title {
@@ -594,19 +600,30 @@ ion-button[fill="outline"] {
     }
 
     /* Modal Actions */
+    .entry-modal-footer {
+      --background: transparent;
+      --border-color: transparent;
+      --border-width: 0;
+      padding: 0;
+      background: transparent;
+    }
+
+    .entry-modal-footer::part(background) {
+      background: transparent;
+    }
+
     .modal-actions {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      padding: 16px 20px;
+      padding: 16px 20px calc(16px + env(safe-area-inset-bottom, 0px) + 48px);
       background: linear-gradient(135deg, rgba(20, 20, 20, 0.98) 0%, rgba(15, 15, 15, 0.98) 100%);
       border-top: 1px solid rgba(255, 255, 255, 0.08);
-      position: sticky;
-      bottom: 0;
-      z-index: 10;
       backdrop-filter: blur(15px) saturate(150%);
       box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .modal-actions ion-button {
@@ -671,7 +688,7 @@ ion-button[fill="outline"] {
       .modal-actions {
         flex-direction: column-reverse;
         gap: 8px;
-        padding: 16px;
+        padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px) + 48px);
       }
 
       .modal-actions ion-button {

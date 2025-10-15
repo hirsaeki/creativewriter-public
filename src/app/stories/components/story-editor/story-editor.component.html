@@ -115,12 +115,28 @@
                     />
                   </div>
                   
-                  <div class="editor-wrapper">
+                  <div class="editor-wrapper" #editorWrapper>
                     <div 
                       #editorContainer
                       class="content-editor"
                       [style.--editor-text-color]="currentTextColor"
                     ></div>
+                    <button
+                      *ngIf="videoButton.visible"
+                      type="button"
+                      class="image-video-action-button"
+                      [style.top.px]="videoButton.top"
+                      [style.left.px]="videoButton.left"
+                      (click)="onVideoButtonClicked($event)"
+                      (mouseenter)="onVideoButtonPointerEnter()"
+                      (mouseleave)="onVideoButtonPointerLeave()"
+                      (focus)="onVideoButtonFocus()"
+                      (blur)="onVideoButtonBlur()"
+                      [attr.aria-label]="videoButton.imageAlt ? 'Manage video for ' + videoButton.imageAlt : 'Manage video for image'"
+                      [attr.title]="videoButton.imageAlt ? 'Manage video for ' + videoButton.imageAlt : 'Manage video'"
+                    >
+                      <ion-icon name="videocam-outline"></ion-icon>
+                    </button>
                   </div>
                   
                   <!-- Scene Navigation - Bottom -->
@@ -171,6 +187,19 @@
         (imageInserted)="onImageInserted($event)"
         (cancelled)="hideImageDialog()">
       </app-image-upload-dialog>
+
+      <app-image-viewer-modal
+        *ngIf="showImageViewer"
+        [isOpen]="showImageViewer"
+        [imageSrc]="imageViewerState.imageSrc"
+        [imageAlt]="imageViewerState.imageAlt"
+        [imageTitle]="imageViewerState.imageTitle"
+        [videoSrc]="imageViewerState.videoSrc"
+        [videoName]="imageViewerState.videoName"
+        [loadingVideo]="imageViewerState.loadingVideo"
+        (closed)="closeImageViewer()"
+        (manageVideo)="manageVideoFromViewer()"
+      ></app-image-viewer-modal>
       
       <app-video-modal
         [isVisible]="showVideoModal"
