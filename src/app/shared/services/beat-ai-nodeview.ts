@@ -118,7 +118,8 @@ export class BeatAINodeView implements NodeView {
   }
 
 
-  stopEvent(event: Event): boolean {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  stopEvent(_event: Event): boolean {
     // Allow all events inside the beat AI component - don't let outer ProseMirror interfere
     return true;
   }

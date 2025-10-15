@@ -384,6 +384,7 @@ export class ProseMirrorEditorService {
     });
 
     // Create the editor view with proper event isolation
+    // eslint-disable-next-line prefer-const
     editorView = new EditorView(element, {
       state,
       dispatchTransaction: (transaction) => {
