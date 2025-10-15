@@ -96,29 +96,23 @@ export class StoryMediaGalleryComponent implements OnInit, OnChanges {
     this.cdr.markForCheck();
 
     try {
-      // Extract all image IDs from all scenes
-      const imageIds = this.extractImageIdsFromStory(this.story);
-
-      // Remove duplicates
-      const uniqueImageIds = [...new Set(imageIds)];
+      // Load all images from the database
+      const allImages = await this.imageService.getAllImages();
 
       // Load images and check for videos
       const items: MediaItem[] = [];
 
-      for (const imageId of uniqueImageIds) {
-        const image = await this.imageService.getImage(imageId);
-        if (image) {
-          // Check if this image has an associated video
-          const video = await this.videoService.getVideoForImage(imageId);
+      for (const image of allImages) {
+        // Check if this image has an associated video
+        const video = await this.videoService.getVideoForImage(image.id);
 
-          items.push({
-            imageId: image.id,
-            imageSrc: this.imageService.getImageDataUrl(image),
-            hasVideo: !!video,
-            videoId: video?.id,
-            imageAlt: image.name
-          });
-        }
+        items.push({
+          imageId: image.id,
+          imageSrc: this.imageService.getImageDataUrl(image),
+          hasVideo: !!video,
+          videoId: video?.id,
+          imageAlt: image.name
+        });
       }
 
       this.mediaItems = items;
@@ -129,37 +123,6 @@ export class StoryMediaGalleryComponent implements OnInit, OnChanges {
       this.isLoading = false;
       this.cdr.markForCheck();
     }
-  }
-
-  private extractImageIdsFromStory(story: Story): string[] {
-    const imageIds: string[] = [];
-
-    // Iterate through all chapters and scenes
-    for (const chapter of story.chapters) {
-      for (const scene of chapter.scenes) {
-        // Parse HTML content to find images
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(scene.content, 'text/html');
-        const images = doc.querySelectorAll('img');
-
-        images.forEach((img) => {
-          // Try to get image ID from data attribute
-          const imageId = img.getAttribute('data-image-id');
-          if (imageId) {
-            imageIds.push(imageId);
-          } else {
-            // Try to extract from CSS class
-            const classes = img.className;
-            const idMatch = classes.match(/image-id-([a-zA-Z0-9_-]+)/);
-            if (idMatch) {
-              imageIds.push(idMatch[1]);
-            }
-          }
-        });
-      }
-    }
-
-    return imageIds;
   }
 
   async onMediaItemClick(item: MediaItem): Promise<void> {
