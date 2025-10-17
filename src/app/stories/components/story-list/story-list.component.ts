@@ -21,6 +21,7 @@ import { AuthService, User } from '../../../core/services/auth.service';
 import { AppHeaderComponent, BurgerMenuItem, HeaderAction } from '../../../ui/components/app-header.component';
 import { HeaderNavigationService } from '../../../shared/services/header-navigation.service';
 import { VersionService } from '../../../core/services/version.service';
+import { DatabaseService } from '../../../core/services/database.service';
 
 @Component({
   selector: 'app-story-list',
@@ -44,8 +45,10 @@ export class StoryListComponent implements OnInit, OnDestroy {
   private sanitizer = inject(DomSanitizer);
   private cdr = inject(ChangeDetectorRef);
   private actionSheetCtrl = inject(ActionSheetController);
+  private databaseService = inject(DatabaseService);
   private destroy$ = new Subject<void>();
   versionService = inject(VersionService);
+  private lastSyncTime: Date | undefined;
 
   @ViewChild('burgerMenuFooter', { static: true }) burgerMenuFooter!: TemplateRef<unknown>;
   stories: Story[] = [];
@@ -93,7 +96,19 @@ export class StoryListComponent implements OnInit, OnDestroy {
           this.cdr.markForCheck();
         }
       });
-    
+
+    // Subscribe to sync status changes to reload stories when sync completes
+    this.databaseService.syncStatus$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(status => {
+        // Check if sync just completed (has lastSync and it's different from our last known sync)
+        if (status.lastSync && (!this.lastSyncTime || status.lastSync > this.lastSyncTime)) {
+          this.lastSyncTime = status.lastSync;
+          // Reload stories when sync brings in new changes
+          this.loadStories();
+        }
+      });
+
     // Setup burger menu items
     this.setupBurgerMenu();
   }

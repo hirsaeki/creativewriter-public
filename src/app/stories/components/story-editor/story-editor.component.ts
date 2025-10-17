@@ -39,6 +39,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { StoryStatsService } from '../../services/story-stats.service';
 import { VersionService } from '../../../core/services/version.service';
 import { PDFExportService, PDFExportProgress } from '../../../shared/services/pdf-export.service';
+import { DatabaseService } from '../../../core/services/database.service';
 
 @Component({
   selector: 'app-story-editor',
@@ -72,6 +73,8 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   private imageVideoService = inject(ImageVideoService);
   private videoService = inject(VideoService);
   private loadingController = inject(LoadingController);
+  private databaseService = inject(DatabaseService);
+  private lastSyncTime: Date | undefined;
 
   @ViewChild('headerTitle', { static: true }) headerTitle!: TemplateRef<unknown>;
   @ViewChild('burgerMenuFooter', { static: true }) burgerMenuFooter!: TemplateRef<unknown>;
@@ -299,7 +302,21 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       })
     );
 
-    
+    // Subscribe to sync status changes to reload story when sync completes
+    this.subscription.add(
+      this.databaseService.syncStatus$.subscribe(status => {
+        // Check if sync just completed (has lastSync and it's different from our last known sync)
+        if (status.lastSync && (!this.lastSyncTime || status.lastSync > this.lastSyncTime)) {
+          this.lastSyncTime = status.lastSync;
+          // Only reload if we have an active story and no unsaved changes
+          if (this.story.id && !this.hasUnsavedChanges && !this.isStreamingActive) {
+            this.reloadCurrentStory();
+          }
+        }
+      })
+    );
+
+
     // Add touch gesture listeners for mobile
     this.setupTouchGestures();
     
@@ -470,6 +487,67 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       if (this.currentSavePromise === saveOperation) {
         this.currentSavePromise = null;
       }
+    }
+  }
+
+  async reloadCurrentStory(): Promise<void> {
+    if (!this.story.id) return;
+
+    try {
+      // Save current cursor position and scroll position
+      const scrollPos = await this.ionContent?.getScrollElement().then(el => el.scrollTop);
+
+      // Get the updated story from database
+      const updatedStory = await this.storyService.getStory(this.story.id);
+
+      if (!updatedStory) return;
+
+      // Update story data
+      this.story = { ...updatedStory };
+
+      // Preserve the active scene if it still exists
+      if (this.activeChapterId && this.activeSceneId) {
+        const chapter = this.story.chapters.find(c => c.id === this.activeChapterId);
+        const scene = chapter?.scenes.find(s => s.id === this.activeSceneId);
+
+        if (chapter && scene) {
+          this.activeScene = scene;
+        } else {
+          // Scene no longer exists, select the last scene
+          if (this.story.chapters.length > 0) {
+            const lastChapter = this.story.chapters[this.story.chapters.length - 1];
+            if (lastChapter.scenes.length > 0) {
+              const lastScene = lastChapter.scenes[lastChapter.scenes.length - 1];
+              this.activeChapterId = lastChapter.id;
+              this.activeSceneId = lastScene.id;
+              this.activeScene = lastScene;
+            }
+          }
+        }
+      }
+
+      // Update word count
+      this.updateWordCount();
+
+      // Update the editor content if editor exists
+      if (this.activeScene) {
+        this.proseMirrorService.setContent(this.activeScene.content || '');
+      }
+
+      // Restore scroll position
+      if (scrollPos !== undefined) {
+        setTimeout(() => {
+          this.ionContent?.scrollToPoint(0, scrollPos, 0);
+        }, 100);
+      }
+
+      // Refresh prompt manager
+      await this.promptManager.setCurrentStory(this.story.id);
+
+      // Trigger change detection
+      this.cdr.markForCheck();
+    } catch (error) {
+      console.error('Error reloading story:', error);
     }
   }
 
