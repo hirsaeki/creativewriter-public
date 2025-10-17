@@ -50,12 +50,24 @@ import { DatabaseService, SyncStatus } from '../../core/services/database.servic
       border: 1px solid rgba(220, 53, 69, 0.4);
     }
     
+    .sync-status.connecting {
+      background-color: rgba(13, 110, 253, 0.2);
+      color: #0d6efd;
+      border: 1px solid rgba(13, 110, 253, 0.4);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
     .sync-status.syncing {
       background-color: rgba(255, 193, 7, 0.2);
       color: #ffc107;
       border: 1px solid rgba(255, 193, 7, 0.4);
     }
-    
+
     .sync-status.error {
       background-color: rgba(220, 53, 69, 0.2);
       color: #ff6b7a;
@@ -134,6 +146,8 @@ import { DatabaseService, SyncStatus } from '../../core/services/database.servic
 })
 export class SyncStatusComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
+  private hasShownInitialSyncToast = false;
+  private wasConnecting = false;
 
   @Input() showActions = false;
 
@@ -149,6 +163,16 @@ export class SyncStatusComponent implements OnInit, OnDestroy {
     this.databaseService.syncStatus$
       .pipe(takeUntil(this.destroy$))
       .subscribe(status => {
+        // Check if we just finished connecting successfully
+        if (this.wasConnecting && !status.isConnecting && !status.error && status.isSync) {
+          // Show toast only once when first connecting succeeds
+          if (!this.hasShownInitialSyncToast) {
+            this.showInitialSyncToast();
+            this.hasShownInitialSyncToast = true;
+          }
+        }
+
+        this.wasConnecting = status.isConnecting || false;
         this.syncStatus = status;
       });
   }
@@ -160,6 +184,7 @@ export class SyncStatusComponent implements OnInit, OnDestroy {
 
   get syncStatusClass(): string {
     if (this.syncStatus.error) return 'error';
+    if (this.syncStatus.isConnecting) return 'connecting';
     if (this.syncStatus.isSync) return 'syncing';
     if (!this.syncStatus.isOnline) return 'offline';
     return 'online';
@@ -167,6 +192,7 @@ export class SyncStatusComponent implements OnInit, OnDestroy {
 
   get syncIcon(): string {
     if (this.syncStatus.error) return '⚠️';
+    if (this.syncStatus.isConnecting) return '🔌';
     if (this.syncStatus.isSync) return '🔄';
     if (!this.syncStatus.isOnline) return '🔌';
     return '☁️';
@@ -187,6 +213,9 @@ export class SyncStatusComponent implements OnInit, OnDestroy {
       }
       // Generic truncation for other errors
       return errorText.length > 30 ? `Error: ${errorText.substring(0, 27)}...` : `Error: ${errorText}`;
+    }
+    if (this.syncStatus.isConnecting) {
+      return 'Connecting to remote database...';
     }
     if (this.syncStatus.isSync) {
       // Show progress if available
@@ -256,6 +285,22 @@ export class SyncStatusComponent implements OnInit, OnDestroy {
         'danger'
       );
     }
+  }
+
+  private async showInitialSyncToast() {
+    const toast = await this.toastController.create({
+      message: '☁️ Connected to remote database - Sync active',
+      duration: 4000,
+      position: 'bottom',
+      color: 'success',
+      buttons: [
+        {
+          text: 'Dismiss',
+          role: 'cancel'
+        }
+      ]
+    });
+    await toast.present();
   }
 
   private async showToast(message: string, color: 'success' | 'danger') {

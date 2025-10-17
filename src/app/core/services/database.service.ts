@@ -20,6 +20,7 @@ interface PouchSync {
 export interface SyncStatus {
   isOnline: boolean;
   isSync: boolean;
+  isConnecting?: boolean;
   lastSync?: Date;
   error?: string;
   syncProgress?: {
@@ -87,6 +88,14 @@ export class DatabaseService {
 
     this.db = new this.pouchdbCtor(dbName);
 
+    // Increase EventEmitter limit to prevent memory leak warnings
+    // PouchDB sync operations create many internal event listeners
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (this.db && (this.db as any).setMaxListeners) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.db as any).setMaxListeners(20);
+    }
+
     // Create comprehensive indexes for better query performance (in parallel)
     const indexes = [
       { fields: ['type'] },
@@ -99,12 +108,25 @@ export class DatabaseService {
       { fields: ['id'] }
     ];
 
+    // Store reference to current db to prevent race conditions
+    const currentDb = this.db;
+
     // Create all indexes in parallel for faster initialization
     await Promise.all(
-      indexes.map(indexDef =>
-        this.db!.createIndex({ index: indexDef })
-          .catch(err => console.warn(`Could not create index for ${JSON.stringify(indexDef.fields)}:`, err))
-      )
+      indexes.map(async (indexDef) => {
+        try {
+          // Only create index if this database instance is still active
+          if (currentDb === this.db) {
+            await currentDb.createIndex({ index: indexDef });
+          }
+        } catch (err) {
+          // Ignore errors if database was closed during initialization
+          if (err && typeof err === 'object' && 'message' in err &&
+              !(err.message as string).includes('database is closed')) {
+            console.warn(`Could not create index for ${JSON.stringify(indexDef.fields)}:`, err);
+          }
+        }
+      })
     );
 
     // Setup sync for the new database
@@ -151,12 +173,17 @@ export class DatabaseService {
     try {
       // Use provided URL or try to detect from environment/location
       const couchUrl = remoteUrl || this.getCouchDBUrl();
-      
+
       if (!couchUrl) {
         return;
       }
 
-      
+      // Indicate that we're connecting
+      this.updateSyncStatus({
+        isConnecting: true,
+        error: undefined
+      });
+
       const Pouch = this.pouchdbCtor;
       if (!Pouch) {
         throw new Error('PouchDB not initialized');
@@ -178,15 +205,21 @@ export class DatabaseService {
         throw new Error(`CouchDB connection failed: ${testError instanceof Error ? testError.message : String(testError)}`);
       }
 
+      // Connection successful, clear connecting state
+      this.updateSyncStatus({ isConnecting: false });
+
       // Start bidirectional sync
       this.startSync();
-      
+
     } catch (error) {
       console.warn('Could not setup sync:', error);
       this.remoteDb = null;
-      
+
       const errorMessage = this.getFriendlySyncError(error, 'Sync setup failed');
-      this.updateSyncStatus({ error: errorMessage });
+      this.updateSyncStatus({
+        error: errorMessage,
+        isConnecting: false
+      });
     }
   }
 
@@ -266,6 +299,13 @@ export class DatabaseService {
   async stopSync(): Promise<void> {
     if (this.syncHandler) {
       try {
+        // Remove all event listeners to prevent memory leaks
+        this.syncHandler.off('change');
+        this.syncHandler.off('active');
+        this.syncHandler.off('paused');
+        this.syncHandler.off('error');
+
+        // Cancel the sync
         this.syncHandler.cancel();
       } catch (error) {
         console.warn('Error canceling sync:', error);
