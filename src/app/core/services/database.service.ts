@@ -105,14 +105,22 @@ export class DatabaseService {
 
     // Create comprehensive indexes for better query performance (in parallel)
     const indexes = [
+      // Indexes for non-story documents (codex, video, etc.)
       { fields: ['type'] },
       { fields: ['type', 'createdAt'] },
       { fields: ['type', 'updatedAt'] },
-      { fields: ['chapters'] },
       { fields: ['storyId'] },
-      { fields: ['createdAt'] },
-      { fields: ['updatedAt'] },
-      { fields: ['id'] }
+
+      // Indexes for stories (stories don't have 'type' field)
+      { fields: ['chapters'] },                    // Identify story documents
+      { fields: ['updatedAt'] },                   // Sort by last update
+      { fields: ['createdAt'] },                   // Sort by creation
+      { fields: ['order'] },                       // Manual ordering
+      { fields: ['id'] },                          // Lookup by id
+
+      // Optimized compound indexes for story queries
+      { fields: ['chapters', 'updatedAt'], name: 'stories-by-updated', ddoc: 'stories-idx' },
+      { fields: ['chapters', 'order'], name: 'stories-by-order', ddoc: 'stories-idx' }
     ];
 
     // Store reference to current db to prevent race conditions

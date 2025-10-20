@@ -59,6 +59,13 @@ export class StoryListComponent implements OnInit, OnDestroy {
   reorderingEnabled = false;
   isLoadingStories = true;
 
+  // Pagination support
+  pageSize = 50;  // Load 50 stories at a time
+  currentPage = 0;
+  totalStories = 0;
+  hasMoreStories = false;
+  isLoadingMore = false;
+
   constructor() {
     // Register Ionic icons
     addIcons({ add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline });
@@ -146,9 +153,52 @@ export class StoryListComponent implements OnInit, OnDestroy {
     }
   }
 
-  async loadStories(): Promise<void> {
-    this.stories = await this.storyService.getAllStories();
-    this.cdr.markForCheck();
+  async loadStories(reset = true): Promise<void> {
+    if (reset) {
+      this.currentPage = 0;
+      this.stories = [];
+      this.isLoadingStories = true;
+    } else {
+      this.isLoadingMore = true;
+    }
+
+    try {
+      // Load stories for current page
+      const newStories = await this.storyService.getAllStories(
+        this.pageSize,
+        this.currentPage * this.pageSize
+      );
+
+      // Get total count (only on first load for efficiency)
+      if (reset) {
+        this.totalStories = await this.storyService.getTotalStoriesCount();
+      }
+
+      // Append or replace stories
+      if (reset) {
+        this.stories = newStories;
+      } else {
+        this.stories = [...this.stories, ...newStories];
+      }
+
+      // Check if there are more stories to load
+      const loadedCount = (this.currentPage + 1) * this.pageSize;
+      this.hasMoreStories = loadedCount < this.totalStories && newStories.length === this.pageSize;
+
+    } finally {
+      this.isLoadingStories = false;
+      this.isLoadingMore = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async loadMoreStories(): Promise<void> {
+    if (this.isLoadingMore || !this.hasMoreStories) {
+      return;
+    }
+
+    this.currentPage++;
+    await this.loadStories(false);
   }
 
   async drop(event: CdkDragDrop<Story[]>): Promise<void> {

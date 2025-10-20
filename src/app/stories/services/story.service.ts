@@ -15,59 +15,61 @@ export class StoryService {
   private previewCache = new Map<string, string>();
   private wordCountCache = new Map<string, number>();
 
-  async getAllStories(): Promise<Story[]> {
+  /**
+   * Get all stories with optional pagination
+   * @param limit Maximum number of stories to return (default: 50, max: 1000)
+   * @param skip Number of stories to skip for pagination (default: 0)
+   * @returns Array of stories
+   */
+  async getAllStories(limit?: number, skip?: number): Promise<Story[]> {
     try {
       this.db = await this.databaseService.getDatabase();
-      const result = await this.db.allDocs({ 
-        include_docs: true
+
+      // Use indexed query instead of allDocs for better performance
+      // Query for documents that have chapters field (stories)
+      const result = await this.db.find({
+        selector: {
+          chapters: { $exists: true }
+        },
+        // Note: We'll sort in memory since we need conditional sorting (order vs updatedAt)
+        limit: Math.min(limit || 50, 1000),  // Default 50, max 1000 for safety
+        skip: skip || 0
       });
-      
-      const stories = result.rows
-        .map((row: { doc?: unknown }) => {
-          return row.doc;
-        })
+
+      const stories = result.docs
         .filter((doc: unknown) => {
           if (!doc) return false;
-          
-          const docWithType = doc as Partial<Story> & { 
-            type?: string; 
+
+          const docWithType = doc as Partial<Story> & {
+            type?: string;
             content?: string;
           };
-          
-          // Filter out design docs
+
+          // Filter out design docs (shouldn't appear with chapters field, but be safe)
           if (docWithType._id && docWithType._id.startsWith('_design')) {
             return false;
           }
-          
+
           // If document has a type field, it's not a story (stories don't have type field)
           if (docWithType.type) {
             return false; // This filters out codex, video, image-video-association, etc.
           }
-          
-          // A story MUST have either chapters array (new format) or content (legacy format)
-          const hasChapters = Array.isArray(docWithType.chapters);
-          const hasLegacyContent = typeof docWithType.content === 'string';
-          
-          // Must have one of these story-specific structures
-          if (!hasChapters && !hasLegacyContent) {
-            return false;
-          }
-          
+
           // Must have an ID
           if (!docWithType.id && !docWithType._id) {
             return false;
           }
-          
+
           // Additional validation: Check if it's an empty/abandoned story
           if (this.isEmptyStory(docWithType)) {
             console.log('Filtering out empty story:', docWithType.title || 'Untitled', docWithType._id);
             return false;
           }
-          
+
           return true;
         })
         .map((story: unknown) => this.migrateStory(story as Story));
-      
+
       // Sort stories by order field (if exists) or by updatedAt (descending)
       stories.sort((a, b) => {
         // If both have order, sort by order (ascending)
@@ -80,11 +82,48 @@ export class StoryService {
         // Otherwise sort by updatedAt (descending - newest first)
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
-        
+
       return stories;
     } catch (error) {
       console.error('Error fetching stories:', error);
       return [];
+    }
+  }
+
+  /**
+   * Get total count of stories (for pagination)
+   * Uses lightweight query with only _id field to minimize data transfer
+   */
+  async getTotalStoriesCount(): Promise<number> {
+    try {
+      this.db = await this.databaseService.getDatabase();
+
+      // Query only for _id to minimize data transfer
+      const result = await this.db.find({
+        selector: {
+          chapters: { $exists: true }
+        },
+        fields: ['_id', 'type'],  // Minimal fields
+        limit: 10000  // Reasonable upper limit
+      });
+
+      // Filter out non-stories (same logic as getAllStories)
+      const storyCount = result.docs.filter((doc: unknown) => {
+        if (!doc) return false;
+        const docWithType = doc as { _id?: string; type?: string };
+
+        // Filter out design docs and typed documents
+        if (docWithType._id?.startsWith('_design') || docWithType.type) {
+          return false;
+        }
+
+        return true;
+      }).length;
+
+      return storyCount;
+    } catch (error) {
+      console.error('Error counting stories:', error);
+      return 0;
     }
   }
 

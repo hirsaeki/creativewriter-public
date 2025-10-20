@@ -105,7 +105,21 @@
       </ion-card-content>
     </ion-card>
   </div>
-  
+
+  <!-- Load More Button -->
+  <div class="load-more-container" *ngIf="stories.length > 0 && hasMoreStories">
+    <ion-button
+      expand="block"
+      fill="outline"
+      color="primary"
+      (click)="loadMoreStories()"
+      [disabled]="isLoadingMore">
+      <ion-spinner name="crescent" *ngIf="isLoadingMore"></ion-spinner>
+      <span *ngIf="!isLoadingMore">Load More Stories ({{ stories.length }} / {{ totalStories }})</span>
+      <span *ngIf="isLoadingMore">Loading...</span>
+    </ion-button>
+  </div>
+
   <ng-template #noStories>
     <div class="no-stories">
       <ng-container *ngIf="isLoadingStories; else emptyState">
