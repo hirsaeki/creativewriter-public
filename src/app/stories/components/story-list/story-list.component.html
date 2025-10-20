@@ -60,15 +60,15 @@
     </ion-button>
   </div>
   
-  <div class="stories-grid" *ngIf="stories.length > 0; else noStories" 
+  <div class="stories-grid" *ngIf="stories.length > 0; else noStories"
        [cdkDropListDisabled]="!reorderingEnabled"
-       cdkDropList 
+       cdkDropList
        (cdkDropListDropped)="drop($event)">
-    <ion-card class="story-card" 
-              *ngFor="let story of stories" 
+    <ion-card class="story-card"
+              *ngFor="let story of stories; trackBy: trackByStoryId"
               [cdkDragDisabled]="!reorderingEnabled"
-              cdkDrag 
-              (click)="!reorderingEnabled && openStory(story.id)" 
+              cdkDrag
+              (click)="!reorderingEnabled && openStory(story.id)"
               [class.reordering-enabled]="reorderingEnabled"
               button>
       <!-- Cover Image -->

@@ -11,6 +11,10 @@ export class StoryService {
   private readonly databaseService = inject(DatabaseService);
   private db: PouchDB.Database | null = null;
 
+  // Performance optimization: Cache for story previews and word counts
+  private previewCache = new Map<string, string>();
+  private wordCountCache = new Map<string, number>();
+
   async getAllStories(): Promise<Story[]> {
     try {
       this.db = await this.databaseService.getDatabase();
@@ -509,17 +513,17 @@ export class StoryService {
    */
   private stripHtmlTags(html: string): string {
     if (!html) return '';
-    
+
     // Remove Beat AI nodes completely (they are editor-only components)
     const cleanHtml = html.replace(/<div[^>]*class="beat-ai-node"[^>]*>.*?<\/div>/gs, '');
-    
+
     // Use DOMParser for safe HTML parsing instead of innerHTML
     const parser = new DOMParser();
     const doc = parser.parseFromString(cleanHtml, 'text/html');
-    
+
     // Get text content safely
     const textContent = doc.body.textContent || '';
-    
+
     // Remove any remaining Beat AI artifacts
     return textContent
       .replace(/🎭\s*Beat\s*AI/gi, '')
@@ -527,6 +531,101 @@ export class StoryService {
       .replace(/BeatAIPrompt/gi, '')
       .trim()
       .replace(/\s+/g, ' '); // Normalize whitespace
+  }
+
+  /**
+   * Get story preview with caching for performance
+   */
+  getStoryPreview(story: Story): string {
+    const cacheKey = this.getStoryCacheKey(story);
+
+    // Check cache first
+    if (this.previewCache.has(cacheKey)) {
+      return this.previewCache.get(cacheKey)!;
+    }
+
+    // Compute preview
+    let preview = 'No content yet...';
+
+    // For legacy stories with content
+    if (story.content) {
+      const cleanContent = this.stripHtmlTags(story.content);
+      preview = cleanContent.length > 150 ? cleanContent.substring(0, 150) + '...' : cleanContent;
+    } else if (story.chapters && story.chapters.length > 0 && story.chapters[0].scenes && story.chapters[0].scenes.length > 0) {
+      // For new chapter/scene structure
+      const firstScene = story.chapters[0].scenes[0];
+      const content = firstScene.content || '';
+      const cleanContent = this.stripHtmlTags(content);
+      preview = cleanContent.length > 150 ? cleanContent.substring(0, 150) + '...' : cleanContent;
+    }
+
+    // Cache the result
+    this.previewCache.set(cacheKey, preview);
+    return preview;
+  }
+
+  /**
+   * Get word count with caching for performance
+   */
+  getWordCount(story: Story): number {
+    const cacheKey = this.getStoryCacheKey(story);
+
+    // Check cache first
+    if (this.wordCountCache.has(cacheKey)) {
+      return this.wordCountCache.get(cacheKey)!;
+    }
+
+    // Compute word count
+    let totalWords = 0;
+
+    // For legacy stories with content
+    if (story.content) {
+      const cleanContent = this.stripHtmlTags(story.content);
+      totalWords = cleanContent.trim().split(/\s+/).filter(word => word.length > 0).length;
+    } else if (story.chapters) {
+      // For new chapter/scene structure - count all scenes
+      story.chapters.forEach(chapter => {
+        if (chapter.scenes) {
+          chapter.scenes.forEach(scene => {
+            const content = scene.content || '';
+            const cleanContent = this.stripHtmlTags(content);
+            totalWords += cleanContent.trim().split(/\s+/).filter(word => word.length > 0).length;
+          });
+        }
+      });
+    }
+
+    // Cache the result
+    this.wordCountCache.set(cacheKey, totalWords);
+    return totalWords;
+  }
+
+  /**
+   * Invalidate cache for a specific story (call when story is updated)
+   */
+  invalidateStoryCache(story: Story): void {
+    const cacheKey = this.getStoryCacheKey(story);
+    this.previewCache.delete(cacheKey);
+    this.wordCountCache.delete(cacheKey);
+  }
+
+  /**
+   * Clear all caches (useful when reloading all stories)
+   */
+  clearAllCaches(): void {
+    this.previewCache.clear();
+    this.wordCountCache.clear();
+  }
+
+  /**
+   * Generate cache key for a story based on ID and updatedAt timestamp
+   */
+  private getStoryCacheKey(story: Story): string {
+    const id = story._id || story.id;
+    const timestamp = story.updatedAt instanceof Date
+      ? story.updatedAt.getTime()
+      : new Date(story.updatedAt).getTime();
+    return `${id}-${timestamp}`;
   }
 
   // Reorder stories method

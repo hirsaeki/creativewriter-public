@@ -275,45 +275,13 @@ export class StoryListComponent implements OnInit, OnDestroy {
   }
 
   getStoryPreview(story: Story): string {
-    // For legacy stories with content
-    if (story.content) {
-      const cleanContent = this.stripHtmlTags(story.content);
-      return cleanContent.length > 150 ? cleanContent.substring(0, 150) + '...' : cleanContent;
-    }
-    
-    // For new chapter/scene structure
-    if (story.chapters && story.chapters.length > 0 && story.chapters[0].scenes && story.chapters[0].scenes.length > 0) {
-      const firstScene = story.chapters[0].scenes[0];
-      const content = firstScene.content || '';
-      const cleanContent = this.stripHtmlTags(content);
-      return cleanContent.length > 150 ? cleanContent.substring(0, 150) + '...' : cleanContent;
-    }
-    
-    return 'No content yet...';
+    // Delegate to service for caching
+    return this.storyService.getStoryPreview(story);
   }
 
   getWordCount(story: Story): number {
-    // For legacy stories with content
-    if (story.content) {
-      const cleanContent = this.stripHtmlTags(story.content);
-      return cleanContent.trim().split(/\s+/).filter(word => word.length > 0).length;
-    }
-    
-    // For new chapter/scene structure - count all scenes
-    let totalWords = 0;
-    if (story.chapters) {
-      story.chapters.forEach(chapter => {
-        if (chapter.scenes) {
-          chapter.scenes.forEach(scene => {
-            const content = scene.content || '';
-            const cleanContent = this.stripHtmlTags(content);
-            totalWords += cleanContent.trim().split(/\s+/).filter(word => word.length > 0).length;
-          });
-        }
-      });
-    }
-    
-    return totalWords;
+    // Delegate to service for caching
+    return this.storyService.getWordCount(story);
   }
 
   getCoverImageUrl(story: Story): string | null {
@@ -321,26 +289,8 @@ export class StoryListComponent implements OnInit, OnDestroy {
     return `data:image/png;base64,${story.coverImage}`;
   }
 
-  private stripHtmlTags(html: string): string {
-    if (!html) return '';
-    
-    // First remove Beat AI nodes completely (they are editor-only components)
-    const cleanHtml = html.replace(/<div[^>]*class="beat-ai-node"[^>]*>.*?<\/div>/gs, '');
-    
-    // Use DOMParser for safe HTML parsing instead of innerHTML
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(cleanHtml, 'text/html');
-    
-    // Get text content safely
-    const textContent = doc.body.textContent || '';
-    
-    // Remove any remaining Beat AI artifacts that might appear as plain text
-    return textContent
-      .replace(/🎭\s*Beat\s*AI/gi, '')
-      .replace(/Prompt:\s*/gi, '')
-      .replace(/BeatAIPrompt/gi, '')
-      .trim()
-      .replace(/\s+/g, ' '); // Normalize whitespace
+  trackByStoryId(index: number, story: Story): string {
+    return story._id || story.id;
   }
 
   ngOnDestroy(): void {
