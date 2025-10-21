@@ -877,21 +877,23 @@ this.subscription = merge(
 ## Progress Tracking
 
 ### Overall Status
-**Last Updated:** 2025-10-20 @ 18:45
+**Last Updated:** 2025-10-20 @ 19:15
 
 | Phase | Status | Progress | Target Completion | Notes |
 |-------|--------|----------|-------------------|-------|
 | Phase 1: Quick Wins | ✅ Complete | 100% | 2025-10-20 | Commit: 0e15f60 |
 | Phase 2: Database | ✅ Complete | 100% | 2025-10-20 | Commit: 2421de8 |
 | Phase 3: Editor | 🟡 In Progress | 25% | 2025-10-22 | Migration caching done |
-| Phase 4: Change Detection | 🔵 Not Started | 0% | 2025-10-25 | Pending |
+| Phase 4: Diagnostics | ✅ Complete | 100% | 2025-10-20 | Commit: 90d4a7a |
 
 **Latest Achievements:**
 - ✅ **Phase 1 completed**: Caching and trackBy implemented (Commit: 0e15f60)
 - ✅ **Phase 2 completed**: Database indexing and pagination (Commit: 2421de8)
 - ✅ **Phase 3 (partial)**: Migration caching with schema versioning (Commit: 056b58f)
+- ✅ **Phase 4 completed**: Performance logging and non-blocking sync (Commit: 90d4a7a)
 - ✅ All tests passing, no regressions
-- 🎯 **Next**: Complete Phase 3 - remaining editor optimizations
+- 🎯 **Critical Fix**: Identified and resolved root cause of slow loading - sync setup was blocking database initialization
+- 🎯 **Next**: Test application to verify performance improvements, then complete remaining Phase 3 tasks
 
 ---
 
@@ -951,10 +953,48 @@ this.subscription = merge(
 - Expected impact: **95% of story loads skip expensive migration**
 - Performance gain: 50-100ms per story load eliminated
 
-#### Phase 4: Change Detection
-- [ ] 4.1: Debounce change detection
-- [ ] 4.2: Consolidate subscriptions
-- [ ] 4.3: Template optimization
+#### Phase 4: Performance Diagnostics & Critical Fixes ✅ COMPLETE
+- [x] 4.1: Add comprehensive performance logging
+- [x] 4.2: Identify blocking sync issue
+- [x] 4.3: Make sync setup non-blocking
+- [x] 4.4: Fix duplicate loading in StoryListComponent
+- [x] Testing and validation (build + lint passed)
+
+**Commit:** `90d4a7a` - perf(stories): add performance logging and fix blocking sync initialization
+
+**Implementation Notes:**
+
+**Performance Logging Added:**
+- StoryListComponent: Total load time, query time, count query time tracking
+- StoryService: Database access, query execution, filter/migrate, sort timing
+- DatabaseService: Initialization wait times, index creation timing
+- All timings logged to console for performance monitoring
+
+**Critical Fix - Non-blocking Sync:**
+- **Root Cause Identified**: `setupSync()` was being awaited during database initialization
+- The sync setup includes `await this.remoteDb.info()` which makes a network call to test CouchDB connection
+- This network delay was blocking database availability, causing "loading stories takes ages"
+- **Solution**: Changed sync to run asynchronously in background with error handling
+- Database is now immediately available for queries
+- Sync happens in parallel without blocking application startup
+
+**Additional Improvements:**
+- Fixed potential duplicate loading in StoryListComponent.ngOnInit()
+- User change subscription now happens before initial load to prevent race conditions
+- Added comprehensive error handling for background sync failures
+
+**Expected Impact:**
+- **Eliminates network-induced delays from blocking story loading**
+- Database available immediately on startup
+- Sync status updates asynchronously without blocking UI
+- Performance logging enables continued monitoring and optimization
+
+---
+
+#### Phase 5: Change Detection (Future)
+- [ ] 5.1: Debounce change detection
+- [ ] 5.2: Consolidate subscriptions
+- [ ] 5.3: Template optimization
 - [ ] Testing and validation
 
 ---
