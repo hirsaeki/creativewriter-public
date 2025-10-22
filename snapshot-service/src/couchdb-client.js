@@ -102,12 +102,24 @@ class DatabaseClient {
         }
       };
 
-      await this.db.insert(designDoc);
-      logger.info(`Created views for database: ${this.dbName}`);
-    } catch (error) {
-      if (error.statusCode !== 409) { // 409 = conflict (already exists)
-        logger.error(`Failed to create views for ${this.dbName}:`, error);
+      try {
+        // Try to get existing design document
+        const existing = await this.db.get('_design/snapshots');
+        // Update with new views, keeping the _rev
+        designDoc._rev = existing._rev;
+        await this.db.insert(designDoc);
+        logger.info(`Updated views for database: ${this.dbName}`);
+      } catch (getError) {
+        if (getError.statusCode === 404) {
+          // Design doc doesn't exist, create it
+          await this.db.insert(designDoc);
+          logger.info(`Created views for database: ${this.dbName}`);
+        } else {
+          throw getError;
+        }
       }
+    } catch (error) {
+      logger.error(`Failed to ensure views for ${this.dbName}:`, error);
     }
   }
 
