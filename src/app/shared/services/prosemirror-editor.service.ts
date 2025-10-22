@@ -154,7 +154,9 @@ export class ProseMirrorEditorService {
           beatType: { default: 'story' },
           model: { default: '' },
           selectedScenes: { default: '' },
-          includeStoryOutline: { default: true }
+          includeStoryOutline: { default: true },
+          currentVersionId: { default: '' },
+          hasHistory: { default: false }
         },
         group: 'block',
         atom: true,
@@ -172,7 +174,9 @@ export class ProseMirrorEditorService {
             'data-beat-type': node.attrs['beatType'] || 'story',
             'data-model': node.attrs['model'] || '',
             'data-selected-scenes': node.attrs['selectedScenes'] || '',
-            'data-include-story-outline': node.attrs['includeStoryOutline'] !== undefined ? node.attrs['includeStoryOutline'] : 'true'
+            'data-include-story-outline': node.attrs['includeStoryOutline'] !== undefined ? node.attrs['includeStoryOutline'] : 'true',
+            'data-current-version-id': node.attrs['currentVersionId'] || '',
+            'data-has-history': node.attrs['hasHistory'] ? 'true' : 'false'
           };
           
           // Create content to make the beat visible in saved HTML
@@ -212,7 +216,9 @@ export class ProseMirrorEditorService {
               beatType: dom.getAttribute('data-beat-type') || 'story',
               model: dom.getAttribute('data-model') || '',
               selectedScenes: selectedScenesStr || '',
-              includeStoryOutline: includeStoryOutlineStr !== '' ? (includeStoryOutlineStr === 'true') : true
+              includeStoryOutline: includeStoryOutlineStr !== '' ? (includeStoryOutlineStr === 'true') : true,
+              currentVersionId: dom.getAttribute('data-current-version-id') || '',
+              hasHistory: dom.getAttribute('data-has-history') === 'true'
             };
             
             return attrs;

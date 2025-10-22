@@ -1,6 +1,6 @@
 import { Injectable, OnDestroy, inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { Observable, ReplaySubject, Subject, Subscription, catchError, from, map, of, scan, switchMap, tap } from 'rxjs';
+import { Observable, ReplaySubject, Subject, Subscription, catchError, finalize, from, map, of, scan, switchMap, tap } from 'rxjs';
 import { BeatAI, BeatAIGenerationEvent } from '../../stories/models/beat-ai.interface';
 import { Story } from '../../stories/models/story.interface';
 import { OpenRouterApiService } from '../../core/services/openrouter-api.service';
@@ -13,6 +13,7 @@ import { CodexService } from '../../stories/services/codex.service';
 import { PromptManagerService } from './prompt-manager.service';
 import { CodexRelevanceService, CodexEntry as CodexRelevanceEntry } from '../../core/services/codex-relevance.service';
 import { CodexEntry, CustomField } from '../../stories/models/codex.interface';
+import { BeatHistoryService } from './beat-history.service';
 
 type ProviderType = 'ollama' | 'claude' | 'gemini' | 'openrouter';
 
@@ -48,6 +49,7 @@ export class BeatAIService implements OnDestroy {
   private readonly codexService = inject(CodexService);
   private readonly promptManager = inject(PromptManagerService);
   private readonly codexRelevanceService = inject(CodexRelevanceService);
+  private readonly beatHistoryService = inject(BeatHistoryService);
   private readonly document = inject(DOCUMENT);
   
   private generationSubject = new Subject<BeatAIGenerationEvent>();
@@ -516,7 +518,18 @@ export class BeatAIService implements OnDestroy {
               this.stopGeneration(beatId);
             }
           };
-        });
+        }).pipe(
+          finalize(() => {
+            // Save to version history after generation completes
+            const finalContent = context.latestContent;
+            if (finalContent && finalContent.trim().length > 0) {
+              // Call saveToHistory asynchronously (don't block)
+              this.saveToHistory(beatId, prompt, finalContent, options).catch(error => {
+                console.error('[BeatAIService] Error saving to history:', error);
+              });
+            }
+          })
+        );
       })
     );
   }
@@ -1232,6 +1245,68 @@ export class BeatAIService implements OnDestroy {
 
   private generateId(): string {
     return 'beat-' + Math.random().toString(36).substring(2, 11);
+  }
+
+  /**
+   * Save generated content to version history
+   * Called automatically after successful generation
+   */
+  private async saveToHistory(
+    beatId: string,
+    prompt: string,
+    content: string,
+    options: {
+      model?: string;
+      beatType?: 'story' | 'scene';
+      wordCount?: number;
+      storyId?: string;
+      customContext?: {
+        selectedScenes: string[];
+        includeStoryOutline: boolean;
+        selectedSceneContexts: { sceneId: string; chapterId: string; content: string; }[];
+      };
+    }
+  ): Promise<void> {
+    // Don't save if content is empty or fallback
+    if (!content || content.trim().length === 0) {
+      return;
+    }
+
+    // Don't save if storyId is not provided
+    if (!options.storyId) {
+      console.warn(`[BeatAIService] Cannot save version history without storyId for beat ${beatId}`);
+      return;
+    }
+
+    try {
+      // Extract selected scenes from custom context
+      const selectedScenes = options.customContext?.selectedSceneContexts?.map(ctx => ({
+        sceneId: ctx.sceneId,
+        chapterId: ctx.chapterId
+      }));
+
+      const versionId = await this.beatHistoryService.saveVersion(
+        beatId,
+        options.storyId,
+        {
+          content,
+          prompt,
+          model: options.model || 'unknown',
+          beatType: options.beatType || 'story',
+          wordCount: options.wordCount || 400,
+          generatedAt: new Date(),
+          characterCount: content.length,
+          isCurrent: true,
+          selectedScenes,
+          includeStoryOutline: options.customContext?.includeStoryOutline
+        }
+      );
+
+      console.log(`[BeatAIService] Saved version ${versionId} to history for beat ${beatId}`);
+    } catch (error) {
+      console.error(`[BeatAIService] Failed to save version history for beat ${beatId}:`, error);
+      // Don't throw - history saving failure shouldn't break generation
+    }
   }
 
   // Public method to preview the structured prompt

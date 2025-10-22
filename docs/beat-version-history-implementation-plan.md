@@ -48,21 +48,23 @@ This document provides actionable implementation recommendations for the Beat Ve
 
 ---
 
-### 3. Version Limit: 20 Versions Per Beat (Configurable)
+### 3. Version Limit: 10 Versions Per Beat (Configurable)
 
-**Decision:** Automatically keep the last 20 versions per beat, delete older ones.
+**Decision:** Automatically keep the last 10 versions per beat, delete older ones.
 
 **Why This Approach:**
 - ✅ **Predictable Storage:** Prevents unbounded growth
-- ✅ **Covers Use Cases:** Most users iterate 3-5 times, power users 10-15 times
+- ✅ **Covers Use Cases:** Most users iterate 3-5 times, power users can reach 10
 - ✅ **User Configurable:** Can be adjusted in settings
 - ✅ **Auto-Pruning:** Oldest versions automatically removed
+- ✅ **Lower Storage Footprint:** ~25KB per beat instead of 50KB
 
-**Rationale for 20:**
+**Rationale for 10:**
 - Typical usage: 3-5 iterations before satisfied
-- Power users: 10-15 iterations
-- 20 provides comfortable buffer
-- Storage: 50KB per beat × 200 beats = 10MB (acceptable)
+- Power users: 7-10 iterations
+- 10 provides adequate buffer while minimizing storage
+- Storage: 25KB per beat × 200 beats = 5MB (very acceptable)
+- **User Decision:** Approved by user on 2025-10-22
 
 ---
 

@@ -814,7 +814,7 @@ async getHistory(beatId: string): Promise<BeatVersionHistory | null> {
 **Auto-prune old versions to prevent document bloat:**
 
 ```typescript
-private MAX_VERSIONS_PER_BEAT = 20;
+private MAX_VERSIONS_PER_BEAT = 10;
 
 async saveVersion(beatId: string, versionData: Omit<BeatVersion, 'versionId'>): Promise<string> {
   // ... create version entry ...
@@ -837,11 +837,13 @@ async saveVersion(beatId: string, versionData: Omit<BeatVersion, 'versionId'>): 
 interface AppSettings {
   // ... existing settings ...
   beatHistory: {
-    maxVersionsPerBeat: number;    // Default: 20
+    maxVersionsPerBeat: number;    // Default: 10
     enableAutoCleanup: boolean;    // Default: true
   };
 }
 ```
+
+**User Decision:** Limit set to 10 versions (approved 2025-10-22)
 
 ### 6.4 Virtual Scrolling
 

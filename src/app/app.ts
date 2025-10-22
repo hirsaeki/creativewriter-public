@@ -5,6 +5,7 @@ import { BackgroundService } from './shared/services/background.service';
 import { BeatAIModalService } from './shared/services/beat-ai-modal.service';
 import { BeatAIPreviewModalComponent } from './stories/components/beat-ai-preview-modal/beat-ai-preview-modal.component';
 import { MemoryWarningService } from './core/services/memory-warning.service';
+import { BeatHistoryService } from './shared/services/beat-history.service';
 
 // Preload PouchDB modules to avoid lazy loading delay during database initialization
 import PouchDB from 'pouchdb-browser';
@@ -33,6 +34,7 @@ export class App {
   private backgroundService = inject(BackgroundService);
   protected modalService = inject(BeatAIModalService);
   private memoryWarning = inject(MemoryWarningService);
+  private beatHistoryService = inject(BeatHistoryService);
 
   constructor() {
     // Initialize background service to apply global background
@@ -40,5 +42,10 @@ export class App {
 
     // Memory warning service automatically starts monitoring on mobile
     // Configure if needed: this.memoryWarning.updateConfig({ warningThreshold: 85 });
+
+    // Initialize beat version history database
+    this.beatHistoryService.initialize().catch(error => {
+      console.error('[App] Failed to initialize beat history service:', error);
+    });
   }
 }

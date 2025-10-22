@@ -11,6 +11,8 @@ export interface BeatAI {
   model?: string; // AI model used for generation
   selectedScenes?: { sceneId: string; chapterId: string; }[]; // Persisted selected scene contexts
   includeStoryOutline?: boolean; // Persisted story outline setting
+  currentVersionId?: string; // ID of the currently active version in history
+  hasHistory?: boolean; // Quick flag to check if version history exists
 }
 
 export interface BeatAIGenerationEvent {
