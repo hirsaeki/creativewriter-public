@@ -3,6 +3,7 @@ import { Story, Chapter, Scene, DEFAULT_STORY_SETTINGS } from '../models/story.i
 import { DatabaseService } from '../../core/services/database.service';
 import { getSystemMessage, getBeatGenerationTemplate } from '../../shared/resources/system-messages';
 import { StoryLanguage } from '../../ui/components/language-selection-dialog/language-selection-dialog.component';
+import { BeatHistoryService } from '../../shared/services/beat-history.service';
 
 // Current schema version for migration tracking
 // Increment this when making breaking changes to Story structure
@@ -13,6 +14,7 @@ const CURRENT_SCHEMA_VERSION = 1;
 })
 export class StoryService {
   private readonly databaseService = inject(DatabaseService);
+  private readonly beatHistoryService = inject(BeatHistoryService);
   private db: PouchDB.Database | null = null;
 
   // Performance optimization: Cache for story previews and word counts
@@ -291,6 +293,19 @@ export class StoryService {
           throw error;
         }
       }
+
+      // Get the story ID for cleanup operations
+      const storyId = (doc as Story).id || id;
+
+      // Delete all associated beat version histories
+      try {
+        const deletedCount = await this.beatHistoryService.deleteAllHistoriesForStory(storyId);
+        console.log(`[StoryService] Deleted ${deletedCount} beat histor${deletedCount !== 1 ? 'ies' : 'y'} for story ${storyId}`);
+      } catch (historyError) {
+        // Log but don't fail the story deletion if history cleanup fails
+        console.error('[StoryService] Failed to delete beat histories:', historyError);
+      }
+
       await this.db.remove(doc);
     } catch (error) {
       console.error('Error deleting story:', error);

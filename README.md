@@ -92,6 +92,7 @@ CreativeWriter is a modern web-based writing tool designed for fiction authors w
 - **Local AI Support**: Connect to self-hosted models via Ollama for complete privacy
 - **Real-time Streaming**: Live text generation with streaming responses
 - **Beat AI Assistant**: Get intelligent suggestions for plot development
+- **Beat Version History**: Automatically save and restore previous beat generations (up to 10 versions per beat)
 - **Scene Enhancement**: AI-powered scene expansion and refinement
 - **Character Consistency**: Maintain character voice and traits with AI assistance
 - **Custom Prompts**: Fine-tune AI behavior with customizable prompt templates
@@ -119,7 +120,8 @@ AI tends to "understand" XML-tags better than simple text as context structuring
 - **Local Database**: PouchDB/CouchDB for offline-first functionality
 - **Import/Export**: Support for various formats including NovelCrafter projects
 - **PDF Export**: Generate formatted PDFs of your stories
-- **Version History**: Track changes and revisions
+- **Beat Version History**: Automatically track and restore previous AI generations for each beat
+- **Database Maintenance**: Clean up version history to free storage space
 
 ### 🖼️ Rich Media Support
 - **📸 Images Within Text**: **Embed images directly within your story text** - perfect for visual storytelling, character references, or scene inspiration
@@ -415,8 +417,9 @@ src/
 2. **Build Your Codex**: Add characters and locations early for better AI context
 3. **Use Beat AI**: Let AI help with writer's block on individual beats
 4. **📸 Leverage Visual Storytelling**: Embed images directly within your text to enhance scenes, character descriptions, or provide visual inspiration
-5. **Customize Prompts**: Tailor AI responses to your writing style
-6. **Regular Exports**: Backup your work regularly using export features
+5. **Experiment with Beat Versions**: Try different AI generations and restore previous versions using the version history feature
+6. **Customize Prompts**: Tailor AI responses to your writing style
+7. **Regular Exports**: Backup your work regularly using export features
 
 ## 🤝 Contributing
 
@@ -437,6 +440,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 📚 Documentation
 
+- [Beat Version History User Guide](docs/USER-GUIDE-BEAT-VERSION-HISTORY.md) - Learn how to use version history for beat generations
 - [Multi-Instance Deployment](README-MULTI-INSTANCE.md)
 - [Image Generation Setup](README-IMAGE-GENERATION.md)
 - [Release Process](RELEASE.md)
