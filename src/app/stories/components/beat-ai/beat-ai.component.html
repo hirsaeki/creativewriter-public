@@ -28,12 +28,19 @@
               title="Include/exclude story overview">
               <ion-icon name="reader-outline"></ion-icon>
             </button>
-            <button 
-              *ngIf="beatData.generatedContent && !beatData.isGenerating" 
+            <button
+              *ngIf="beatData.generatedContent && !beatData.isGenerating"
               class="action-btn regenerate-btn"
               (click)="regenerateContent(); $event.stopPropagation()"
               title="Regenerate">
               <ion-icon name="refresh-outline"></ion-icon>
+            </button>
+            <button
+              *ngIf="beatData.hasHistory"
+              class="action-btn history-btn"
+              (click)="openVersionHistory(); $event.stopPropagation()"
+              title="Version History">
+              <ion-icon name="time-outline"></ion-icon>
             </button>
             <button
               class="action-btn delete-btn"

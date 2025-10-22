@@ -1,0 +1,260 @@
+import { Component, Input, OnInit, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import {
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons,
+  IonButton,
+  IonIcon,
+  IonContent,
+  IonLabel,
+  IonCard,
+  IonCardHeader,
+  IonCardSubtitle,
+  IonCardTitle,
+  IonCardContent,
+  IonFooter,
+  IonSpinner,
+  ModalController,
+  AlertController,
+  LoadingController
+} from '@ionic/angular/standalone';
+import { addIcons } from 'ionicons';
+import { close, timeOutline, trashOutline, checkmarkCircle, chevronDown, chevronUp } from 'ionicons/icons';
+import { BeatHistoryService } from '../../../shared/services/beat-history.service';
+import { ProseMirrorEditorService } from '../../../shared/services/prosemirror-editor.service';
+import { BeatVersion } from '../../models/beat-version-history.interface';
+
+@Component({
+  selector: 'app-beat-version-history-modal',
+  imports: [
+    CommonModule,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonButtons,
+    IonButton,
+    IonIcon,
+    IonContent,
+    IonLabel,
+    IonCard,
+    IonCardHeader,
+    IonCardSubtitle,
+    IonCardTitle,
+    IonCardContent,
+    IonFooter,
+    IonSpinner
+  ],
+  templateUrl: './beat-version-history-modal.component.html',
+  styleUrls: ['./beat-version-history-modal.component.css']
+})
+export class BeatVersionHistoryModalComponent implements OnInit {
+  @Input() beatId!: string;
+  @Input() currentPrompt!: string;
+  @Input() storyId!: string;
+
+  versions: (BeatVersion & { expanded?: boolean })[] = [];
+  loading = false;
+  error: string | null = null;
+
+  private readonly modalController = inject(ModalController);
+  private readonly beatHistoryService = inject(BeatHistoryService);
+  private readonly proseMirrorService = inject(ProseMirrorEditorService);
+  private readonly alertController = inject(AlertController);
+  private readonly loadingController = inject(LoadingController);
+
+  constructor() {
+    addIcons({ close, timeOutline, trashOutline, checkmarkCircle, chevronDown, chevronUp });
+  }
+
+  async ngOnInit() {
+    await this.loadHistory();
+  }
+
+  async loadHistory() {
+    this.loading = true;
+    this.error = null;
+
+    try {
+      const history = await this.beatHistoryService.getHistory(this.beatId);
+
+      if (history) {
+        // Sort by newest first and add expanded flag
+        this.versions = history.versions
+          .map(v => ({ ...v, expanded: false }))
+          .sort((a, b) => b.generatedAt.getTime() - a.generatedAt.getTime());
+      } else {
+        this.versions = [];
+      }
+    } catch (error) {
+      console.error('[BeatVersionHistoryModal] Error loading history:', error);
+      this.error = 'Failed to load version history. Please try again.';
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  /**
+   * Format version label (e.g., "Version 3")
+   */
+  formatVersionLabel(version: BeatVersion): string {
+    const index = this.versions.indexOf(version as BeatVersion & { expanded?: boolean });
+    return `Version ${this.versions.length - index}`;
+  }
+
+  /**
+   * Format timestamp as relative time
+   */
+  formatTimestamp(date: Date): string {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+  }
+
+  /**
+   * Get preview text (first 150 characters)
+   */
+  getPreview(content: string): string {
+    // Strip HTML tags
+    const textContent = content.replace(/<[^>]*>/g, '');
+    return textContent.length > 150
+      ? textContent.substring(0, 150) + '...'
+      : textContent;
+  }
+
+  /**
+   * Get full text content without HTML
+   */
+  getFullText(content: string): string {
+    return content.replace(/<[^>]*>/g, '');
+  }
+
+  /**
+   * Toggle expanded state for a version
+   */
+  toggleExpanded(version: BeatVersion & { expanded?: boolean }) {
+    version.expanded = !version.expanded;
+  }
+
+  /**
+   * Restore a previous version
+   */
+  async restoreVersion(version: BeatVersion) {
+    if (version.isCurrent) {
+      return; // Already current
+    }
+
+    const alert = await this.alertController.create({
+      header: 'Restore Version',
+      message: 'Replace current beat content with this version?',
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Restore',
+          handler: async () => {
+            const loading = await this.loadingController.create({
+              message: 'Restoring version...'
+            });
+            await loading.present();
+
+            try {
+              await this.proseMirrorService.switchBeatVersion(this.beatId, version.versionId);
+
+              // Reload history to update current flags
+              await this.loadHistory();
+
+              await loading.dismiss();
+
+              // Notify parent that version was changed
+              await this.modalController.dismiss({ versionChanged: true });
+            } catch (error) {
+              await loading.dismiss();
+              console.error('[BeatVersionHistoryModal] Error restoring version:', error);
+
+              const errorAlert = await this.alertController.create({
+                header: 'Error',
+                message: 'Failed to restore version. Please try again.',
+                buttons: ['OK']
+              });
+              await errorAlert.present();
+            }
+          }
+        }
+      ]
+    });
+
+    await alert.present();
+  }
+
+  /**
+   * Delete all history for this beat
+   */
+  async deleteHistory() {
+    const alert = await this.alertController.create({
+      header: 'Delete History',
+      message: 'Delete all version history for this beat? This cannot be undone.',
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: async () => {
+            const loading = await this.loadingController.create({
+              message: 'Deleting history...'
+            });
+            await loading.present();
+
+            try {
+              await this.beatHistoryService.deleteHistory(this.beatId);
+              this.versions = [];
+              await loading.dismiss();
+
+              // Close modal after deletion
+              await this.modalController.dismiss({ historyDeleted: true });
+            } catch (error) {
+              await loading.dismiss();
+              console.error('[BeatVersionHistoryModal] Error deleting history:', error);
+
+              const errorAlert = await this.alertController.create({
+                header: 'Error',
+                message: 'Failed to delete history. Please try again.',
+                buttons: ['OK']
+              });
+              await errorAlert.present();
+            }
+          }
+        }
+      ]
+    });
+
+    await alert.present();
+  }
+
+  /**
+   * Close modal
+   */
+  dismiss() {
+    this.modalController.dismiss();
+  }
+
+  /**
+   * TrackBy function for ngFor performance
+   */
+  trackByVersionId(index: number, version: BeatVersion): string {
+    return version.versionId;
+  }
+}

@@ -13,6 +13,7 @@ import { BeatAINodeView } from './beat-ai-nodeview';
 import { ResizableImageNodeView } from './resizable-image-nodeview';
 import { BeatAI, BeatAIPromptEvent } from '../../stories/models/beat-ai.interface';
 import { BeatAIService } from './beat-ai.service';
+import { BeatHistoryService } from './beat-history.service';
 import { ImageInsertResult } from '../../ui/components/image-upload-dialog.component';
 import { PromptManagerService } from './prompt-manager.service';
 import { createCodexHighlightingPlugin, updateCodexHighlightingPlugin } from './codex-highlighting-plugin';
@@ -55,6 +56,7 @@ export class ProseMirrorEditorService {
   private appRef = inject(ApplicationRef);
   private envInjector = inject(EnvironmentInjector);
   private beatAIService = inject(BeatAIService);
+  private beatHistoryService = inject(BeatHistoryService);
   private promptManager = inject(PromptManagerService);
   private codexService = inject(CodexService);
 
@@ -913,17 +915,18 @@ export class ProseMirrorEditorService {
         }
       } else if (generationEvent.isComplete) {
         // Generation completed - no need to append closing </p> as it's handled in the HTML structure
-        this.updateBeatNode(event.beatId, { 
+        this.updateBeatNode(event.beatId, {
           isGenerating: false,
           generatedContent: accumulatedContent,
-          prompt: event.prompt || ''
+          prompt: event.prompt || '',
+          hasHistory: true // Mark that this beat now has version history
         });
         // Clean up stored position
         this.beatStreamingPositions.delete(event.beatId);
         generationSubscription.unsubscribe();
       }
     });
-    
+
     // Generate AI content with streaming
     this.beatAIService.generateBeatContent(event.prompt || '', event.beatId, {
       wordCount: event.wordCount,
@@ -937,10 +940,11 @@ export class ProseMirrorEditorService {
     }).subscribe({
       next: (finalContent) => {
         // Final content received - ensure beat node is updated
-        this.updateBeatNode(event.beatId, { 
+        this.updateBeatNode(event.beatId, {
           isGenerating: false,
           generatedContent: finalContent,
-          prompt: event.prompt || ''
+          prompt: event.prompt || '',
+          hasHistory: true // Mark that this beat now has version history
         });
       },
       error: (error) => {
@@ -1063,6 +1067,72 @@ export class ProseMirrorEditorService {
     return nextBeatPos;
   }
 
+  /**
+   * Switch beat to a different version from history
+   *
+   * @param beatId - ID of the beat
+   * @param versionId - ID of the version to switch to
+   */
+  async switchBeatVersion(beatId: string, versionId: string): Promise<void> {
+    if (!this.editorView) {
+      throw new Error('Editor not initialized');
+    }
+
+    // 1. Get version content from history
+    const history = await this.beatHistoryService.getHistory(beatId);
+    if (!history) {
+      throw new Error(`No history found for beat ${beatId}`);
+    }
+
+    const version = history.versions.find(v => v.versionId === versionId);
+    if (!version) {
+      throw new Error(`Version ${versionId} not found in history`);
+    }
+
+    // 2. Delete current content after beat
+    const deleteSuccess = this.deleteContentAfterBeat(beatId);
+    if (!deleteSuccess) {
+      console.warn('[ProseMirrorService] Failed to delete content, continuing anyway');
+    }
+
+    // 3. Insert version content
+    const beatPos = this.findBeatNodePosition(beatId);
+    if (beatPos === null) {
+      throw new Error(`Beat node ${beatId} not found`);
+    }
+
+    const beatNode = this.editorView.state.doc.nodeAt(beatPos);
+    if (!beatNode) {
+      throw new Error(`Beat node ${beatId} not found in document`);
+    }
+
+    const afterBeatPos = beatPos + beatNode.nodeSize;
+
+    // Insert the version content as HTML
+    this.insertHtmlContent(beatId, version.content, afterBeatPos);
+
+    // 4. Update beat node attributes
+    this.updateBeatNode(beatId, {
+      currentVersionId: versionId,
+      hasHistory: true
+    });
+
+    // 5. Mark version as current in history
+    await this.beatHistoryService.setCurrentVersion(beatId, versionId);
+
+    // Emit content update
+    const content = this.getHTMLContent();
+    this.contentUpdate$.next(content);
+
+    // Refresh prompt manager
+    setTimeout(() => {
+      this.promptManager.refresh().catch(error => {
+        console.error('Error refreshing prompt manager:', error);
+      });
+    }, 500);
+
+    console.log(`[ProseMirrorService] Switched beat ${beatId} to version ${versionId}`);
+  }
 
   private isGeneratedContent(node: ProseMirrorNode): boolean {
     // For streaming, we consider all paragraphs after a beat node as generated content

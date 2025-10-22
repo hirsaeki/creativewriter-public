@@ -2,13 +2,14 @@ import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, AfterViewIni
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
-import { 
-  IonIcon, PopoverController, IonModal, IonChip, IonLabel, IonSearchbar, IonCheckbox, IonItemDivider,
+import {
+  IonIcon, PopoverController, ModalController, IonModal, IonChip, IonLabel, IonSearchbar, IonCheckbox, IonItemDivider,
   IonButton, IonButtons, IonToolbar, IonTitle, IonHeader, IonContent, IonList, IonItem
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline } from 'ionicons/icons';
+import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline, timeOutline } from 'ionicons/icons';
 import { BeatAIModalService } from '../../../shared/services/beat-ai-modal.service';
+import { BeatVersionHistoryModalComponent } from '../beat-version-history-modal/beat-version-history-modal.component';
 import { TokenInfoPopoverComponent } from '../../../ui/components/token-info-popover.component';
 import { TokenCounterService, SupportedModel } from '../../../shared/services/token-counter.service';
 import { BeatAI, BeatAIPromptEvent } from '../../models/beat-ai.interface';
@@ -57,6 +58,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   private proseMirrorService = inject(ProseMirrorEditorService);
   private elementRef = inject(ElementRef);
   private popoverController = inject(PopoverController);
+  private modalController = inject(ModalController);
   private tokenCounter = inject(TokenCounterService);
   private modalService = inject(BeatAIModalService);
   private databaseService = inject(DatabaseService);
@@ -122,7 +124,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   constructor() {
     // Register icons
-    addIcons({ logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline });
+    addIcons({ logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline, timeOutline });
   }
   
   ngOnInit(): void {
@@ -399,7 +401,44 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     
     this.contentUpdate.emit(this.beatData);
   }
-  
+
+  /**
+   * Open version history modal
+   */
+  async openVersionHistory(): Promise<void> {
+    if (!this.storyId) {
+      console.warn('[BeatAIComponent] Cannot open version history without storyId');
+      return;
+    }
+
+    const modal = await this.modalController.create({
+      component: BeatVersionHistoryModalComponent,
+      componentProps: {
+        beatId: this.beatData.id,
+        currentPrompt: this.beatData.prompt,
+        storyId: this.storyId
+      },
+      cssClass: 'beat-history-modal'
+    });
+
+    await modal.present();
+
+    // Handle modal dismissal
+    const { data } = await modal.onDidDismiss();
+    if (data?.versionChanged || data?.historyDeleted) {
+      // Refresh beat data if version was changed
+      // The version has already been switched in the editor by the modal
+      // We just need to update the hasHistory flag if history was deleted
+      if (data?.historyDeleted) {
+        this.beatData.hasHistory = false;
+        this.contentUpdate.emit(this.beatData);
+      }
+
+      // Trigger change detection to update UI
+      this.cdr.detectChanges();
+    }
+  }
+
   deleteContentAfterBeat(): void {
     if (confirm('Delete writing after this beat until the next beat or the end of this scene? This cannot be undone.')) {
       this.promptSubmit.emit({
