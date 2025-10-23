@@ -97,15 +97,17 @@ export class BeatAINodeView implements NodeView {
     if (node.type !== this.node.type) {
       return false;
     }
-    
+
     this.node = node;
     const newBeatData = this.createBeatDataFromNode(node);
-    
+
     // Only update if the component is not currently generating
     // This preserves the component's isGenerating state during streaming
     if (!this.componentRef.instance.beatData.isGenerating) {
       this.beatData = newBeatData;
       this.componentRef.instance.beatData = this.beatData;
+      // Trigger change detection for OnPush strategy
+      this.componentRef.changeDetectorRef.markForCheck();
     } else {
       // During generation, only update non-state properties
       this.beatData.prompt = newBeatData.prompt;
@@ -113,7 +115,7 @@ export class BeatAINodeView implements NodeView {
       this.beatData.updatedAt = newBeatData.updatedAt;
       // Keep the existing streaming state while allowing prompt/content updates
     }
-    
+
     return true;
   }
 
