@@ -178,7 +178,9 @@ export class BeatAINodeView implements NodeView {
       beatType: attrs['beatType'] || 'story',
       model: attrs['model'] || '',
       selectedScenes: attrs['selectedScenes'] ? JSON.parse(attrs['selectedScenes']) : undefined,
-      includeStoryOutline: attrs['includeStoryOutline'] !== undefined ? attrs['includeStoryOutline'] : true
+      includeStoryOutline: attrs['includeStoryOutline'] !== undefined ? attrs['includeStoryOutline'] : true,
+      currentVersionId: attrs['currentVersionId'] || undefined,
+      hasHistory: attrs['hasHistory'] || false
     };
   }
 
@@ -196,7 +198,9 @@ export class BeatAINodeView implements NodeView {
       updatedAt: beatData.updatedAt.toISOString(),
       wordCount: beatData.wordCount || 400,
       beatType: beatData.beatType || 'story',
-      model: beatData.model || ''
+      model: beatData.model || '',
+      currentVersionId: beatData.currentVersionId || '',
+      hasHistory: beatData.hasHistory || false
     };
 
     // Add selectedScenes and includeStoryOutline if they exist
