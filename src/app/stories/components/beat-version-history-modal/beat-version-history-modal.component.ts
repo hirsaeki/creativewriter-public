@@ -81,8 +81,13 @@ export class BeatVersionHistoryModalComponent implements OnInit {
 
       if (history) {
         // Sort by newest first and add expanded flag
+        // Convert generatedAt to Date if it's a string
         this.versions = history.versions
-          .map(v => ({ ...v, expanded: false }))
+          .map(v => ({
+            ...v,
+            generatedAt: typeof v.generatedAt === 'string' ? new Date(v.generatedAt) : v.generatedAt,
+            expanded: false
+          }))
           .sort((a, b) => b.generatedAt.getTime() - a.generatedAt.getTime());
       } else {
         this.versions = [];
@@ -106,9 +111,10 @@ export class BeatVersionHistoryModalComponent implements OnInit {
   /**
    * Format timestamp as relative time
    */
-  formatTimestamp(date: Date): string {
+  formatTimestamp(date: Date | string): string {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
+    const diff = now.getTime() - dateObj.getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);

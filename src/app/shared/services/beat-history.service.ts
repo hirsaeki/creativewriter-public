@@ -166,7 +166,18 @@ export class BeatHistoryService {
     const docId = `history-${beatId}`;
 
     try {
-      const history = await this.historyDb.get<BeatVersionHistory>(docId);
+      const rawHistory = await this.historyDb.get<BeatVersionHistory>(docId);
+
+      // Convert date strings to Date objects
+      const history: BeatVersionHistory = {
+        ...rawHistory,
+        createdAt: new Date(rawHistory.createdAt),
+        updatedAt: new Date(rawHistory.updatedAt),
+        versions: rawHistory.versions.map(v => ({
+          ...v,
+          generatedAt: new Date(v.generatedAt)
+        }))
+      };
 
       // Update cache
       this.historyCache.set(beatId, {
