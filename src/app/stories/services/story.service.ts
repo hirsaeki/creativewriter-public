@@ -4,6 +4,7 @@ import { DatabaseService } from '../../core/services/database.service';
 import { getSystemMessage, getBeatGenerationTemplate } from '../../shared/resources/system-messages';
 import { StoryLanguage } from '../../ui/components/language-selection-dialog/language-selection-dialog.component';
 import { BeatHistoryService } from '../../shared/services/beat-history.service';
+import { countStories } from '../../shared/utils/document-filters';
 
 // Current schema version for migration tracking
 // Increment this when making breaking changes to Story structure
@@ -140,24 +141,8 @@ export class StoryService {
       // Use allDocs without include_docs for fastest count
       const result = await db.allDocs();
 
-      // Filter out non-stories by checking ID patterns
-      // Stories don't start with _ and don't have type prefix patterns
-      const storyCount = result.rows.filter((row) => {
-        const id = row.id;
-
-        // Filter out design docs
-        if (id.startsWith('_design')) {
-          return false;
-        }
-
-        // Filter out typed documents by ID pattern (type-xxx)
-        // Common patterns: video-, codex-, image-video-association-
-        if (id.match(/^(video|codex|image-video-association|beat-suggestion)-/)) {
-          return false;
-        }
-
-        return true;
-      }).length;
+      // Use shared utility function for consistent story document filtering
+      const storyCount = countStories(result.rows);
 
       return storyCount;
     } catch (error) {

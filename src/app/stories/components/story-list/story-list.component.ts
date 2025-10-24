@@ -7,11 +7,11 @@ import { FormsModule } from '@angular/forms';
 import { DomSanitizer } from '@angular/platform-browser';
 import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonChip, IonIcon, IonButton,
-  IonContent, IonLabel, IonSpinner, ActionSheetController
+  IonContent, IonLabel, IonSpinner, ActionSheetController, ToastController
 } from '@ionic/angular/standalone';
 import { CdkDropList, CdkDrag, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { addIcons } from 'ionicons';
-import { add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline } from 'ionicons/icons';
+import { add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline, cloudDownload, warning, checkmarkCircle, alertCircle } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { Story } from '../../models/story.interface';
 import { StoryLanguage } from '../../../ui/components/language-selection-dialog/language-selection-dialog.component';
@@ -45,6 +45,7 @@ export class StoryListComponent implements OnInit, OnDestroy {
   private sanitizer = inject(DomSanitizer);
   private cdr = inject(ChangeDetectorRef);
   private actionSheetCtrl = inject(ActionSheetController);
+  private toastCtrl = inject(ToastController);
   private databaseService = inject(DatabaseService);
   private destroy$ = new Subject<void>();
   versionService = inject(VersionService);
@@ -73,9 +74,24 @@ export class StoryListComponent implements OnInit, OnDestroy {
   hasMoreStories = false;
   isLoadingMore = false;
 
+  // Missing stories check
+  missingStoriesInfo: { localCount: number; remoteCount: number } | null = null;
+  isCheckingMissingStories = false;
+  isSyncingMissingStories = false;
+
   constructor() {
     // Register Ionic icons
-    addIcons({ add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline });
+    addIcons({ add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline, cloudDownload, warning, checkmarkCircle, alertCircle });
+  }
+
+  /**
+   * Get the count of missing stories (remote - local)
+   * Used in template to avoid repeated calculations
+   */
+  get missingStoriesCount(): number {
+    return this.missingStoriesInfo
+      ? this.missingStoriesInfo.remoteCount - this.missingStoriesInfo.localCount
+      : 0;
   }
 
   ngOnInit(): void {
@@ -218,6 +234,11 @@ export class StoryListComponent implements OnInit, OnDestroy {
       // Update initial sync status based on loaded stories
       this.isSyncingInitialData = this.stories.length === 0 &&
                                    (this.syncStatus.isSync || this.syncStatus.isConnecting || false);
+
+      // Check for missing stories after loading (only on reset/initial load)
+      if (reset && this.stories.length > 0) {
+        this.checkForMissingStories();
+      }
 
     } finally {
       this.isLoadingStories = false;
@@ -407,6 +428,99 @@ export class StoryListComponent implements OnInit, OnDestroy {
       return 'First time loading may take a moment';
     }
     return null;
+  }
+
+  /**
+   * Check if there are stories in the remote database that are missing locally
+   */
+  async checkForMissingStories(): Promise<void> {
+    if (this.isCheckingMissingStories) {
+      return;
+    }
+
+    this.isCheckingMissingStories = true;
+    try {
+      const result = await this.databaseService.checkForMissingStories();
+
+      if (result && result.hasMissing) {
+        this.missingStoriesInfo = {
+          localCount: result.localCount,
+          remoteCount: result.remoteCount
+        };
+        console.log(`[StoryList] Missing stories detected: ${result.remoteCount - result.localCount} story(ies) available in cloud`);
+      } else {
+        this.missingStoriesInfo = null;
+      }
+
+      this.cdr.markForCheck();
+    } catch (error) {
+      console.error('[StoryList] Error checking for missing stories:', error);
+    } finally {
+      this.isCheckingMissingStories = false;
+    }
+  }
+
+  /**
+   * Sync missing stories from remote database
+   */
+  async syncMissingStories(): Promise<void> {
+    if (this.isSyncingMissingStories) {
+      return;
+    }
+
+    this.isSyncingMissingStories = true;
+    this.cdr.markForCheck();
+
+    try {
+      // Trigger a manual pull to get missing stories
+      const result = await this.databaseService.forcePull();
+      console.log(`[StoryList] Synced ${result.docsProcessed} document(s) from cloud`);
+
+      // Clear the missing stories banner
+      this.missingStoriesInfo = null;
+
+      // Reload stories to show the newly synced ones
+      await this.loadStories();
+
+      // Show success toast
+      const toast = await this.toastCtrl.create({
+        message: `Successfully synced ${result.docsProcessed} document${result.docsProcessed === 1 ? '' : 's'} from cloud`,
+        duration: 3000,
+        position: 'bottom',
+        color: 'success',
+        icon: 'checkmark-circle'
+      });
+      await toast.present();
+    } catch (error) {
+      console.error('[StoryList] Error syncing missing stories:', error);
+
+      // Show error toast
+      const toast = await this.toastCtrl.create({
+        message: 'Failed to sync stories. Please check your connection and try again.',
+        duration: 4000,
+        position: 'bottom',
+        color: 'danger',
+        icon: 'alert-circle',
+        buttons: [
+          {
+            text: 'Dismiss',
+            role: 'cancel'
+          }
+        ]
+      });
+      await toast.present();
+    } finally {
+      this.isSyncingMissingStories = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  /**
+   * Dismiss the missing stories banner
+   */
+  dismissMissingStoriesBanner(): void {
+    this.missingStoriesInfo = null;
+    this.cdr.markForCheck();
   }
 
   ngOnDestroy(): void {

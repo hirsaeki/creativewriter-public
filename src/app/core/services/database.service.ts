@@ -3,6 +3,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { AuthService, User } from './auth.service';
 import { SyncLoggerService } from './sync-logger.service';
 import { PouchDB } from '../../app';
+import { countStories } from '../../shared/utils/document-filters';
 
 // Minimal static type for the PouchDB constructor when loaded via ESM
 interface PouchDBStatic {
@@ -717,5 +718,51 @@ export class DatabaseService {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  /**
+   * Check if there are stories in the remote database that are missing locally
+   * This is a quick check that compares story counts between local and remote databases
+   * @returns Object with hasMissing flag and counts, or null if remote DB is unavailable
+   */
+  async checkForMissingStories(): Promise<{
+    hasMissing: boolean;
+    localCount: number;
+    remoteCount: number;
+  } | null> {
+    try {
+      // Check if we have a remote database connection
+      if (!this.remoteDb) {
+        console.log('[DatabaseService] No remote database connection, skipping missing stories check');
+        return null;
+      }
+
+      // Get local database
+      const localDb = await this.getDatabase();
+
+      // Quick count using allDocs (same efficient method used by StoryService)
+      const countStoriesInDb = async (db: PouchDB.Database): Promise<number> => {
+        const result = await db.allDocs();
+        // Use shared utility function for consistent story document filtering
+        return countStories(result.rows);
+      };
+
+      // Count stories in both databases
+      const [localCount, remoteCount] = await Promise.all([
+        countStoriesInDb(localDb),
+        countStoriesInDb(this.remoteDb)
+      ]);
+
+      console.log(`[DatabaseService] Story count check - Local: ${localCount}, Remote: ${remoteCount}`);
+
+      return {
+        hasMissing: remoteCount > localCount,
+        localCount,
+        remoteCount
+      };
+    } catch (error) {
+      console.error('[DatabaseService] Error checking for missing stories:', error);
+      return null;
+    }
   }
 }
