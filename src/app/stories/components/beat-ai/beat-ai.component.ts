@@ -3,11 +3,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
 import {
-  IonIcon, PopoverController, ModalController, IonModal, IonChip, IonLabel, IonSearchbar, IonCheckbox, IonItemDivider,
+  IonIcon, PopoverController, ModalController, AlertController, IonModal, IonChip, IonLabel, IonSearchbar, IonCheckbox, IonItemDivider,
   IonButton, IonButtons, IonToolbar, IonTitle, IonHeader, IonContent, IonList, IonItem
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline, timeOutline } from 'ionicons/icons';
+import { logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline, timeOutline, createOutline } from 'ionicons/icons';
 import { BeatAIModalService } from '../../../shared/services/beat-ai-modal.service';
 import { BeatVersionHistoryModalComponent } from '../beat-version-history-modal/beat-version-history-modal.component';
 import { TokenInfoPopoverComponent } from '../../../ui/components/token-info-popover.component';
@@ -59,6 +59,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   private elementRef = inject(ElementRef);
   private popoverController = inject(PopoverController);
   private modalController = inject(ModalController);
+  private alertController = inject(AlertController);
   private tokenCounter = inject(TokenCounterService);
   private modalService = inject(BeatAIModalService);
   private databaseService = inject(DatabaseService);
@@ -124,7 +125,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   constructor() {
     // Register icons
-    addIcons({ logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline, timeOutline });
+    addIcons({ logoGoogle, globeOutline, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, refreshOutline, trashOutline, analyticsOutline, colorWandOutline, addOutline, closeOutline, readerOutline, copyOutline, sparklesOutline, eyeOutline, chevronDown, chevronUp, closeCircleOutline, starOutline, timeOutline, createOutline });
   }
   
   ngOnInit(): void {
@@ -370,22 +371,22 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   async regenerateContent(): Promise<void> {
     if (!this.beatData.prompt) return;
-    
+
     this.beatData.isGenerating = true;
     this.beatData.wordCount = this.getActualWordCount();
     this.beatData.model = this.selectedModel;
     this.beatData.beatType = this.selectedBeatType;
-    
+
     // Persist the selected scenes and story outline setting
     this.beatData.selectedScenes = this.selectedScenes.map(scene => ({
       sceneId: scene.sceneId,
       chapterId: scene.chapterId
     }));
     this.beatData.includeStoryOutline = this.includeStoryOutline;
-    
+
     // Build custom context from selected scenes
     const customContext = await this.buildCustomContext();
-    
+
     this.promptSubmit.emit({
       beatId: this.beatData.id,
       prompt: this.beatData.prompt,
@@ -398,8 +399,97 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       beatType: this.beatData.beatType,
       customContext: customContext // Add custom context
     });
-    
+
     this.contentUpdate.emit(this.beatData);
+  }
+
+  /**
+   * Rewrite the generated content with a custom rewrite prompt
+   */
+  async rewriteContent(): Promise<void> {
+    // First, get the text after this beat
+    const existingText = this.proseMirrorService.getTextAfterBeat(this.beatData.id);
+
+    if (!existingText || !existingText.trim()) {
+      const alert = await this.alertController.create({
+        header: 'No Content',
+        message: 'There is no generated text after this beat to rewrite.',
+        buttons: ['OK']
+      });
+      await alert.present();
+      return;
+    }
+
+    // Show alert to get rewrite prompt
+    const alert = await this.alertController.create({
+      header: 'Rewrite Beat',
+      message: 'Provide instructions for how the AI should rewrite the existing text.',
+      inputs: [
+        {
+          name: 'rewritePrompt',
+          type: 'textarea',
+          placeholder: 'e.g., "Make it more dramatic", "Write from a different perspective", "Expand the details"'
+        }
+      ],
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Rewrite',
+          handler: async (data) => {
+            const rewritePrompt = data.rewritePrompt?.trim();
+
+            if (!rewritePrompt) {
+              // Show error if no prompt provided
+              const errorAlert = await this.alertController.create({
+                header: 'Prompt Required',
+                message: 'Please provide a rewrite prompt.',
+                buttons: ['OK']
+              });
+              await errorAlert.present();
+              return false; // Prevent alert from closing
+            }
+
+            // Start rewrite process
+            this.beatData.isGenerating = true;
+            this.beatData.wordCount = this.getActualWordCount();
+            this.beatData.model = this.selectedModel;
+            this.beatData.beatType = this.selectedBeatType;
+
+            // Persist the selected scenes and story outline setting
+            this.beatData.selectedScenes = this.selectedScenes.map(scene => ({
+              sceneId: scene.sceneId,
+              chapterId: scene.chapterId
+            }));
+            this.beatData.includeStoryOutline = this.includeStoryOutline;
+
+            // Build custom context from selected scenes
+            const customContext = await this.buildCustomContext();
+
+            this.promptSubmit.emit({
+              beatId: this.beatData.id,
+              prompt: rewritePrompt,
+              action: 'rewrite',
+              wordCount: this.getActualWordCount(),
+              model: this.selectedModel,
+              storyId: this.storyId,
+              chapterId: this.chapterId,
+              sceneId: this.sceneId,
+              beatType: this.beatData.beatType,
+              customContext: customContext,
+              existingText: existingText // Pass the existing text to be rewritten
+            });
+
+            this.contentUpdate.emit(this.beatData);
+            return true;
+          }
+        }
+      ]
+    });
+
+    await alert.present();
   }
 
   /**

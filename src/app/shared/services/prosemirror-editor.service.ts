@@ -875,25 +875,41 @@ export class ProseMirrorEditorService {
 
   handleBeatPromptSubmit(event: BeatAIPromptEvent): void {
     if (!this.editorView) return;
-    
+
     // Handle delete after beat action
     if (event.action === 'deleteAfter') {
       this.deleteContentAfterBeat(event.beatId);
       return;
     }
-    
+
+    // Handle rewrite action - delete old content and prepare rewrite prompt
+    let promptToUse = event.prompt || '';
+    if (event.action === 'rewrite' && event.existingText) {
+      // Delete existing content before rewriting
+      this.deleteContentAfterBeat(event.beatId);
+
+      // Build a rewrite prompt that includes the existing text
+      promptToUse = `EXISTING TEXT TO REWRITE:
+${event.existingText}
+
+REWRITE INSTRUCTIONS:
+${event.prompt}
+
+Please rewrite the above text according to the instructions. Only output the rewritten text, nothing else.`;
+    }
+
     // Start generation process and update prompt
-    this.updateBeatNode(event.beatId, { 
-      isGenerating: true, 
+    this.updateBeatNode(event.beatId, {
+      isGenerating: true,
       generatedContent: '',
-      prompt: event.prompt || '' 
+      prompt: event.prompt || '' // Store the original prompt, not the augmented one
     });
-    
+
     // Find the beat node position to insert content after it
     const beatNodePosition = this.findBeatNodePosition(event.beatId);
     if (beatNodePosition === null) return;
-    
-    // Content clearing is now only done through explicit delete action
+
+    // Content clearing is now only done through explicit delete action or rewrite action
     // Regeneration no longer automatically deletes content
     
     // Track accumulating content for real-time insertion
@@ -928,7 +944,8 @@ export class ProseMirrorEditorService {
     });
 
     // Generate AI content with streaming
-    this.beatAIService.generateBeatContent(event.prompt || '', event.beatId, {
+    // Use the potentially modified prompt (for rewrites) or the original prompt
+    this.beatAIService.generateBeatContent(promptToUse, event.beatId, {
       wordCount: event.wordCount,
       model: event.model,
       storyId: event.storyId,
@@ -1011,30 +1028,59 @@ export class ProseMirrorEditorService {
   }
 
 
+  /**
+   * Get the text content between a beat and the next beat (or end of scene)
+   * @param beatId - ID of the beat node
+   * @returns The plain text content after the beat, or null if not found
+   */
+  getTextAfterBeat(beatId: string): string | null {
+    if (!this.editorView) return null;
+
+    const beatPos = this.findBeatNodePosition(beatId);
+    if (beatPos === null) return null;
+
+    const { state } = this.editorView;
+    const beatNode = state.doc.nodeAt(beatPos);
+    if (!beatNode) return null;
+
+    const contentStartPos = beatPos + beatNode.nodeSize;
+    const nextBeatPos = this.findNextBeatPosition(contentStartPos);
+    const contentEndPos = nextBeatPos ?? state.doc.content.size;
+
+    if (contentEndPos <= contentStartPos) {
+      return '';
+    }
+
+    // Extract text content between the beat and next beat
+    const textContent = state.doc.textBetween(contentStartPos, contentEndPos, '\n\n', '\n');
+
+    return textContent;
+  }
+
   deleteContentAfterBeat(beatId: string): boolean {
     if (!this.editorView) return false;
-    
+
     const beatPos = this.findBeatNodePosition(beatId);
     if (beatPos === null) return false;
-    
+
     const { state } = this.editorView;
     const beatNode = state.doc.nodeAt(beatPos);
     if (!beatNode) return false;
-    
+
     const deleteStartPos = beatPos + beatNode.nodeSize;
     const nextBeatPos = this.findNextBeatPosition(deleteStartPos);
     const deleteEndPos = nextBeatPos ?? state.doc.content.size;
-    
+
     if (deleteEndPos <= deleteStartPos) {
       return false;
     }
-    
+
     const tr = state.tr.delete(deleteStartPos, deleteEndPos);
     this.editorView.dispatch(tr);
-    
+
     const content = this.getHTMLContent();
     this.contentUpdate$.next(content);
-    
+
     // Refresh prompt manager after the deletion so context stays accurate
     setTimeout(() => {
       this.promptManager.refresh().catch(error => {

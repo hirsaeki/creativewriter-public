@@ -24,7 +24,7 @@ export interface BeatAIGenerationEvent {
 export interface BeatAIPromptEvent {
   beatId: string;
   prompt?: string;
-  action: 'generate' | 'deleteAfter' | 'regenerate';
+  action: 'generate' | 'deleteAfter' | 'regenerate' | 'rewrite';
   wordCount?: number;
   model?: string;
   storyId?: string;
@@ -36,6 +36,7 @@ export interface BeatAIPromptEvent {
     includeStoryOutline: boolean;
     selectedSceneContexts: { sceneId: string; chapterId: string; content: string; }[];
   };
+  existingText?: string; // Text to be rewritten (for rewrite action)
 }
 
 export interface BeatContentInsertEvent {
