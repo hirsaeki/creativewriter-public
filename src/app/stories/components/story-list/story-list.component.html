@@ -44,7 +44,47 @@
     </h1>
     <div class="brand-decoration"></div>
   </div>
-  
+
+  <!-- Missing Stories Banner -->
+  <div *ngIf="missingStoriesInfo" class="missing-stories-banner">
+    <div class="banner-content">
+      <div class="banner-icon">
+        <ion-icon name="warning" color="warning"></ion-icon>
+      </div>
+      <div class="banner-text">
+        <p class="banner-title">
+          <strong>Stories available in cloud</strong>
+        </p>
+        <p class="banner-message">
+          {{ missingStoriesInfo.remoteCount - missingStoriesInfo.localCount }}
+          {{ (missingStoriesInfo.remoteCount - missingStoriesInfo.localCount) === 1 ? 'story' : 'stories' }}
+          found in your cloud storage that {{ (missingStoriesInfo.remoteCount - missingStoriesInfo.localCount) === 1 ? 'is' : 'are' }} not available locally.
+        </p>
+      </div>
+      <div class="banner-actions">
+        <ion-button
+          size="small"
+          fill="solid"
+          color="primary"
+          (click)="syncMissingStories()"
+          [disabled]="isSyncingMissingStories">
+          <ion-spinner name="crescent" *ngIf="isSyncingMissingStories"></ion-spinner>
+          <ion-icon name="cloud-download" slot="start" *ngIf="!isSyncingMissingStories"></ion-icon>
+          <span *ngIf="!isSyncingMissingStories">Sync Now</span>
+          <span *ngIf="isSyncingMissingStories">Syncing...</span>
+        </ion-button>
+        <ion-button
+          size="small"
+          fill="clear"
+          color="medium"
+          (click)="dismissMissingStoriesBanner()"
+          [disabled]="isSyncingMissingStories">
+          <ion-icon name="close" slot="icon-only"></ion-icon>
+        </ion-button>
+      </div>
+    </div>
+  </div>
+
   <div class="action-buttons">
     <ion-button expand="block" size="default" color="primary" (click)="createNewStory()">
       <ion-icon name="add" slot="start"></ion-icon>
