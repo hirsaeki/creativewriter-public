@@ -365,10 +365,11 @@ export class DatabaseService {
         } : undefined
       });
     })
-    .on('paused', (info: unknown) => {
+    .on('paused', () => {
+      // Paused event means sync caught up and is waiting for new changes
+      // This is normal for live sync - not an error
       this.updateSyncStatus({
         isSync: false,
-        error: info ? `Sync paused: ${info}` : undefined,
         syncProgress: undefined
       });
     })

@@ -111,7 +111,10 @@ export class StoryListComponent implements OnInit, OnDestroy {
         if (status.lastSync && (!this.lastSyncTime || status.lastSync > this.lastSyncTime)) {
           this.lastSyncTime = status.lastSync;
           // Reload stories when sync brings in new changes
-          this.loadStories();
+          this.loadStories().then(() => {
+            // Explicitly trigger change detection since we use OnPush strategy
+            this.cdr.markForCheck();
+          });
         }
       });
 
