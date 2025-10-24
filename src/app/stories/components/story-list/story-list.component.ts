@@ -7,11 +7,11 @@ import { FormsModule } from '@angular/forms';
 import { DomSanitizer } from '@angular/platform-browser';
 import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonChip, IonIcon, IonButton,
-  IonContent, IonLabel, IonSpinner, ActionSheetController
+  IonContent, IonLabel, IonSpinner, ActionSheetController, ToastController
 } from '@ionic/angular/standalone';
 import { CdkDropList, CdkDrag, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { addIcons } from 'ionicons';
-import { add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline, cloudDownload, warning } from 'ionicons/icons';
+import { add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline, cloudDownload, warning, checkmarkCircle, alertCircle } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { Story } from '../../models/story.interface';
 import { StoryLanguage } from '../../../ui/components/language-selection-dialog/language-selection-dialog.component';
@@ -45,6 +45,7 @@ export class StoryListComponent implements OnInit, OnDestroy {
   private sanitizer = inject(DomSanitizer);
   private cdr = inject(ChangeDetectorRef);
   private actionSheetCtrl = inject(ActionSheetController);
+  private toastCtrl = inject(ToastController);
   private databaseService = inject(DatabaseService);
   private destroy$ = new Subject<void>();
   versionService = inject(VersionService);
@@ -80,7 +81,17 @@ export class StoryListComponent implements OnInit, OnDestroy {
 
   constructor() {
     // Register Ionic icons
-    addIcons({ add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline, cloudDownload, warning });
+    addIcons({ add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline, cloudDownload, warning, checkmarkCircle, alertCircle });
+  }
+
+  /**
+   * Get the count of missing stories (remote - local)
+   * Used in template to avoid repeated calculations
+   */
+  get missingStoriesCount(): number {
+    return this.missingStoriesInfo
+      ? this.missingStoriesInfo.remoteCount - this.missingStoriesInfo.localCount
+      : 0;
   }
 
   ngOnInit(): void {
@@ -470,9 +481,34 @@ export class StoryListComponent implements OnInit, OnDestroy {
 
       // Reload stories to show the newly synced ones
       await this.loadStories();
+
+      // Show success toast
+      const toast = await this.toastCtrl.create({
+        message: `Successfully synced ${result.docsProcessed} document${result.docsProcessed === 1 ? '' : 's'} from cloud`,
+        duration: 3000,
+        position: 'bottom',
+        color: 'success',
+        icon: 'checkmark-circle'
+      });
+      await toast.present();
     } catch (error) {
       console.error('[StoryList] Error syncing missing stories:', error);
-      alert('Failed to sync stories. Please check your connection and try again.');
+
+      // Show error toast
+      const toast = await this.toastCtrl.create({
+        message: 'Failed to sync stories. Please check your connection and try again.',
+        duration: 4000,
+        position: 'bottom',
+        color: 'danger',
+        icon: 'alert-circle',
+        buttons: [
+          {
+            text: 'Dismiss',
+            role: 'cancel'
+          }
+        ]
+      });
+      await toast.present();
     } finally {
       this.isSyncingMissingStories = false;
       this.cdr.markForCheck();

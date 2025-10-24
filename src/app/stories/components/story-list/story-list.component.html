@@ -56,9 +56,9 @@
           <strong>Stories available in cloud</strong>
         </p>
         <p class="banner-message">
-          {{ missingStoriesInfo.remoteCount - missingStoriesInfo.localCount }}
-          {{ (missingStoriesInfo.remoteCount - missingStoriesInfo.localCount) === 1 ? 'story' : 'stories' }}
-          found in your cloud storage that {{ (missingStoriesInfo.remoteCount - missingStoriesInfo.localCount) === 1 ? 'is' : 'are' }} not available locally.
+          {{ missingStoriesCount }}
+          {{ missingStoriesCount === 1 ? 'story' : 'stories' }}
+          found in your cloud storage that {{ missingStoriesCount === 1 ? 'is' : 'are' }} not available locally.
         </p>
       </div>
       <div class="banner-actions">
