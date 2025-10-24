@@ -16,8 +16,9 @@
  * isStoryDocument('codex-xyz789') // returns false
  */
 export function isStoryDocument(id: string): boolean {
-  // Filter out design docs
-  if (id.startsWith('_design')) {
+  // Filter out all system documents (start with underscore)
+  // This includes _design docs, _local docs (PouchDB internal state), and other system docs
+  if (id.startsWith('_')) {
     return false;
   }
 
