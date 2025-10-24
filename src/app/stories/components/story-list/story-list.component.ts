@@ -21,7 +21,7 @@ import { AuthService, User } from '../../../core/services/auth.service';
 import { AppHeaderComponent, BurgerMenuItem, HeaderAction } from '../../../ui/components/app-header.component';
 import { HeaderNavigationService } from '../../../shared/services/header-navigation.service';
 import { VersionService } from '../../../core/services/version.service';
-import { DatabaseService } from '../../../core/services/database.service';
+import { DatabaseService, SyncStatus } from '../../../core/services/database.service';
 
 @Component({
   selector: 'app-story-list',
@@ -58,6 +58,13 @@ export class StoryListComponent implements OnInit, OnDestroy {
   rightActions: HeaderAction[] = [];
   reorderingEnabled = false;
   isLoadingStories = true;
+
+  // Sync status for loading indicator
+  syncStatus: SyncStatus = {
+    isOnline: navigator.onLine,
+    isSync: false
+  };
+  isSyncingInitialData = false;
 
   // Pagination support
   pageSize = 50;  // Load 50 stories at a time
@@ -107,6 +114,12 @@ export class StoryListComponent implements OnInit, OnDestroy {
     this.databaseService.syncStatus$
       .pipe(takeUntil(this.destroy$))
       .subscribe(status => {
+        this.syncStatus = status;
+
+        // Determine if we're in initial sync state (no stories + syncing/connecting)
+        this.isSyncingInitialData = this.stories.length === 0 &&
+                                     (status.isSync || status.isConnecting || false);
+
         // Check if sync just completed (has lastSync and it's different from our last known sync)
         if (status.lastSync && (!this.lastSyncTime || status.lastSync > this.lastSyncTime)) {
           this.lastSyncTime = status.lastSync;
@@ -115,6 +128,9 @@ export class StoryListComponent implements OnInit, OnDestroy {
             // Explicitly trigger change detection since we use OnPush strategy
             this.cdr.markForCheck();
           });
+        } else {
+          // Trigger change detection for sync status updates
+          this.cdr.markForCheck();
         }
       });
 
@@ -198,6 +214,10 @@ export class StoryListComponent implements OnInit, OnDestroy {
 
       const totalTime = performance.now() - loadStart;
       console.log(`[StoryList] loadStories completed in ${totalTime.toFixed(0)}ms`);
+
+      // Update initial sync status based on loaded stories
+      this.isSyncingInitialData = this.stories.length === 0 &&
+                                   (this.syncStatus.isSync || this.syncStatus.isConnecting || false);
 
     } finally {
       this.isLoadingStories = false;
@@ -355,6 +375,38 @@ export class StoryListComponent implements OnInit, OnDestroy {
 
   trackByStoryId(index: number, story: Story): string {
     return story._id || story.id;
+  }
+
+  /**
+   * Get loading message based on current state
+   */
+  getLoadingMessage(): string {
+    if (this.isSyncingInitialData) {
+      if (this.syncStatus.isConnecting) {
+        return 'Connecting to cloud storage...';
+      }
+      if (this.syncStatus.syncProgress) {
+        const progress = this.syncStatus.syncProgress;
+        if (progress.pendingDocs !== undefined && progress.pendingDocs > 0) {
+          return `Syncing ${progress.pendingDocs} ${progress.pendingDocs === 1 ? 'story' : 'stories'}...`;
+        }
+        if (progress.docsProcessed > 0) {
+          return `Syncing stories (${progress.docsProcessed} loaded)...`;
+        }
+      }
+      return 'Syncing stories from cloud...';
+    }
+    return 'Loading stories...';
+  }
+
+  /**
+   * Get loading subtext for additional context
+   */
+  getLoadingSubtext(): string | null {
+    if (this.isSyncingInitialData) {
+      return 'First time loading may take a moment';
+    }
+    return null;
   }
 
   ngOnDestroy(): void {

@@ -122,9 +122,10 @@
 
   <ng-template #noStories>
     <div class="no-stories">
-      <ng-container *ngIf="isLoadingStories; else emptyState">
+      <ng-container *ngIf="isLoadingStories || isSyncingInitialData; else emptyState">
         <ion-spinner name="crescent"></ion-spinner>
-        <p>Loading stories...</p>
+        <p class="loading-message">{{ getLoadingMessage() }}</p>
+        <p class="loading-subtext" *ngIf="getLoadingSubtext()">{{ getLoadingSubtext() }}</p>
       </ng-container>
       <ng-template #emptyState>
         <p>No stories available yet.</p>
