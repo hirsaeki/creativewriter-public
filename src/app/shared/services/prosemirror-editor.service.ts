@@ -1108,8 +1108,11 @@ export class ProseMirrorEditorService {
 
     const afterBeatPos = beatPos + beatNode.nodeSize;
 
+    // Convert plain text content to HTML format, preserving newlines as paragraphs
+    const htmlContent = this.convertTextToHtml(version.content);
+
     // Insert the version content as HTML
-    this.insertHtmlContent(beatId, version.content, afterBeatPos);
+    this.insertHtmlContent(beatId, htmlContent, afterBeatPos);
 
     // 4. Update beat node attributes
     this.updateBeatNode(beatId, {
@@ -1474,25 +1477,56 @@ export class ProseMirrorEditorService {
     }
   }
 
+  /**
+   * Convert plain text content to HTML, preserving formatting like newlines
+   *
+   * @param content - Content that might be plain text or HTML
+   * @returns HTML formatted content
+   */
+  private convertTextToHtml(content: string): string {
+    // Check if content already looks like HTML (contains paragraph or other block tags)
+    if (/<(p|div|h[1-6]|ul|ol|li|blockquote)[\s>]/i.test(content)) {
+      return content; // Already HTML, return as-is
+    }
+
+    // Plain text content - convert newlines to paragraphs
+    // Split by double newlines for paragraph breaks, single newlines become <br> within paragraphs
+    const paragraphs = content.split(/\n\n+/);
+
+    return paragraphs
+      .map(para => {
+        // Trim the paragraph
+        const trimmed = para.trim();
+        if (!trimmed) return ''; // Skip empty paragraphs
+
+        // Replace single newlines with <br> tags within the paragraph
+        const withBreaks = trimmed.replace(/\n/g, '<br>');
+
+        return `<p>${withBreaks}</p>`;
+      })
+      .filter(para => para.length > 0) // Remove empty paragraphs
+      .join('');
+  }
+
   private insertHtmlContent(beatId: string, htmlContent: string, position: number): void {
     if (!this.editorView) return;
-    
+
     try {
       const div = document.createElement('div');
       div.innerHTML = htmlContent;
-      
+
       const fragment = DOMParser.fromSchema(this.editorSchema).parseSlice(div);
       const tr = this.editorView.state.tr.replaceRange(position, position, fragment);
       this.editorView.dispatch(tr);
-      
+
       // Find the actual end position by looking for the last text node
       const newState = this.editorView.state;
       const insertedSize = fragment.content.size;
       const insertEndPos = position + insertedSize;
-      
+
       // Find the last paragraph that was inserted and get position at end of its text content
       let endPosition = insertEndPos - 1;
-      
+
       // Walk backwards to find the last text position
       for (let pos = insertEndPos - 1; pos >= position; pos--) {
         try {
@@ -1505,7 +1539,7 @@ export class ProseMirrorEditorService {
           // Position might be invalid, continue searching
         }
       }
-      
+
       this.beatStreamingPositions.set(beatId, endPosition);
     } catch (error) {
       console.error('Failed to insert HTML content:', error);

@@ -77,10 +77,10 @@
 
         <!-- Content Preview -->
         <div class="version-content" [class.expanded]="version.expanded">
-          <p class="content-preview" *ngIf="!version.expanded">
+          <p class="content-preview" *ngIf="!version.expanded" style="white-space: pre-wrap;">
             {{ getPreview(version.content) }}
           </p>
-          <p class="content-full" *ngIf="version.expanded">
+          <p class="content-full" *ngIf="version.expanded" style="white-space: pre-wrap;">
             {{ getFullText(version.content) }}
           </p>
         </div>

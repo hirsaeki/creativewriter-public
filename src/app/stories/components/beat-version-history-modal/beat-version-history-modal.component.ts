@@ -129,18 +129,41 @@ export class BeatVersionHistoryModalComponent implements OnInit {
    * Get preview text (first 150 characters)
    */
   getPreview(content: string): string {
-    // Strip HTML tags
-    const textContent = content.replace(/<[^>]*>/g, '');
+    // Convert to plain text while preserving newlines
+    const textContent = this.htmlToPlainText(content);
     return textContent.length > 150
       ? textContent.substring(0, 150) + '...'
       : textContent;
   }
 
   /**
-   * Get full text content without HTML
+   * Get full text content without HTML, preserving newlines
    */
   getFullText(content: string): string {
-    return content.replace(/<[^>]*>/g, '');
+    return this.htmlToPlainText(content);
+  }
+
+  /**
+   * Convert HTML to plain text while preserving formatting
+   */
+  private htmlToPlainText(html: string): string {
+    // Replace paragraph and div end tags with newlines
+    let text = html.replace(/<\/(p|div)>/gi, '\n');
+    // Replace br tags with newlines
+    text = text.replace(/<br\s*\/?>/gi, '\n');
+    // Replace closing heading tags with double newlines for spacing
+    text = text.replace(/<\/h[1-6]>/gi, '\n\n');
+    // Strip remaining HTML tags
+    text = text.replace(/<[^>]*>/g, '');
+    // Decode HTML entities
+    text = text.replace(/&nbsp;/g, ' ');
+    text = text.replace(/&amp;/g, '&');
+    text = text.replace(/&lt;/g, '<');
+    text = text.replace(/&gt;/g, '>');
+    text = text.replace(/&quot;/g, '"');
+    // Trim excess whitespace but preserve intentional newlines
+    text = text.replace(/\n\n\n+/g, '\n\n'); // Max 2 consecutive newlines
+    return text.trim();
   }
 
   /**
