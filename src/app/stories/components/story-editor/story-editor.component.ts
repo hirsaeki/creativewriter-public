@@ -2222,11 +2222,67 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  onBeatSelected(beatId: string): void {
-    // Scroll to the selected beat
-    this.proseMirrorService.scrollToBeat(beatId);
-    // Close the panel
+  async onBeatSelected(beatId: string): Promise<void> {
+    // Close the panel first
     this.closeBeatNavPanel();
+
+    // Small delay to let panel close animation start
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Scroll to the selected beat using ProseMirror service
+    this.proseMirrorService.scrollToBeat(beatId);
+
+    // Alternative scroll using IonContent for better mobile support
+    if (this.editorView && this.ionContent) {
+      try {
+        // Get the beat position in the document
+        const beatPos = this.findBeatPosition(beatId);
+        if (beatPos !== null) {
+          // Find the DOM element
+          const domPos = this.editorView.domAtPos(beatPos);
+          let beatElement: HTMLElement | null = null;
+
+          if (domPos.node instanceof HTMLElement) {
+            beatElement = domPos.node.closest('.beat-ai-container') as HTMLElement;
+          } else if (domPos.node.parentElement) {
+            beatElement = domPos.node.parentElement.closest('.beat-ai-container') as HTMLElement;
+          }
+
+          if (beatElement) {
+            // Get the scroll element
+            const scrollElement = await this.ionContent.getScrollElement();
+            const beatRect = beatElement.getBoundingClientRect();
+            const scrollRect = scrollElement.getBoundingClientRect();
+
+            // Calculate scroll position to center the beat
+            const targetScroll = scrollElement.scrollTop + beatRect.top - scrollRect.top - (scrollRect.height / 2) + (beatRect.height / 2);
+
+            // Scroll to the beat
+            await this.ionContent.scrollToPoint(0, targetScroll, 600);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to scroll with IonContent, using fallback:', error);
+        // Fallback already handled by proseMirrorService.scrollToBeat
+      }
+    }
+  }
+
+  private findBeatPosition(beatId: string): number | null {
+    if (!this.editorView) return null;
+
+    const { state } = this.editorView;
+    let foundPos: number | null = null;
+
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === 'beatAI' && node.attrs['id'] === beatId) {
+        foundPos = pos;
+        return false; // Stop searching
+      }
+      return true;
+    });
+
+    return foundPos;
   }
 
   private updateBeatList(): void {

@@ -2174,16 +2174,34 @@ Please rewrite the above text according to the instructions. Only output the rew
     const beatPos = this.findBeatNodePosition(beatId);
     if (beatPos === null) return;
 
-    // Scroll the beat into view
-    const beatElement = this.editorView.domAtPos(beatPos);
-    if (beatElement.node instanceof Element) {
-      beatElement.node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    } else if (beatElement.node.parentElement) {
-      beatElement.node.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Find the actual beat container element in the DOM
+    const domPos = this.editorView.domAtPos(beatPos);
+    let beatContainer: HTMLElement | null = null;
+
+    // Try to find the beat-ai-container element
+    if (domPos.node instanceof HTMLElement) {
+      beatContainer = domPos.node.closest('.beat-ai-container') as HTMLElement;
+    } else if (domPos.node.parentElement) {
+      beatContainer = domPos.node.parentElement.closest('.beat-ai-container') as HTMLElement;
     }
 
-    // Flash the beat to indicate selection
-    this.flashBeat(beatId);
+    if (beatContainer) {
+      // Scroll the beat container into view
+      beatContainer.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+
+      // Flash the beat to indicate selection
+      this.flashBeat(beatId);
+    } else {
+      // Fallback: scroll using coordinates
+      const coords = this.editorView.coordsAtPos(beatPos);
+      window.scrollTo({
+        top: coords.top - window.innerHeight / 2,
+        behavior: 'smooth'
+      });
+
+      // Flash the beat to indicate selection
+      this.flashBeat(beatId);
+    }
   }
 
   /**
