@@ -742,7 +742,9 @@ export class DatabaseService {
 
       // Quick count using allDocs (same efficient method used by StoryService)
       const countStoriesInDb = async (db: PouchDB.Database): Promise<number> => {
-        const result = await db.allDocs();
+        const result = await db.allDocs({
+          include_docs: true  // REQUIRED: filterStoryRows needs full documents to check type/chapters fields
+        });
         // Use shared utility function for consistent story document filtering
         return countStories(result.rows);
       };

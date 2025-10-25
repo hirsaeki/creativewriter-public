@@ -3,28 +3,37 @@
  */
 
 /**
- * Determines if a document ID represents a story document.
- * Stories are documents that don't have special prefixes or start with underscore.
+ * Determines if a document represents a story document.
+ * Stories are documents that don't have a type field and have a chapters field.
+ * This matches the filtering logic used in StoryService.
  *
- * @param id - The document ID to check
- * @returns true if the ID represents a story document, false otherwise
+ * @param doc - The document to check (with _id and optional type/chapters fields)
+ * @returns true if the document represents a story, false otherwise
  *
  * @example
- * isStoryDocument('my-story-123') // returns true
- * isStoryDocument('_design/views') // returns false
- * isStoryDocument('video-abc123') // returns false
- * isStoryDocument('codex-xyz789') // returns false
+ * isStoryDocument({ _id: 'story-123', chapters: [] }) // returns true
+ * isStoryDocument({ _id: '_design/views' }) // returns false
+ * isStoryDocument({ _id: 'video-abc', type: 'video' }) // returns false
+ * isStoryDocument({ _id: 'beat-history-xyz', type: 'beat-history' }) // returns false
  */
-export function isStoryDocument(id: string): boolean {
+export function isStoryDocument(doc: { _id?: string; id?: string; type?: string; chapters?: unknown }): boolean {
+  const docId = doc._id || doc.id;
+
   // Filter out all system documents (start with underscore)
   // This includes _design docs, _local docs (PouchDB internal state), and other system docs
-  if (id.startsWith('_')) {
+  if (docId && docId.startsWith('_')) {
     return false;
   }
 
-  // Filter out typed documents by ID pattern
-  // These prefixes are used for non-story documents in the database
-  if (id.match(/^(video|codex|image-video-association|beat-suggestion|beat-history)-/)) {
+  // If document has a type field, it's not a story
+  // Stories don't have a type field - other documents (video, codex, beat-history, etc.) do
+  if (doc.type) {
+    return false;
+  }
+
+  // Must have chapters field to be a story
+  // This is the key identifier for story documents
+  if (!doc.chapters) {
     return false;
   }
 
@@ -33,16 +42,22 @@ export function isStoryDocument(id: string): boolean {
 
 /**
  * Filter an array of PouchDB rows to only include story documents
+ * IMPORTANT: Requires rows to have the 'doc' field populated (use include_docs: true in allDocs)
  *
- * @param rows - Array of PouchDB document rows to filter
+ * @param rows - Array of PouchDB document rows to filter (must have doc field)
  * @returns Filtered array containing only story document rows
  *
  * @example
- * const allRows = await db.allDocs();
+ * const allRows = await db.allDocs({ include_docs: true });
  * const storyRows = filterStoryRows(allRows.rows);
  */
-export function filterStoryRows<T extends { id: string }>(rows: T[]): T[] {
-  return rows.filter(row => isStoryDocument(row.id));
+export function filterStoryRows<T extends { id: string; doc?: unknown }>(rows: T[]): T[] {
+  return rows.filter(row => {
+    if (!row.doc) {
+      return false;
+    }
+    return isStoryDocument(row.doc as { _id?: string; id?: string; type?: string; chapters?: unknown });
+  });
 }
 
 /**
