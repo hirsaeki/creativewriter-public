@@ -2105,14 +2105,121 @@ Please rewrite the above text according to the instructions. Only output the rew
   private replaceSelectedText(view: EditorView, result: AIRewriteResult, from: number, to: number): void {
     const { state } = view;
     const tr = state.tr;
-    
+
     // Replace the selected text with the rewritten text
     tr.insertText(result.rewrittenText, from, to);
-    
+
     view.dispatch(tr);
-    
+
     // Emit content update to trigger save
     const content = this.getHTMLContent();
     this.contentUpdate$.next(content);
+  }
+
+  /**
+   * Extract all beats from the current editor for beat navigation panel
+   */
+  extractBeatsFromEditor(): { beatId: string; prompt: string; position: number; isGenerating: boolean; hasContent: boolean }[] {
+    if (!this.editorView) return [];
+
+    const beats: { beatId: string; prompt: string; position: number; isGenerating: boolean; hasContent: boolean }[] = [];
+    const { state } = this.editorView;
+
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === 'beatAI') {
+        const beatData = node.attrs as BeatAI;
+
+        // Check if there's content after this beat
+        let hasContent = false;
+        let checkPos = pos + node.nodeSize;
+
+        while (checkPos < state.doc.content.size) {
+          const nextNode = state.doc.nodeAt(checkPos);
+          if (!nextNode) break;
+
+          // Stop if we hit another beat
+          if (nextNode.type.name === 'beatAI') {
+            break;
+          }
+
+          // Check if paragraph has content
+          if (nextNode.type.name === 'paragraph' && nextNode.textContent.trim()) {
+            hasContent = true;
+            break;
+          }
+
+          checkPos += nextNode.nodeSize;
+        }
+
+        beats.push({
+          beatId: beatData.id,
+          prompt: beatData.prompt || 'No prompt',
+          position: pos,
+          isGenerating: beatData.isGenerating || false,
+          hasContent
+        });
+      }
+      return true;
+    });
+
+    return beats;
+  }
+
+  /**
+   * Scroll to a specific beat in the editor
+   */
+  scrollToBeat(beatId: string): void {
+    if (!this.editorView) return;
+
+    const beatPos = this.findBeatNodePosition(beatId);
+    if (beatPos === null) return;
+
+    // Scroll the beat into view
+    const beatElement = this.editorView.domAtPos(beatPos);
+    if (beatElement.node instanceof Element) {
+      beatElement.node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (beatElement.node.parentElement) {
+      beatElement.node.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // Flash the beat to indicate selection
+    this.flashBeat(beatId);
+  }
+
+  /**
+   * Flash a beat to indicate selection
+   */
+  private flashBeat(beatId: string): void {
+    if (!this.editorView) return;
+
+    const beatPos = this.findBeatNodePosition(beatId);
+    if (beatPos === null) return;
+
+    // Find the beat DOM element
+    const domPos = this.editorView.domAtPos(beatPos);
+    let beatElement: HTMLElement | null = null;
+
+    if (domPos.node instanceof HTMLElement) {
+      beatElement = domPos.node;
+    } else if (domPos.node.parentElement) {
+      beatElement = domPos.node.parentElement;
+    }
+
+    // Find the beat-ai-container
+    if (beatElement) {
+      const container = beatElement.closest('.beat-ai-container') as HTMLElement;
+      if (container) {
+        // Add flash animation
+        container.style.transition = 'background-color 0.3s ease';
+        container.style.backgroundColor = 'rgba(56, 128, 255, 0.3)';
+
+        setTimeout(() => {
+          container.style.backgroundColor = '';
+          setTimeout(() => {
+            container.style.transition = '';
+          }, 300);
+        }, 600);
+      }
+    }
   }
 }

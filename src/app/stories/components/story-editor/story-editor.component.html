@@ -220,5 +220,14 @@
         [story]="story"
         (closed)="closeMediaGallery()">
       </app-story-media-gallery>
+
+      <app-beat-navigation-panel
+        [isOpen]="showBeatNavPanel"
+        [story]="story"
+        [activeSceneId]="activeSceneId"
+        (closed)="closeBeatNavPanel()"
+        (opened)="openBeatNavPanel()"
+        (beatSelected)="onBeatSelected($event)">
+      </app-beat-navigation-panel>
       </div>
     </ion-split-pane>

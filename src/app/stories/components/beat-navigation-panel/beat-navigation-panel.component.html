@@ -1,0 +1,75 @@
+<div
+  class="beat-nav-overlay"
+  [class.open]="isOpen"
+  (click)="close()"
+  (keydown.escape)="close()"
+  [attr.tabindex]="isOpen ? 0 : -1"
+  [attr.role]="'button'"
+  [attr.aria-label]="'Close beat navigation panel'">
+</div>
+
+<div class="beat-nav-panel" [class.open]="isOpen">
+  <!-- Edge Indicator (visible when closed) -->
+  <div
+    class="edge-indicator"
+    [class.hidden]="isOpen"
+    (click)="openPanel($event)"
+    (keydown.enter)="openPanel($event)"
+    (keydown.space)="openPanel($event)"
+    tabindex="0"
+    role="button"
+    aria-label="Open beat navigation panel">
+    <div class="beat-count-badge" *ngIf="beats.length > 0">
+      {{ beats.length }}
+    </div>
+    <ion-icon name="color-wand-outline" class="edge-icon"></ion-icon>
+  </div>
+
+  <!-- Expanded Panel Content -->
+  <div class="panel-content" [class.visible]="isOpen">
+    <div class="panel-header">
+      <div class="header-title">
+        <ion-icon name="color-wand-outline"></ion-icon>
+        <span>Beat Navigation</span>
+      </div>
+      <ion-button fill="clear" size="small" (click)="close()">
+        <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+      </ion-button>
+    </div>
+
+    <div class="panel-body">
+      <div class="beat-list">
+        <div
+          *ngFor="let beat of beats; let i = index"
+          class="beat-item"
+          (click)="selectBeat(beat.beatId); $event.stopPropagation()"
+          (keydown.enter)="selectBeat(beat.beatId); $event.stopPropagation()"
+          (keydown.space)="selectBeat(beat.beatId); $event.stopPropagation()"
+          tabindex="0"
+          role="button"
+          [attr.aria-label]="'Jump to beat ' + (i + 1) + ': ' + getBeatPreview(beat.prompt)">
+          <div class="beat-number">{{ i + 1 }}</div>
+          <div class="beat-info">
+            <div class="beat-prompt">{{ getBeatPreview(beat.prompt) }}</div>
+            <div class="beat-status">
+              <ion-chip [color]="getBeatStatusColor(beat)" class="status-chip">
+                <ion-icon [name]="getBeatStatusIcon(beat)"></ion-icon>
+                <ion-label>
+                  <span *ngIf="beat.isGenerating">Generating...</span>
+                  <span *ngIf="!beat.isGenerating && beat.hasContent">Complete</span>
+                  <span *ngIf="!beat.isGenerating && !beat.hasContent">Pending</span>
+                </ion-label>
+              </ion-chip>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="beats.length === 0" class="no-beats">
+          <ion-icon name="color-wand-outline" class="no-beats-icon"></ion-icon>
+          <p>No beats in this scene</p>
+          <p class="hint">Use /beat to add AI prompts</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

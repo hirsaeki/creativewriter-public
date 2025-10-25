@@ -19,6 +19,7 @@ import { StoryStructureComponent } from '../story-structure/story-structure.comp
 import { SlashCommandDropdownComponent } from '../slash-command-dropdown/slash-command-dropdown.component';
 import { StoryStatsComponent } from '../story-stats/story-stats.component';
 import { StoryMediaGalleryComponent } from '../story-media-gallery/story-media-gallery.component';
+import { BeatNavigationPanelComponent } from '../beat-navigation-panel/beat-navigation-panel.component';
 import { SlashCommandResult, SlashCommandAction } from '../../models/slash-command.interface';
 import { Subscription, debounceTime, Subject, throttleTime } from 'rxjs';
 import { ProseMirrorEditorService } from '../../../shared/services/prosemirror-editor.service';
@@ -51,7 +52,7 @@ import { SnapshotTimelineComponent } from '../snapshot-timeline/snapshot-timelin
     IonMenu, IonSplitPane,
     StoryStructureComponent, SlashCommandDropdownComponent, ImageUploadDialogComponent,
     VideoModalComponent, ImageViewerModalComponent, AppHeaderComponent, StoryStatsComponent, VersionTooltipComponent,
-    StoryMediaGalleryComponent
+    StoryMediaGalleryComponent, BeatNavigationPanelComponent
   ],
   templateUrl: './story-editor.component.html',
   styleUrls: ['./story-editor.component.scss'],
@@ -83,6 +84,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   @ViewChild('editorContainer') editorContainer!: ElementRef<HTMLDivElement>;
   @ViewChild('editorWrapper') editorWrapper!: ElementRef<HTMLDivElement>;
   @ViewChild(IonContent, { read: IonContent, static: false }) ionContent!: IonContent;
+  @ViewChild(BeatNavigationPanelComponent) beatNavPanel!: BeatNavigationPanelComponent;
   private editorView: EditorView | null = null;
   private mutationObserver: MutationObserver | null = null;
   wordCount = 0;
@@ -140,6 +142,9 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
 
   // Media gallery functionality
   showMediaGallery = false;
+
+  // Beat navigation panel functionality
+  showBeatNavPanel = false;
 
   hasUnsavedChanges = false;
   debugModeEnabled = false;
@@ -860,8 +865,9 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   }
   
   private setupTouchGestures(): void {
-    // Touch gestures disabled to prevent accidental sidebar closing
-    return;
+    // Enable touch gestures for beat navigation panel
+    document.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: true });
+    document.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: true });
   }
   
   private removeTouchGestures(): void {
@@ -872,13 +878,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   private handleTouchStart(event: TouchEvent): void {
     // Only enable gestures on mobile devices, not tablets
     if (window.innerWidth > 768) return;
-    
-    // Ignore touches that start on interactive elements
-    const target = event.target as HTMLElement;
-    if (this.isInteractiveElement(target)) {
-      return;
-    }
-    
+
     const touch = event.touches[0];
     this.touchStartX = touch.clientX;
     this.touchStartY = touch.clientY;
@@ -887,17 +887,11 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   private handleTouchEnd(event: TouchEvent): void {
     // Only enable gestures on mobile devices, not tablets
     if (window.innerWidth > 768) return;
-    
-    // Ignore touches that end on interactive elements
-    const target = event.target as HTMLElement;
-    if (this.isInteractiveElement(target)) {
-      return;
-    }
-    
+
     const touch = event.changedTouches[0];
     this.touchEndX = touch.clientX;
     this.touchEndY = touch.clientY;
-    
+
     this.handleSwipeGesture();
   }
   
@@ -947,24 +941,34 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   private handleSwipeGesture(): void {
     const deltaX = this.touchEndX - this.touchStartX;
     const deltaY = Math.abs(this.touchEndY - this.touchStartY);
-    
+
     // Check if it's a horizontal swipe (not vertical scroll)
     if (deltaY > this.maxVerticalDistance) return;
-    
+
     // Check if swipe distance is sufficient
     if (Math.abs(deltaX) < this.minSwipeDistance) return;
-    
+
     // Additional safety check: don't process gestures if touchStart coordinates are invalid
     if (this.touchStartX === undefined || this.touchStartY === undefined) return;
-    
+
     // Adjust swipe sensitivity based on screen size
-    // const edgeThreshold = window.innerWidth <= 480 ? 30 : 50; // Unused variable
+    const edgeThreshold = window.innerWidth <= 480 ? 30 : 50;
     const minSwipeDistance = window.innerWidth <= 480 ? 40 : this.minSwipeDistance;
-    
+
     // Check if swipe distance is sufficient for this screen size
     if (Math.abs(deltaX) < minSwipeDistance) return;
-    
-    // Ion-menu handles swipe gestures automatically
+
+    // Swipe from right edge to left (open beat nav panel)
+    if (deltaX < 0 && this.touchStartX > window.innerWidth - edgeThreshold) {
+      this.openBeatNavPanel();
+      return;
+    }
+
+    // Swipe from left to right while panel is open (close beat nav panel)
+    if (deltaX > 0 && this.showBeatNavPanel) {
+      this.closeBeatNavPanel();
+      return;
+    }
   }
   
   private setupMobileKeyboardHandling(): void {
@@ -2181,7 +2185,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
 
   async openCoverPopover(event: Event): Promise<void> {
     event.stopPropagation();
-    
+
     if (!this.story?.coverImage) return;
 
     const popoverElement = document.createElement('ion-popover');
@@ -2189,21 +2193,52 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     popoverElement.dismissOnSelect = true;
     popoverElement.cssClass = 'cover-image-popover';
     popoverElement.event = event;
-    
+
     // Create the content
     const contentDiv = document.createElement('div');
     contentDiv.className = 'cover-popover-content';
-    
+
     const img = document.createElement('img');
     img.src = this.getCoverImageUrl() || '';
     img.alt = this.story.title || 'Story cover';
     img.className = 'cover-popover-image';
-    
+
     contentDiv.appendChild(img);
     popoverElement.appendChild(contentDiv);
-    
+
     document.body.appendChild(popoverElement);
     await popoverElement.present();
+  }
+
+  // Beat Navigation Panel Methods
+  openBeatNavPanel(): void {
+    this.showBeatNavPanel = true;
+    this.updateBeatList();
+    this.cdr.markForCheck();
+  }
+
+  closeBeatNavPanel(): void {
+    this.showBeatNavPanel = false;
+    this.cdr.markForCheck();
+  }
+
+  onBeatSelected(beatId: string): void {
+    // Scroll to the selected beat
+    this.proseMirrorService.scrollToBeat(beatId);
+    // Close the panel
+    this.closeBeatNavPanel();
+  }
+
+  private updateBeatList(): void {
+    // Extract beats from the current editor content
+    if (!this.editorView) return;
+
+    const beats = this.proseMirrorService.extractBeatsFromEditor();
+
+    // Update the beat navigation panel component through ViewChild
+    if (this.beatNavPanel) {
+      this.beatNavPanel.updateBeats(beats);
+    }
   }
 
 }
