@@ -953,7 +953,9 @@ Please rewrite the above text according to the instructions. Only output the rew
       sceneId: event.sceneId,
       beatPosition: beatNodePosition,
       beatType: event.beatType,
-      customContext: event.customContext
+      customContext: event.customContext,
+      action: event.action === 'rewrite' ? 'rewrite' : 'generate',
+      existingText: event.existingText
     }).subscribe({
       next: (finalContent) => {
         // Final content received - ensure beat node is updated

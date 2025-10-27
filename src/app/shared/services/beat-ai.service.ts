@@ -395,6 +395,8 @@ export class BeatAIService implements OnDestroy {
       includeStoryOutline: boolean;
       selectedSceneContexts: { sceneId: string; chapterId: string; content: string; }[];
     };
+    action?: 'generate' | 'rewrite';
+    existingText?: string;
   } = {}): Observable<string> {
     const settings = this.settingsService.getSettings();
 
@@ -1265,6 +1267,8 @@ export class BeatAIService implements OnDestroy {
         includeStoryOutline: boolean;
         selectedSceneContexts: { sceneId: string; chapterId: string; content: string; }[];
       };
+      action?: 'generate' | 'rewrite';
+      existingText?: string;
     }
   ): Promise<void> {
     // Don't save if content is empty or fallback
@@ -1298,7 +1302,9 @@ export class BeatAIService implements OnDestroy {
           characterCount: content.length,
           isCurrent: true,
           selectedScenes,
-          includeStoryOutline: options.customContext?.includeStoryOutline
+          includeStoryOutline: options.customContext?.includeStoryOutline,
+          action: options.action || 'generate',
+          existingText: options.existingText
         }
       );
 

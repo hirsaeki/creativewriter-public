@@ -57,6 +57,9 @@
               </ion-icon>
               <span class="version-label">{{ formatVersionLabel(version) }}</span>
               <span class="version-badge" *ngIf="version.isCurrent">CURRENT</span>
+              <span class="action-badge" [class.rewrite-badge]="version.action === 'rewrite'" [class.generate-badge]="!version.action || version.action === 'generate'">
+                {{ version.action === 'rewrite' ? 'REWRITE' : 'GENERATE' }}
+              </span>
             </div>
             <span class="version-timestamp">{{ formatTimestamp(version.generatedAt) }}</span>
           </div>
@@ -73,6 +76,14 @@
         <!-- Version Prompt (if different from current) -->
         <div class="version-prompt" *ngIf="version.prompt && version.prompt !== currentPrompt">
           <strong>Prompt:</strong> <em>{{ version.prompt }}</em>
+        </div>
+
+        <!-- Original Text (for rewrites) -->
+        <div class="original-text-section" *ngIf="version.action === 'rewrite' && version.existingText">
+          <strong>Original Text (Before Rewrite):</strong>
+          <div class="original-text-content">
+            {{ version.existingText }}
+          </div>
         </div>
 
         <!-- Content Preview -->
