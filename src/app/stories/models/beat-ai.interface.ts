@@ -13,6 +13,11 @@ export interface BeatAI {
   includeStoryOutline?: boolean; // Persisted story outline setting
   currentVersionId?: string; // ID of the currently active version in history
   hasHistory?: boolean; // Quick flag to check if version history exists
+  lastAction?: 'generate' | 'rewrite'; // Track the last action performed on this beat
+  rewriteContext?: { // Context for rewrite operations to enable proper regeneration
+    originalText: string; // The text that was rewritten
+    instruction: string; // The user's rewrite instruction
+  };
 }
 
 export interface BeatAIGenerationEvent {

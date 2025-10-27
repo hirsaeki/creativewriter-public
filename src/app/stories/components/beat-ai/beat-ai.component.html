@@ -6,6 +6,10 @@
             <ion-icon name="color-wand-outline"></ion-icon>
           </div>
           <div class="beat-title">Beat AI</div>
+          <ion-chip *ngIf="beatData.lastAction === 'rewrite'" color="warning" class="rewrite-indicator">
+            <ion-icon name="create-outline"></ion-icon>
+            <ion-label>Rewrite</ion-label>
+          </ion-chip>
           <div class="beat-actions">
             <button
               class="action-btn collapse-btn"

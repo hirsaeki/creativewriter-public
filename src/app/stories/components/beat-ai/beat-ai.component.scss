@@ -103,7 +103,23 @@
       color: #f8f9fa;
       flex: 1;
     }
-    
+
+    .rewrite-indicator {
+      font-size: 0.75rem;
+      height: 24px;
+      margin: 0;
+
+      ion-icon {
+        font-size: 14px;
+        margin-right: 2px;
+      }
+
+      ion-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+    }
+
     .beat-actions {
       display: flex;
       gap: 0.5rem;

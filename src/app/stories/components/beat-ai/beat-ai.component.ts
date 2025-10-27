@@ -335,24 +335,28 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   
   async generateContent(): Promise<void> {
     if (!this.currentPrompt.trim() || !this.selectedModel) return;
-    
+
     this.beatData.prompt = this.currentPrompt.trim();
     this.beatData.isGenerating = true;
     this.beatData.updatedAt = new Date();
     this.beatData.wordCount = this.getActualWordCount();
     this.beatData.model = this.selectedModel;
     this.beatData.beatType = this.selectedBeatType;
-    
+
+    // Mark this as a generate action (not rewrite)
+    this.beatData.lastAction = 'generate';
+    this.beatData.rewriteContext = undefined; // Clear any previous rewrite context
+
     // Persist the selected scenes and story outline setting
     this.beatData.selectedScenes = this.selectedScenes.map(scene => ({
       sceneId: scene.sceneId,
       chapterId: scene.chapterId
     }));
     this.beatData.includeStoryOutline = this.includeStoryOutline;
-    
+
     // Build custom context from selected scenes
     const customContext = await this.buildCustomContext();
-    
+
     this.promptSubmit.emit({
       beatId: this.beatData.id,
       prompt: this.beatData.prompt,
@@ -365,7 +369,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       beatType: this.beatData.beatType,
       customContext: customContext // Add custom context
     });
-    
+
     this.contentUpdate.emit(this.beatData);
   }
   
@@ -387,17 +391,33 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     // Build custom context from selected scenes
     const customContext = await this.buildCustomContext();
 
+    // Determine the action and get existing text if needed
+    let action: 'generate' | 'regenerate' | 'rewrite';
+    let existingText: string | undefined;
+
+    if (this.beatData.lastAction === 'rewrite' && this.beatData.rewriteContext) {
+      // This was a rewrite - regenerate as a rewrite
+      action = 'rewrite';
+      // Try to get current text after beat, fallback to original stored text
+      existingText = this.proseMirrorService.getTextAfterBeat(this.beatData.id)
+                     || this.beatData.rewriteContext.originalText;
+    } else {
+      // Regular regeneration
+      action = 'regenerate';
+    }
+
     this.promptSubmit.emit({
       beatId: this.beatData.id,
       prompt: this.beatData.prompt,
-      action: 'regenerate',
+      action: action,
       wordCount: this.getActualWordCount(),
       model: this.selectedModel,
       storyId: this.storyId,
       chapterId: this.chapterId,
       sceneId: this.sceneId,
       beatType: this.beatData.beatType,
-      customContext: customContext // Add custom context
+      customContext: customContext,
+      existingText: existingText // Pass the text to rewrite if applicable
     });
 
     this.contentUpdate.emit(this.beatData);
@@ -451,6 +471,14 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
               await errorAlert.present();
               return false; // Prevent alert from closing
             }
+
+            // Store the rewrite context for regeneration
+            this.beatData.lastAction = 'rewrite';
+            this.beatData.rewriteContext = {
+              originalText: existingText,
+              instruction: rewritePrompt
+            };
+            this.beatData.prompt = rewritePrompt; // User-facing prompt
 
             // Start rewrite process
             this.beatData.isGenerating = true;
