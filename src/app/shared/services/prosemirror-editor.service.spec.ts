@@ -2,34 +2,42 @@ import { TestBed } from '@angular/core/testing';
 import { ProseMirrorEditorService } from './prosemirror-editor.service';
 import { PromptManagerService } from './prompt-manager.service';
 import { BeatAIService } from './beat-ai.service';
-import { SettingsService } from '../../core/services/settings.service';
+import { BeatHistoryService } from './beat-history.service';
+import { CodexService } from '../../stories/services/codex.service';
+import { ModalController } from '@ionic/angular/standalone';
+import { ApplicationRef, EnvironmentInjector } from '@angular/core';
 import { EditorView } from 'prosemirror-view';
-import { Settings } from '../../core/models/settings.interface';
 
 describe('ProseMirrorEditorService', () => {
   let service: ProseMirrorEditorService;
   let mockPromptManager: jasmine.SpyObj<PromptManagerService>;
   let mockBeatAIService: jasmine.SpyObj<BeatAIService>;
-  let mockSettingsService: jasmine.SpyObj<SettingsService>;
+  let mockBeatHistoryService: jasmine.SpyObj<BeatHistoryService>;
+  let mockCodexService: jasmine.SpyObj<CodexService>;
+  let mockModalController: jasmine.SpyObj<ModalController>;
 
   beforeEach(() => {
     // Create mocks for dependencies
     mockPromptManager = jasmine.createSpyObj('PromptManagerService', ['refresh', 'initialize']);
     mockBeatAIService = jasmine.createSpyObj('BeatAIService', ['generate', 'stopGeneration']);
-    mockSettingsService = jasmine.createSpyObj('SettingsService', ['getSettings']);
+    mockBeatHistoryService = jasmine.createSpyObj('BeatHistoryService', ['saveVersion', 'getHistory']);
+    mockCodexService = jasmine.createSpyObj('CodexService', ['getCodex', 'codexUpdated$']);
+    mockModalController = jasmine.createSpyObj('ModalController', ['create', 'dismiss']);
 
     // Setup default mock behaviors
     mockPromptManager.refresh.and.returnValue(Promise.resolve());
-    mockSettingsService.getSettings.and.returnValue({
-      appearance: { textColor: '#e0e0e0' }
-    } as Settings);
+    mockCodexService.getCodex.and.returnValue(undefined);
 
     TestBed.configureTestingModule({
       providers: [
         ProseMirrorEditorService,
         { provide: PromptManagerService, useValue: mockPromptManager },
         { provide: BeatAIService, useValue: mockBeatAIService },
-        { provide: SettingsService, useValue: mockSettingsService }
+        { provide: BeatHistoryService, useValue: mockBeatHistoryService },
+        { provide: CodexService, useValue: mockCodexService },
+        { provide: ModalController, useValue: mockModalController },
+        ApplicationRef,
+        EnvironmentInjector
       ]
     });
 
@@ -349,7 +357,7 @@ describe('ProseMirrorEditorService', () => {
     describe('setSimpleContent', () => {
       it('should preserve single line breaks as hard breaks', () => {
         const content = 'Line 1\nLine 2\nLine 3';
-        service.setSimpleContent(content);
+        service.setSimpleContent(editorView, content);
 
         // Verify the document structure contains hard breaks
         const doc = editorView.state.doc;
@@ -365,7 +373,7 @@ describe('ProseMirrorEditorService', () => {
 
       it('should create separate paragraphs for double line breaks', () => {
         const content = 'Paragraph 1\n\nParagraph 2\n\nParagraph 3';
-        service.setSimpleContent(content);
+        service.setSimpleContent(editorView, content);
 
         // Count paragraphs in the document
         const doc = editorView.state.doc;
@@ -381,7 +389,7 @@ describe('ProseMirrorEditorService', () => {
 
       it('should handle mixed single and double line breaks', () => {
         const content = 'Line 1\nLine 2\n\nParagraph 2';
-        service.setSimpleContent(content);
+        service.setSimpleContent(editorView, content);
 
         const doc = editorView.state.doc;
         let paragraphCount = 0;
@@ -400,7 +408,7 @@ describe('ProseMirrorEditorService', () => {
       });
 
       it('should handle empty content', () => {
-        service.setSimpleContent('');
+        service.setSimpleContent(editorView, '');
 
         const doc = editorView.state.doc;
         let paragraphCount = 0;
@@ -416,7 +424,7 @@ describe('ProseMirrorEditorService', () => {
 
       it('should handle content with only line breaks', () => {
         const content = '\n\n\n';
-        service.setSimpleContent(content);
+        service.setSimpleContent(editorView, content);
 
         // Should create empty paragraphs or handle gracefully
         expect(editorView.state.doc).toBeTruthy();
@@ -424,7 +432,7 @@ describe('ProseMirrorEditorService', () => {
 
       it('should handle content with trailing line breaks', () => {
         const content = 'Line 1\nLine 2\n';
-        service.setSimpleContent(content);
+        service.setSimpleContent(editorView, content);
 
         const doc = editorView.state.doc;
         let hardBreakCount = 0;
@@ -441,27 +449,27 @@ describe('ProseMirrorEditorService', () => {
     describe('getSimpleTextContent', () => {
       it('should extract single line breaks as \\n', () => {
         const originalContent = 'Line 1\nLine 2\nLine 3';
-        service.setSimpleContent(originalContent);
+        service.setSimpleContent(editorView, originalContent);
 
-        const extractedContent = service.getSimpleTextContent();
+        const extractedContent = service.getSimpleTextContent(editorView);
 
         expect(extractedContent).toBe(originalContent);
       });
 
       it('should extract paragraphs separated by \\n\\n', () => {
         const originalContent = 'Paragraph 1\n\nParagraph 2\n\nParagraph 3';
-        service.setSimpleContent(originalContent);
+        service.setSimpleContent(editorView, originalContent);
 
-        const extractedContent = service.getSimpleTextContent();
+        const extractedContent = service.getSimpleTextContent(editorView);
 
         expect(extractedContent).toBe(originalContent);
       });
 
       it('should handle mixed line breaks correctly', () => {
         const originalContent = 'Line 1\nLine 2\n\nParagraph 2\nLine in P2';
-        service.setSimpleContent(originalContent);
+        service.setSimpleContent(editorView, originalContent);
 
-        const extractedContent = service.getSimpleTextContent();
+        const extractedContent = service.getSimpleTextContent(editorView);
 
         expect(extractedContent).toBe(originalContent);
       });
@@ -475,23 +483,23 @@ describe('ProseMirrorEditorService', () => {
         ];
 
         testCases.forEach(testContent => {
-          service.setSimpleContent(testContent);
-          const extractedContent = service.getSimpleTextContent();
+          service.setSimpleContent(editorView, testContent);
+          const extractedContent = service.getSimpleTextContent(editorView);
           expect(extractedContent).toBe(testContent);
         });
       });
 
       it('should handle empty content correctly', () => {
-        service.setSimpleContent('');
-        const extractedContent = service.getSimpleTextContent();
+        service.setSimpleContent(editorView, '');
+        const extractedContent = service.getSimpleTextContent(editorView);
         expect(extractedContent).toBe('');
       });
 
       it('should trim leading and trailing whitespace', () => {
         const contentWithWhitespace = '  Line 1\nLine 2  ';
-        service.setSimpleContent(contentWithWhitespace);
+        service.setSimpleContent(editorView, contentWithWhitespace);
 
-        const extractedContent = service.getSimpleTextContent();
+        const extractedContent = service.getSimpleTextContent(editorView);
 
         // Content should be trimmed
         expect(extractedContent).toBe('Line 1\nLine 2');
@@ -523,7 +531,7 @@ describe('ProseMirrorEditorService', () => {
         editorView = service.createSimpleTextEditor(container, config);
 
         // Set content which should trigger the callback
-        service.setSimpleContent(testContent);
+        service.setSimpleContent(editorView, testContent);
 
         // Manually trigger a transaction to ensure callback is called
         setTimeout(() => {
@@ -539,6 +547,178 @@ describe('ProseMirrorEditorService', () => {
           }, 50);
         }, 50);
       });
+    });
+  });
+
+  describe('Beat navigation attribute consistency', () => {
+    /**
+     * These tests verify that the beatAI schema's toDOM method and the
+     * scrollToBeat function use consistent attribute names for identifying beats.
+     *
+     * Bug History:
+     * Previously, toDOM used 'data-id' while scrollToBeat searched for 'data-beat-id',
+     * causing scroll-to-beat to fail after beat rewrite operations.
+     *
+     * Fix:
+     * Changed toDOM to use 'data-beat-id' to match scrollToBeat.
+     */
+
+    let container: HTMLElement;
+    let editorView: EditorView;
+
+    beforeEach(() => {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+
+      const config = {
+        placeholder: 'Test editor',
+        onUpdate: () => {
+          // Update callback for editor changes
+        },
+        storyContext: {
+          storyId: 'test-story',
+          chapterId: 'test-chapter',
+          sceneId: 'test-scene'
+        }
+      };
+
+      editorView = service.createSimpleTextEditor(container, config);
+    });
+
+    afterEach(() => {
+      if (editorView) {
+        editorView.destroy();
+      }
+      if (container && container.parentNode) {
+        container.parentNode.removeChild(container);
+      }
+      service.destroy();
+    });
+
+    it('should create beatAI nodes with data-beat-id attribute', () => {
+      // Access the internal schema from the service
+      // @ts-expect-error - accessing private property for testing
+      const schema = service.editorSchema;
+      const beatAINodeType = schema?.nodes?.['beatAI'];
+
+      // Skip test if schema isn't available (simple editor mode)
+      if (!beatAINodeType) {
+        pending('BeatAI node not available in simple editor schema');
+        return;
+      }
+
+      // Create a beat node with test data
+      const beatNode = beatAINodeType.create({
+        id: 'test-beat-123',
+        prompt: 'Test prompt',
+        generatedContent: 'Test content',
+        isGenerating: false,
+        isCollapsed: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      // Convert to DOM
+      const domSpec = beatAINodeType.spec.toDOM?.(beatNode);
+
+      expect(domSpec).toBeTruthy();
+
+      // domSpec should be ['div', {attributes}, ...children]
+      if (domSpec && Array.isArray(domSpec) && domSpec.length >= 2) {
+        const attributes = domSpec[1] as Record<string, string>;
+
+        // The critical assertion: should use 'data-beat-id', not 'data-id'
+        expect(attributes['data-beat-id']).toBe('test-beat-123');
+        expect(attributes['data-id']).toBeUndefined(); // Should NOT have data-id
+      } else {
+        fail('toDOM did not return expected array structure');
+      }
+    });
+
+    it('should verify scrollToBeat searches for data-beat-id attribute', () => {
+      /**
+       * This test verifies that scrollToBeat uses the correct querySelector
+       * to find beat elements by data-beat-id attribute.
+       *
+       * Note: This is a documentation test - it verifies the implementation
+       * uses the correct selector without requiring full DOM integration.
+       */
+
+      // Get the scrollToBeat method implementation as a string to verify selector
+      const scrollToBeatSource = service.scrollToBeat.toString();
+
+      // Verify the method searches for data-beat-id (not data-id)
+      expect(scrollToBeatSource).toContain('data-beat-id');
+      expect(scrollToBeatSource).not.toContain('[data-id=');
+    });
+
+    it('should use data-beat-id consistently after beat rewrite (regression test)', () => {
+      /**
+       * Regression test for the bug where scrollToBeat failed after rewrite.
+       *
+       * The issue: After a rewrite, the node is reconstructed via toDOM,
+       * and if toDOM uses different attribute names than scrollToBeat searches for,
+       * navigation breaks.
+       *
+       * This test verifies that both the schema's toDOM and scrollToBeat
+       * use the same attribute name: data-beat-id
+       */
+
+      // Access the internal schema from the service
+      // @ts-expect-error - accessing private property for testing
+      const schema = service.editorSchema;
+      const beatAINodeType = schema?.nodes?.['beatAI'];
+
+      // Skip test if schema isn't available (simple editor mode)
+      if (!beatAINodeType) {
+        pending('BeatAI node not available in simple editor schema');
+        return;
+      }
+
+      // Simulate rewrite: create beat node, convert to DOM, then "rewrite"
+      // by creating it again with updated content
+      const beatId = 'rewrite-test-beat';
+
+      // Initial beat
+      const initialBeat = beatAINodeType.create({
+        id: beatId,
+        prompt: 'Original prompt',
+        generatedContent: 'Original content',
+        isGenerating: false,
+        isCollapsed: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      // Convert to DOM
+      const initialDomSpec = beatAINodeType.spec.toDOM?.(initialBeat) as [string, Record<string, string>];
+      const [, attrs1] = initialDomSpec;
+
+      // Verify initial beat has data-beat-id
+      expect(attrs1['data-beat-id']).toBe(beatId);
+
+      // "Rewritten" beat (simulating regenerate)
+      const rewrittenBeat = beatAINodeType.create({
+        id: beatId, // Same ID
+        prompt: 'Rewrite prompt',
+        generatedContent: 'New rewritten content',
+        isGenerating: false,
+        isCollapsed: false,
+        createdAt: attrs1['data-created'],
+        updatedAt: new Date().toISOString()
+      });
+
+      // Convert rewritten beat to DOM (this is what happens on rewrite)
+      const rewrittenDomSpec = beatAINodeType.spec.toDOM?.(rewrittenBeat) as [string, Record<string, string>];
+      const [, attrs2] = rewrittenDomSpec;
+
+      // Critical assertion: After rewrite, should still have data-beat-id
+      expect(attrs2['data-beat-id']).toBe(beatId);
+      expect(attrs2['data-id']).toBeUndefined(); // Should NOT revert to data-id
+
+      // Verify scrollToBeat also uses data-beat-id
+      const scrollToBeatSource = service.scrollToBeat.toString();
+      expect(scrollToBeatSource).toContain('data-beat-id');
     });
   });
 });
