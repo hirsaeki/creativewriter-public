@@ -85,7 +85,7 @@
                   <ion-input
                     class="chapter-edit-input"
                     [ngModel]="editingChapterTitles[chapter.id] || ''"
-                    (ngModelChange)="onEditChapterTitleChange(chapter.id, $event, $event)"
+                    (ngModelChange)="onEditChapterTitleChange(chapter.id, $event)"
                     placeholder="Untitled Chapter"
                     (click)="$event.stopPropagation()"
                     (keydown)="$event.stopPropagation()"

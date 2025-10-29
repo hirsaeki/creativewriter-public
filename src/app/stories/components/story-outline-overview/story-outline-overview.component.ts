@@ -83,13 +83,26 @@ export class StoryOutlineOverviewComponent implements OnInit {
     })).filter(ch => ch.scenes.length > 0);
   });
 
+  // Cache for word counts to avoid recalculating unchanged scenes
+  private wordCountCache = new Map<string, { content: string; count: number }>();
+
   sceneWordCounts = computed<Record<string, number>>(() => {
     const s = this.story();
     if (!s) return {};
     const counts: Record<string, number> = {};
     for (const chapter of s.chapters ?? []) {
       for (const scene of chapter.scenes ?? []) {
-        counts[scene.id] = this.storyStats.calculateSceneWordCount(scene);
+        const cacheKey = scene.id;
+        const cached = this.wordCountCache.get(cacheKey);
+
+        // Use cached count if content hasn't changed
+        if (cached && cached.content === scene.content) {
+          counts[scene.id] = cached.count;
+        } else {
+          const count = this.storyStats.calculateSceneWordCount(scene);
+          counts[scene.id] = count;
+          this.wordCountCache.set(cacheKey, { content: scene.content || '', count });
+        }
       }
     }
     return counts;
@@ -137,6 +150,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
     try {
       const s = await this.storyService.getStory(id);
       if (!s) {
+        console.warn(`Story with id ${id} not found`);
         this.router.navigate(['/']);
         return;
       }
@@ -149,10 +163,19 @@ export class StoryOutlineOverviewComponent implements OnInit {
           setTimeout(() => this.scrollToScene(sceneId), 600);
         }
       } else {
-        // Expand all chapters by default for quick overview
-        const all = new Set<string>(s.chapters.map(c => c.id));
-        this.expanded.set(all);
+        // Expand chapters by default for quick overview
+        // For performance, limit to first 10 chapters if story is large
+        const maxDefaultExpanded = 10;
+        const chaptersToExpand = s.chapters.length <= maxDefaultExpanded
+          ? s.chapters
+          : s.chapters.slice(0, maxDefaultExpanded);
+        const expanded = new Set<string>(chaptersToExpand.map(c => c.id));
+        this.expanded.set(expanded);
       }
+    } catch (error) {
+      console.error('Failed to load story:', error);
+      alert('Failed to load story. Please try again.');
+      this.router.navigate(['/']);
     } finally {
       this.loading.set(false);
     }
@@ -703,8 +726,7 @@ export class StoryOutlineOverviewComponent implements OnInit {
     this.editingChapterTitles = rest;
   }
 
-  onEditChapterTitleChange(chapterId: string, value: string, event?: Event): void {
-    if (event) event.stopPropagation();
+  onEditChapterTitleChange(chapterId: string, value: string): void {
     this.editingChapterTitles = { ...this.editingChapterTitles, [chapterId]: value };
   }
 
