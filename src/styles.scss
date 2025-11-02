@@ -181,7 +181,7 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   background-color: #1a1a1a; /* Fallback color for when no background is selected */
   color: #e0e0e0;
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* Ensure Ionic app and pages are transparent to show background service backgrounds */
@@ -535,29 +535,28 @@ button:hover {
     font-size: 16px !important;
     transform: scale(1) !important;
   }
-  
+
   /* Adjust body when keyboard is visible */
   body.keyboard-visible {
-    height: calc(100% - var(--keyboard-height, 0px));
-    overflow-y: hidden;
+    min-height: calc(100% - var(--keyboard-height, 0px));
+    overflow-y: auto;
   }
-  
+
   /* Prevent zoom on double tap */
   body.keyboard-visible * {
     touch-action: pan-x pan-y;
   }
-  
+
   /* Adjust Ionic content for keyboard */
   body.keyboard-visible ion-content {
-    --height: calc(100vh - var(--keyboard-height, 0px));
-    --max-height: calc(100vh - var(--keyboard-height, 0px));
+    --min-height: calc(100vh - var(--keyboard-height, 0px));
   }
-  
+
   /* Smooth transition for keyboard show/hide */
   body {
-    transition: height 0.3s ease;
+    transition: min-height 0.3s ease;
   }
-  
+
   /* Ensure proper scrolling behavior */
   body.keyboard-visible {
     scroll-behavior: smooth;

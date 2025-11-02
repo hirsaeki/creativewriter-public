@@ -6,7 +6,7 @@
     
     .ion-page {
       background-color: transparent;
-      height: 100vh;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
@@ -17,7 +17,8 @@
       backdrop-filter: blur(15px);
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       box-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
-      position: relative;
+      position: sticky;
+      top: 0;
       z-index: 100;
     }
     
@@ -806,24 +807,22 @@
     @media (max-width: 768px) {
       /* When keyboard is visible, adjust viewport */
       :host-context(.keyboard-visible) .ion-page {
-        height: calc(100vh - var(--keyboard-height, 0px));
-        max-height: calc(100vh - var(--keyboard-height, 0px));
+        min-height: calc(100vh - var(--keyboard-height, 0px));
       }
-      
+
       :host-context(.keyboard-visible) .editor-container {
         min-height: calc(100vh - var(--keyboard-height, 0px));
-        max-height: calc(100vh - var(--keyboard-height, 0px));
       }
-      
+
       :host-context(.keyboard-visible) .content-editor {
         max-height: calc(100vh - var(--keyboard-height, 0px) - 250px);
       }
-      
+
       /* Ensure content can scroll above keyboard */
       :host-context(.keyboard-visible) .editor-inner {
         padding-bottom: calc(var(--keyboard-height, 0px) + 2rem);
       }
-      
+
       /* Adjust ProseMirror editor for keyboard */
       :host-context(.keyboard-visible) .content-editor :global(.prosemirror-editor) {
         padding-bottom: var(--keyboard-height, 0px);

@@ -187,7 +187,8 @@ export interface BurgerMenuItem {
       backdrop-filter: blur(15px);
       background: rgba(45, 45, 45, 0.3);
       box-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
-      position: relative;
+      position: sticky;
+      top: 0;
       z-index: 100;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
