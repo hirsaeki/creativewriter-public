@@ -1383,10 +1383,10 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   }
 
   private handleBeatContentUpdate(): void {
-    // Mark as changed but don't trigger immediate save for beat updates
-    // These are already saved within the content
+    // Update scene content after beat generation
     this.editorState.updateSceneContent(this.proseMirrorService.getHTMLContent());
-    // Don't trigger save subject - let the regular debounce handle it
+    // Trigger debounced save to persist beat-generated content
+    this.saveSubject.next();
   }
 
   hideImageDialog(): void {
