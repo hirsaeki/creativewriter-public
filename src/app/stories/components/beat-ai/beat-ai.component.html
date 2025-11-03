@@ -74,15 +74,18 @@
         <div class="context-chips" *ngIf="!beatData.isCollapsed && (selectedScenes.length > 0 || includeStoryOutline)">
           <ion-chip *ngIf="includeStoryOutline" color="success">
             <ion-label>Story Overview</ion-label>
-            <ion-icon 
-              name="close-outline" 
+            <ion-icon
+              name="close-outline"
               (click)="removeStoryOutline(); $event.stopPropagation()">
             </ion-icon>
           </ion-chip>
-          <ion-chip *ngFor="let scene of selectedScenes" [color]="scene.sceneId === sceneId ? 'primary' : 'medium'">
+          <ion-chip
+            *ngFor="let scene of selectedScenes"
+            [color]="scene.sceneId === sceneId ? 'primary' : 'medium'"
+            [class.truncated-scene]="scene.isTruncated">
             <ion-label>{{ scene.chapterTitle }} - {{ scene.sceneTitle }}</ion-label>
-            <ion-icon 
-              name="close-outline" 
+            <ion-icon
+              name="close-outline"
               (click)="removeSceneContext(scene); $event.stopPropagation()">
             </ion-icon>
           </ion-chip>

@@ -367,6 +367,19 @@
     .context-chips ion-chip ion-icon:hover {
       opacity: 1;
     }
+
+    .context-chips ion-chip.truncated-scene {
+      background: linear-gradient(
+        135deg,
+        rgba(220, 53, 69, 0.15) 0%,
+        rgba(255, 107, 107, 0.12) 100%
+      );
+      border: 1px solid rgba(220, 53, 69, 0.3);
+    }
+
+    .context-chips ion-chip.truncated-scene ion-label {
+      color: rgba(255, 150, 150, 0.95);
+    }
     
     .prompt-input-container {
       margin-top: 0.1rem;

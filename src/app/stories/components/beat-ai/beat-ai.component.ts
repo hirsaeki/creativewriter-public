@@ -35,6 +35,7 @@ interface SceneContext {
   sceneTitle: string;
   content: string;
   selected: boolean;
+  isTruncated?: boolean; // Indicates if content is truncated at current beat position
 }
 
 @Component({
@@ -1095,26 +1096,29 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private async setupDefaultContext(): Promise<void> {
     if (!this.storyId || !this.chapterId || !this.sceneId) return;
-    
+
     // Always get fresh data from database to ensure we have the latest content
     const freshStory = await this.storyService.getStory(this.storyId);
     if (!freshStory) return;
-    
+
     // Check if there are persisted selected scenes to restore
     if (this.beatData.selectedScenes && this.beatData.selectedScenes.length > 0) {
       // Restore persisted selected scenes
       for (const persistedScene of this.beatData.selectedScenes) {
         const chapter = freshStory.chapters.find(c => c.id === persistedScene.chapterId);
         const scene = chapter?.scenes.find(s => s.id === persistedScene.sceneId);
-        
+
         if (chapter && scene) {
+          const isCurrentScene = scene.id === this.sceneId;
+
           this.selectedScenes.push({
             chapterId: chapter.id,
             sceneId: scene.id,
             chapterTitle: `C${chapter.chapterNumber || chapter.order}:${chapter.title}`,
             sceneTitle: `S${scene.sceneNumber || scene.order}:${scene.title}`,
             content: this.extractFullTextFromScene(scene),
-            selected: true
+            selected: true,
+            isTruncated: isCurrentScene // Mark as truncated if it's the current scene
           });
         }
       }
@@ -1122,11 +1126,11 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       // Set up default context if no persisted scenes
       const chapter = freshStory.chapters.find(c => c.id === this.chapterId);
       const scene = chapter?.scenes.find(s => s.id === this.sceneId);
-      
+
       if (chapter && scene) {
         // Add current scene as default context
         const currentSceneContent = this.extractFullTextFromScene(scene);
-        
+
         // If current scene has no content, try to find the previous scene with content
         let contentToUse = currentSceneContent;
         if (!contentToUse.trim()) {
@@ -1135,14 +1139,15 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
             contentToUse = this.extractFullTextFromScene(previousScene.scene);
           }
         }
-        
+
         this.selectedScenes.push({
           chapterId: chapter.id,
           sceneId: scene.id,
           chapterTitle: `C${chapter.chapterNumber || chapter.order}:${chapter.title}`,
           sceneTitle: `S${scene.sceneNumber || scene.order}:${scene.title}`,
           content: contentToUse,
-          selected: true
+          selected: true,
+          isTruncated: true // Current scene is always truncated
         });
       }
     }
@@ -1184,29 +1189,33 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
 
   async toggleSceneSelection(chapterId: string, sceneId: string): Promise<void> {
     const index = this.selectedScenes.findIndex(s => s.sceneId === sceneId);
-    
+
     if (index > -1) {
       this.selectedScenes.splice(index, 1);
     } else {
       // Get fresh data from database to ensure latest content
       const freshStory = await this.storyService.getStory(this.storyId!);
       if (!freshStory) return;
-      
+
       const chapter = freshStory.chapters.find(c => c.id === chapterId);
       const scene = chapter?.scenes.find(s => s.id === sceneId);
-      
+
       if (chapter && scene) {
+        // Check if this is the current scene - if so, mark as truncated
+        const isCurrentScene = sceneId === this.sceneId;
+
         this.selectedScenes.push({
           chapterId: chapter.id,
           sceneId: scene.id,
           chapterTitle: `C${chapter.chapterNumber || chapter.order}:${chapter.title}`,
           sceneTitle: `S${scene.sceneNumber || scene.order}:${scene.title}`,
           content: this.extractFullTextFromScene(scene),
-          selected: true
+          selected: true,
+          isTruncated: isCurrentScene // Mark as truncated if it's the current scene
         });
       }
     }
-    
+
     // Persist the selected scenes
     this.persistContextSettings();
   }
@@ -1240,17 +1249,42 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     return cleanText.substring(0, 100) + (cleanText.length > 100 ? '...' : '');
   }
 
-  private extractFullTextFromScene(scene: Scene): string {
+  private extractFullTextFromScene(scene: Scene, truncateAtBeatId?: string): string {
     if (!scene.content) return '';
 
     // Use DOM parser for more reliable HTML parsing
     const parser = new DOMParser();
     const doc = parser.parseFromString(scene.content, 'text/html');
-    
-    // Remove all beat AI wrapper elements and their contents
+
+    // If we need to truncate at a specific beat, find that beat and remove everything after it
+    if (truncateAtBeatId) {
+      const targetBeat = doc.querySelector(`.beat-ai-node[data-beat-id="${truncateAtBeatId}"]`);
+      if (targetBeat) {
+        // Remove the beat itself and all following siblings
+        let currentNode: Node | null = targetBeat;
+        while (currentNode) {
+          const nextNode: Node | null = currentNode.nextSibling;
+          currentNode.parentNode?.removeChild(currentNode);
+          currentNode = nextNode;
+        }
+
+        // Also check if beat is within a paragraph and remove content after it
+        const parentParagraph = targetBeat.parentElement;
+        if (parentParagraph?.tagName === 'P') {
+          let sibling: Node | null = parentParagraph.nextSibling;
+          while (sibling) {
+            const nextSibling: Node | null = sibling.nextSibling;
+            sibling.parentNode?.removeChild(sibling);
+            sibling = nextSibling;
+          }
+        }
+      }
+    }
+
+    // Remove all remaining beat AI wrapper elements and their contents
     const beatWrappers = doc.querySelectorAll('.beat-ai-wrapper, .beat-ai-node');
     beatWrappers.forEach(element => element.remove());
-    
+
     // Remove beat markers and comments
     const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
     const textNodes: Text[] = [];
@@ -1258,16 +1292,16 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     while ((node = walker.nextNode())) {
       textNodes.push(node as Text);
     }
-    
+
     textNodes.forEach(textNode => {
       // Remove beat markers like [Beat: description]
       textNode.textContent = textNode.textContent?.replace(/\[Beat:[^\]]*\]/g, '') || '';
     });
-    
+
     // Convert to text while preserving paragraph structure
     let cleanText = '';
     const paragraphs = doc.querySelectorAll('p');
-    
+
     for (const p of paragraphs) {
       const text = p.textContent?.trim() || '';
       if (text) {
@@ -1277,12 +1311,12 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
         cleanText += '\n';
       }
     }
-    
+
     // If no paragraphs found, fall back to body text
     if (!paragraphs.length) {
       cleanText = doc.body.textContent || '';
     }
-    
+
     // Clean up extra whitespace
     cleanText = cleanText.replace(/\n\s*\n\s*\n/g, '\n\n');
     cleanText = cleanText.trim();
@@ -1290,17 +1324,17 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     return cleanText;
   }
 
-  private async buildCustomContext(): Promise<{ 
-    selectedScenes: string[]; 
+  private async buildCustomContext(): Promise<{
+    selectedScenes: string[];
     includeStoryOutline: boolean;
     selectedSceneContexts: { sceneId: string; chapterId: string; content: string; }[];
   }> {
     // For the current scene, get fresh content from database
     const freshSelectedScenes = [];
-    
+
     for (const scene of this.selectedScenes) {
       let content = scene.content;
-      
+
       // If this is the current scene being edited, get fresh content from database
       if (scene.sceneId === this.sceneId && this.storyId) {
         try {
@@ -1309,7 +1343,8 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
             const freshChapter = freshStory.chapters.find(c => c.id === scene.chapterId);
             const freshScene = freshChapter?.scenes.find(s => s.id === scene.sceneId);
             if (freshScene) {
-              content = this.extractFullTextFromScene(freshScene);
+              // For the current scene, truncate at the current beat position
+              content = this.extractFullTextFromScene(freshScene, this.beatData.id);
             }
           }
         } catch (error) {
@@ -1317,14 +1352,14 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
           // Fall back to cached content
         }
       }
-      
+
       freshSelectedScenes.push({
         sceneId: scene.sceneId,
         chapterId: scene.chapterId,
         content: content
       });
     }
-    
+
     return {
       selectedScenes: freshSelectedScenes.map(scene => scene.content),
       includeStoryOutline: this.includeStoryOutline,
