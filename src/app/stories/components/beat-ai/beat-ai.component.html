@@ -82,7 +82,8 @@
           <ion-chip
             *ngFor="let scene of selectedScenes"
             [color]="scene.sceneId === sceneId ? 'primary' : 'medium'"
-            [class.truncated-scene]="scene.isTruncated">
+            [class.truncated-scene]="scene.isTruncated"
+            [title]="scene.isTruncated ? 'This scene context is truncated at the current beat position - only text before this beat is included' : ''">
             <ion-label>{{ scene.chapterTitle }} - {{ scene.sceneTitle }}</ion-label>
             <ion-icon
               name="close-outline"
