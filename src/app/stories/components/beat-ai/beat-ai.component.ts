@@ -395,6 +395,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     // Determine the action and get existing text if needed
     let action: 'generate' | 'regenerate' | 'rewrite';
     let existingText: string | undefined;
+    let promptToUse = this.beatData.prompt; // Default to original prompt
 
     if (this.beatData.lastAction === 'rewrite' && this.beatData.rewriteContext) {
       // This was a rewrite - regenerate as a rewrite
@@ -402,14 +403,16 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       // Try to get current text after beat, fallback to original stored text
       existingText = this.proseMirrorService.getTextAfterBeat(this.beatData.id)
                      || this.beatData.rewriteContext.originalText;
+      // Use the rewrite instruction, not the original prompt
+      promptToUse = this.beatData.rewriteContext.instruction;
     } else {
-      // Regular regeneration
+      // Regular regeneration - use original prompt
       action = 'regenerate';
     }
 
     this.promptSubmit.emit({
       beatId: this.beatData.id,
-      prompt: this.beatData.prompt,
+      prompt: promptToUse,
       action: action,
       wordCount: this.getActualWordCount(),
       model: this.selectedModel,
@@ -474,12 +477,13 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
             }
 
             // Store the rewrite context for regeneration
+            // IMPORTANT: Keep the original prompt intact, store rewrite instruction separately
             this.beatData.lastAction = 'rewrite';
             this.beatData.rewriteContext = {
               originalText: existingText,
               instruction: rewritePrompt
             };
-            this.beatData.prompt = rewritePrompt; // User-facing prompt
+            // DO NOT replace the original prompt - keep it for future regenerations
 
             // Start rewrite process
             this.beatData.isGenerating = true;
