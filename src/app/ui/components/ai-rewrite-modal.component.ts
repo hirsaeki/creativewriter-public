@@ -557,9 +557,9 @@ export class AIRewriteModalComponent implements OnInit, OnDestroy {
         ? `${contextText}Based on the above context, rewrite the following text: "${this.selectedText}"`
         : `Rewrite the following text: "${this.selectedText}"`;
       
-      const fullPrompt = this.customPrompt 
-        ? `${basePrompt}\n\nAdditional instruction: ${this.customPrompt}\n\nPlease ensure that the rewritten text fits the style and context of the story.`
-        : `${basePrompt}\n\nPlease ensure that the rewritten text fits the style and context of the story.`;
+      const fullPrompt = this.customPrompt
+        ? `${basePrompt}\n\nAdditional instruction: ${this.customPrompt}\n\nPlease ensure that the rewritten text fits the style and context of the story.\n\nIMPORTANT: Return ONLY the rewritten text. Do not include any explanations, introductory phrases, multiple versions, or any other text. Just the rewritten content itself.`
+        : `${basePrompt}\n\nPlease ensure that the rewritten text fits the style and context of the story.\n\nIMPORTANT: Return ONLY the rewritten text. Do not include any explanations, introductory phrases, multiple versions, or any other text. Just the rewritten content itself.`;
 
       // Generate a unique beat ID for this rewrite request
       const beatId = `rewrite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
