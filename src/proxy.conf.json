@@ -12,8 +12,8 @@
     "logLevel": "debug"
   },
   "/_db": {
-    "target": "http://192.168.178.5:3080",
-    "secure": false,
+    "target": "https://creativewriter.qw05.de",
+    "secure": true,
     "changeOrigin": true,
     "logLevel": "debug"
   },

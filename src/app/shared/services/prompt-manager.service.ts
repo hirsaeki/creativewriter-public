@@ -414,7 +414,7 @@ export class PromptManagerService {
       const doc = parser.parseFromString(scene.content, 'text/html');
       
       // Find the target beat node
-      const targetBeatNode = doc.querySelector(`.beat-ai-node[data-id="${beatId}"]`);
+      const targetBeatNode = doc.querySelector(`.beat-ai-node[data-beat-id="${beatId}"]`);
       if (!targetBeatNode) {
         // Beat not found, return full text
         return flatScene.fullText;
