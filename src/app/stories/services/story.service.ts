@@ -5,6 +5,7 @@ import { DeviceService } from '../../core/services/device.service';
 import { getSystemMessage, getBeatGenerationTemplate } from '../../shared/resources/system-messages';
 import { StoryLanguage } from '../../ui/components/language-selection-dialog/language-selection-dialog.component';
 import { BeatHistoryService } from '../../shared/services/beat-history.service';
+import { StoryMetadataIndexService } from './story-metadata-index.service';
 import { countStories } from '../../shared/utils/document-filters';
 
 // Current schema version for migration tracking
@@ -18,11 +19,40 @@ export class StoryService {
   private readonly databaseService = inject(DatabaseService);
   private readonly beatHistoryService = inject(BeatHistoryService);
   private readonly deviceService = inject(DeviceService);
+  private readonly metadataIndexService = inject(StoryMetadataIndexService);
   private db: PouchDB.Database | null = null;
 
   // Performance optimization: Cache for story previews and word counts
   private previewCache = new Map<string, string>();
   private wordCountCache = new Map<string, number>();
+
+  constructor() {
+    // Ensure metadata index exists and is up-to-date
+    // Run in background - don't block service initialization
+    this.ensureMetadataIndexExists().catch(err => {
+      console.error('[StoryService] Failed to ensure metadata index exists:', err);
+    });
+  }
+
+  /**
+   * Ensure metadata index exists and rebuild if necessary
+   * This runs on service initialization to maintain index integrity
+   */
+  private async ensureMetadataIndexExists(): Promise<void> {
+    try {
+      // Try to get the index - this will create it if missing
+      await this.metadataIndexService.getMetadataIndex();
+    } catch {
+      // If there's an error, try to rebuild the index
+      console.warn('[StoryService] Metadata index missing or corrupted, rebuilding...');
+      try {
+        await this.metadataIndexService.rebuildIndex();
+      } catch (rebuildError) {
+        console.error('[StoryService] Failed to rebuild metadata index:', rebuildError);
+        // Don't throw - service should still work without index
+      }
+    }
+  }
 
   /**
    * Get all stories with optional pagination
@@ -217,6 +247,13 @@ export class StoryService {
     try {
       const response = await this.db.put(newStory);
       newStory._rev = response.rev;
+
+      // Update metadata index with new story
+      // Run in background - don't block story creation
+      this.metadataIndexService.updateStoryMetadata(newStory).catch(err => {
+        console.error('[StoryService] Failed to update metadata index after creation:', err);
+      });
+
       return newStory;
     } catch (error) {
       console.error('Error creating story:', error);
@@ -246,6 +283,12 @@ export class StoryService {
       };
 
       await this.db.put(updatedStory);
+
+      // Update metadata index with updated story
+      // Run in background - don't block story updates
+      this.metadataIndexService.updateStoryMetadata(updatedStory).catch(err => {
+        console.error('[StoryService] Failed to update metadata index after update:', err);
+      });
     } catch (error) {
       console.error('Error updating story:', error);
       throw error;
@@ -286,6 +329,12 @@ export class StoryService {
       }
 
       await this.db.remove(doc);
+
+      // Remove story from metadata index
+      // Run in background - don't block story deletion
+      this.metadataIndexService.removeStoryMetadata(storyId).catch(err => {
+        console.error('[StoryService] Failed to remove story from metadata index:', err);
+      });
     } catch (error) {
       console.error('Error deleting story:', error);
       throw error;

@@ -32,8 +32,8 @@ Two-part optimization:
 |-------|--------|----------------|--------|
 | Selective Sync | ✅ Complete | 2025-11-07 | d3349d0 |
 | Metadata Index - Phase 1 | ✅ Complete | 2025-11-07 | 60e09f1 |
-| Metadata Index - Phase 2 | ⏳ Next | - | - |
-| Metadata Index - Phase 3 | 📋 Planned | - | - |
+| Metadata Index - Phase 2 | ✅ Complete | 2025-11-07 | TBD |
+| Metadata Index - Phase 3 | ⏳ Next | - | - |
 | Metadata Index - Phase 4 | 📋 Planned | - | - |
 | Metadata Index - Phase 5 | 📋 Planned | - | - |
 
@@ -168,58 +168,89 @@ StoryMetadata {
 
 ---
 
-## Next Steps
+### ✅ Metadata Index - Phase 2: StoryService Integration
+**Commit:** TBD
+**Date:** 2025-11-07
+**Branch:** main
 
-### 📋 Metadata Index - Phase 2: Integration with StoryService
+**Description:**
+Integrated metadata index service with StoryService to automatically update the index whenever stories are created, updated, or deleted.
 
-**Goal:** Automatically update metadata index when stories are created, updated, or deleted.
+**Changes Made:**
 
-**Planned Changes:**
+**File Modified:** `src/app/stories/services/story.service.ts` (+37 lines, modified 4 methods)
 
-**File to Modify:** `src/app/stories/services/story.service.ts`
+1. **Added import and injection:**
+   - Imported `StoryMetadataIndexService`
+   - Injected service via `inject()`
 
-1. **Inject StoryMetadataIndexService**
-   ```typescript
-   private metadataIndexService = inject(StoryMetadataIndexService);
-   ```
+2. **Added constructor with index initialization:**
+   - Calls `ensureMetadataIndexExists()` on service creation
+   - Runs in background to avoid blocking service initialization
+   - Automatically rebuilds index if missing or corrupted
 
-2. **Update `createStory()` method**
+3. **Updated `createStory()` method** (lines 219-228):
    - After successful story creation
-   - Call `metadataIndexService.updateStoryMetadata(story)`
+   - Calls `metadataIndexService.updateStoryMetadata(newStory)`
+   - Runs in background - doesn't block story creation
+   - Logs errors without failing the operation
 
-3. **Update `updateStory()` method**
+4. **Updated `updateStory()` method** (lines 257-263):
    - After successful story update
-   - Call `metadataIndexService.updateStoryMetadata(story)`
+   - Calls `metadataIndexService.updateStoryMetadata(updatedStory)`
+   - Runs in background - doesn't block story updates
+   - Logs errors without failing the operation
 
-4. **Update `updateScene()` method**
-   - After successful scene update
-   - Reload full story and update index
-   - (Scene changes affect preview text)
+5. **Updated `deleteStory()` method** (lines 303-309):
+   - After successful story deletion
+   - Calls `metadataIndexService.removeStoryMetadata(storyId)`
+   - Runs in background - doesn't block story deletion
+   - Logs errors without failing the operation
 
-5. **Update `deleteStory()` method**
-   - After successful deletion
-   - Call `metadataIndexService.removeStoryMetadata(storyId)`
+6. **Note on `updateScene()` method:**
+   - No changes needed - already calls `updateStory()`
+   - Automatically triggers index update through `updateStory()`
 
-6. **Add index rebuild on service initialization**
-   - Check if index exists on startup
-   - Rebuild if missing or corrupted
-   - Run in background, don't block
+**Key Design Decisions:**
 
-**Testing Plan:**
-- Create new story → verify index updated
-- Edit story → verify index updated
-- Delete story → verify removed from index
-- Edit first scene → verify preview text updated
-- Check index document in database
+1. **Background Updates:**
+   - All index updates run asynchronously without blocking
+   - Errors are logged but don't fail the main operation
+   - Index is "best effort" - app works even if index update fails
 
-**Estimated Effort:** 1-2 hours
+2. **Automatic Index Creation:**
+   - Service checks for index on initialization
+   - Creates new index if missing
+   - Rebuilds if corrupted
 
-**Success Criteria:**
-- Index automatically stays in sync with stories
-- No manual intervention required
-- Graceful handling of failures
+3. **Graceful Degradation:**
+   - Service works without metadata index
+   - Index updates are opportunistic, not critical
+   - Failures don't break story operations
+
+**Testing:**
+- ✅ Build successful
+- ✅ Linting passed
+- ✅ All methods properly call index service
+- ✅ Error handling in place
+- 🔄 Manual testing pending (Phase 3)
+
+**Expected Behavior:**
+- New story created → index updated with metadata
+- Story edited → index metadata refreshed (including preview text)
+- First scene edited → preview text in index updated
+- Story deleted → removed from index
+- App starts → index verified/created/rebuilt as needed
+
+**Integration Status:**
+- ✅ StoryService automatically updates index
+- ✅ Index stays in sync with story changes
+- ⏳ Story list component still loads full stories (Phase 3)
+- ⏳ Sync filter not yet updated to prioritize index (Phase 4)
 
 ---
+
+## Next Steps
 
 ### 📋 Metadata Index - Phase 3: Update Story List Component
 
