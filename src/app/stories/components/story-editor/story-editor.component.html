@@ -68,6 +68,9 @@
             <div class="loading-content">
               <ion-spinner name="crescent"></ion-spinner>
               <p class="loading-message">{{ loadingMessage }}</p>
+              <div class="debug-logs" *ngIf="debugLogs.length > 0">
+                <div class="debug-log" *ngFor="let log of debugLogs">{{ log }}</div>
+              </div>
             </div>
           </div>
 

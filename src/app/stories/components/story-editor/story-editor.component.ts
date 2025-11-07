@@ -155,6 +155,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   // Story loading state (Phase 5: Sync indicator)
   isLoadingStory = false;
   loadingMessage = 'Loading story...';
+  debugLogs: string[] = [];
 
   debugModeEnabled = false;
   private saveSubject = new Subject<void>();
@@ -245,14 +246,19 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
             // Phase 5: Show loading indicator and wait for story to sync
             this.isLoadingStory = true;
             this.loadingMessage = 'Loading story...';
+            this.debugLogs = [];
             this.cdr.markForCheck();
 
             // CRITICAL: Set activeStoryId BEFORE loading so selective sync knows to sync this story
             // Without this, the sync filter won't sync the story document (only metadata index)
+            this.addDebugLog(`Setting activeStoryId: ${storyId}`);
             console.info(`[StoryEditor] Setting activeStoryId to ${storyId} for selective sync`);
             this.databaseService.setActiveStoryId(storyId);
 
-            // Wait for story to sync from remote (with 5s timeout)
+            const currentActiveId = this.databaseService.getActiveStoryId();
+            this.addDebugLog(`Active story ID confirmed: ${currentActiveId}`);
+
+            // Wait for story to sync from remote (with 10s timeout)
             await this.waitForStorySynced(storyId);
 
             // Update loading message
@@ -663,11 +669,13 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
    */
   private async waitForStorySynced(storyId: string, timeoutMs = 10000): Promise<void> {
     const startTime = Date.now();
+    this.addDebugLog(`Waiting for story to sync...`);
     console.info(`[StoryEditor] Waiting for story ${storyId} to sync...`);
 
     return new Promise((resolve) => {
       let syncSubscription: Subscription | null = null;
       let checkInterval: ReturnType<typeof setInterval> | null = null;
+      let checkCount = 0;
 
       const cleanup = () => {
         if (syncSubscription) {
@@ -683,23 +691,32 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       const checkTimeout = () => {
         if (Date.now() - startTime >= timeoutMs) {
           cleanup();
-          console.warn(`[StoryEditor] Timeout waiting for story ${storyId} to sync (${timeoutMs}ms)`);
+          const message = `Timeout after ${timeoutMs}ms (checked ${checkCount} times)`;
+          this.addDebugLog(`⚠️ ${message}`);
+          console.warn(`[StoryEditor] ${message}`);
           resolve(); // Timeout - proceed anyway and let loadStory handle the error
         }
       };
 
       // Periodically check if the story document exists
       const checkStoryExists = async () => {
+        checkCount++;
         try {
           const db = await this.databaseService.getDatabase();
           await db.get(storyId);
           // Story exists!
           cleanup();
           const elapsed = Date.now() - startTime;
-          console.info(`[StoryEditor] Story ${storyId} found in database after ${elapsed}ms`);
+          const message = `✓ Story found after ${elapsed}ms`;
+          this.addDebugLog(message);
+          console.info(`[StoryEditor] ${message}`);
           resolve();
         } catch {
           // Story doesn't exist yet, keep waiting
+          if (checkCount % 4 === 0) { // Log every 2 seconds (4 checks)
+            const elapsed = Date.now() - startTime;
+            this.addDebugLog(`Still waiting... (${elapsed}ms, check ${checkCount})`);
+          }
           checkTimeout();
         }
       };
@@ -714,6 +731,9 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
 
       // Subscribe to sync status to check when sync completes
       syncSubscription = this.databaseService.syncStatus$.subscribe(status => {
+        if (checkCount === 1) { // Only log sync status once
+          this.addDebugLog(`Sync status: ${status.isSync ? 'syncing' : 'idle'}, online: ${status.isOnline}`);
+        }
         checkTimeout();
 
         // When sync completes or becomes idle, check if story exists
@@ -728,10 +748,21 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       // Hard timeout
       setTimeout(() => {
         cleanup();
+        this.addDebugLog(`❌ Hard timeout reached`);
         console.warn(`[StoryEditor] Hard timeout reached for story ${storyId}`);
         resolve();
       }, timeoutMs);
     });
+  }
+
+  private addDebugLog(message: string): void {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+    this.debugLogs.push(`[${timestamp}] ${message}`);
+    // Keep only last 20 logs
+    if (this.debugLogs.length > 20) {
+      this.debugLogs = this.debugLogs.slice(-20);
+    }
+    this.cdr.markForCheck();
   }
 
   // Consider a story an "empty draft" only if it's in the default structure
