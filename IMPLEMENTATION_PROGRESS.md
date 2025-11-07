@@ -32,7 +32,7 @@ Two-part optimization:
 |-------|--------|----------------|--------|
 | Selective Sync | ✅ Complete | 2025-11-07 | d3349d0 |
 | Metadata Index - Phase 1 | ✅ Complete | 2025-11-07 | 60e09f1 |
-| Metadata Index - Phase 2 | ✅ Complete | 2025-11-07 | TBD |
+| Metadata Index - Phase 2 | ✅ Complete | 2025-11-07 | 1cddf16 |
 | Metadata Index - Phase 3 | ⏳ Next | - | - |
 | Metadata Index - Phase 4 | 📋 Planned | - | - |
 | Metadata Index - Phase 5 | 📋 Planned | - | - |
@@ -169,7 +169,7 @@ StoryMetadata {
 ---
 
 ### ✅ Metadata Index - Phase 2: StoryService Integration
-**Commit:** TBD
+**Commit:** 1cddf16
 **Date:** 2025-11-07
 **Branch:** main
 
