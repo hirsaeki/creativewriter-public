@@ -195,15 +195,23 @@ export class DatabaseService {
    */
   setActiveStoryId(storyId: string | null): void {
     const changed = this.activeStoryId !== storyId;
+    const previousId = this.activeStoryId;
     this.activeStoryId = storyId;
+
+    console.info(`[DatabaseService] setActiveStoryId: ${previousId} → ${storyId} (changed: ${changed})`);
 
     // If the active story changed and sync is running, restart sync to apply new filter
     if (changed && this.syncHandler) {
+      console.info('[DatabaseService] Restarting sync to apply new activeStoryId filter...');
       this.stopSync().then(() => {
+        console.info('[DatabaseService] Sync stopped, starting with new filter...');
         this.startSync();
+        console.info('[DatabaseService] Sync restarted with activeStoryId:', this.activeStoryId);
       }).catch(err => {
         console.error('Error restarting sync after story change:', err);
       });
+    } else if (changed && !this.syncHandler) {
+      console.warn('[DatabaseService] activeStoryId changed but sync is not running');
     }
   }
 
@@ -332,6 +340,7 @@ export class DatabaseService {
         if (!this.activeStoryId) {
           // Story documents have no type field - exclude them
           if (!docType) {
+            console.debug(`[SyncFilter] Excluding story document ${docId} (no activeStoryId)`);
             return false;
           }
           // Codex documents are story-specific - exclude them
@@ -346,16 +355,21 @@ export class DatabaseService {
 
         // 1. Sync the active story document (stories have no type field)
         if (!docType && docId === this.activeStoryId) {
+          console.info(`[SyncFilter] ✓ Syncing active story: ${docId}`);
           return true;
         }
 
         // 2. Sync codex for the active story
         const storyId = (doc as { storyId?: string }).storyId;
         if (docType === 'codex' && storyId === this.activeStoryId) {
+          console.info(`[SyncFilter] ✓ Syncing codex for active story: ${docId}`);
           return true;
         }
 
         // 3. Exclude all other documents (other stories, their codex entries, etc.)
+        if (!docType) {
+          console.debug(`[SyncFilter] Excluding story document ${docId} (not active story ${this.activeStoryId})`);
+        }
         return false;
       }
     }) as unknown as PouchSync;
