@@ -222,6 +222,34 @@ export class DatabaseService {
     return this.activeStoryId;
   }
 
+  /**
+   * Force replication of a specific document from remote
+   * This is useful when opening a story to ensure it's immediately pulled from remote
+   *
+   * @param docId The document ID to replicate
+   * @returns Promise that resolves when replication completes
+   */
+  async forceReplicateDocument(docId: string): Promise<void> {
+    if (!this.remoteDb || !this.db) {
+      console.warn('[DatabaseService] Cannot force replicate: database not initialized');
+      return;
+    }
+
+    console.info(`[DatabaseService] Force replicating document: ${docId}`);
+
+    try {
+      // Do a one-time pull replication for this specific document
+      await this.db.replicate.from(this.remoteDb, {
+        doc_ids: [docId],
+        timeout: 10000
+      });
+      console.info(`[DatabaseService] ✓ Successfully replicated document: ${docId}`);
+    } catch (error) {
+      console.error(`[DatabaseService] Failed to replicate document ${docId}:`, error);
+      throw error;
+    }
+  }
+
   async setupSync(remoteUrl?: string): Promise<void> {
     try {
       // Use provided URL or try to detect from environment/location

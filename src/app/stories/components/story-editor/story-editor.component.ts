@@ -258,7 +258,18 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
             const currentActiveId = this.databaseService.getActiveStoryId();
             this.addDebugLog(`Active story ID confirmed: ${currentActiveId}`);
 
-            // Wait for story to sync from remote (with 10s timeout)
+            // FORCE immediate replication of the story document from remote
+            // This ensures the story is pulled even if live sync hasn't picked it up yet
+            this.addDebugLog(`Force replicating story from remote...`);
+            try {
+              await this.databaseService.forceReplicateDocument(storyId);
+              this.addDebugLog(`✓ Story replicated successfully`);
+            } catch (error) {
+              this.addDebugLog(`⚠️ Replication failed: ${error}`);
+              console.warn('[StoryEditor] Force replication failed, will wait for live sync:', error);
+            }
+
+            // Wait for story to be available in local database (with 10s timeout)
             await this.waitForStorySynced(storyId);
 
             // Update loading message
