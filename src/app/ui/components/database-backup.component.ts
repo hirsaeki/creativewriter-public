@@ -904,8 +904,8 @@ This action CANNOT be undone! All previous versions will be lost forever.`,
     try {
       console.info('[DatabaseBackup] Starting metadata index rebuild from local stories');
 
-      // Rebuild the index from local stories
-      const index = await this.metadataIndexService.rebuildIndex();
+      // Rebuild the index from local stories (force=true for manual user action)
+      const index = await this.metadataIndexService.rebuildIndex(true);
       const storiesCount = index.stories.length;
 
       console.info(`[DatabaseBackup] Successfully rebuilt metadata index with ${storiesCount} stories`);

@@ -27,7 +27,13 @@
       "Bash(npm --version)",
       "Bash(who)",
       "Bash(echo $DISPLAY)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "WebFetch(domain:code.claude.com)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.github.com)",
+      "Bash(git log:*)",
+      "mcp__chrome-devtools__list_pages"
     ],
     "deny": [],
     "ask": [],

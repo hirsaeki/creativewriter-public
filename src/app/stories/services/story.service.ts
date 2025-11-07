@@ -42,15 +42,14 @@ export class StoryService {
     try {
       // Try to get the index - this will create it if missing
       await this.metadataIndexService.getMetadataIndex();
-    } catch {
-      // If there's an error, try to rebuild the index
-      console.warn('[StoryService] Metadata index missing or corrupted, rebuilding...');
-      try {
-        await this.metadataIndexService.rebuildIndex();
-      } catch (rebuildError) {
-        console.error('[StoryService] Failed to rebuild metadata index:', rebuildError);
-        // Don't throw - service should still work without index
-      }
+    } catch (error) {
+      // If there's an error, log it but don't try to rebuild
+      // The new safety check in rebuildIndex prevents creating empty indexes
+      // that would overwrite remote data during sync
+      console.warn('[StoryService] Metadata index not available:', error);
+      console.info('[StoryService] Index will be created automatically when stories are added');
+      console.info('[StoryService] If sync is in progress, index will arrive shortly');
+      // Don't throw - service should still work without index
     }
   }
 

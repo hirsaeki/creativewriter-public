@@ -171,9 +171,10 @@ export class StoryMetadataIndexService {
    * - Index is corrupted
    * - Manual rebuild requested by user
    *
+   * @param force If true, rebuild even if local database is empty
    * @returns The newly rebuilt index
    */
-  async rebuildIndex(): Promise<StoryMetadataIndex> {
+  async rebuildIndex(force = false): Promise<StoryMetadataIndex> {
     await this.ensureInitialized();
 
     console.info('Rebuilding story metadata index from all stories...');
@@ -194,6 +195,28 @@ export class StoryMetadataIndexService {
         .map(row => this.deserializeStory(row.doc as Story));
 
       console.info(`Found ${stories.length} stories, extracting metadata...`);
+
+      // CRITICAL: Don't create an empty index that would overwrite a syncing remote index
+      // This prevents the race condition where a fresh Firefox install creates an empty
+      // index before sync completes, which then syncs to remote and overwrites Chrome's index
+      if (stories.length === 0 && !force) {
+        console.warn('[MetadataIndex] Local database has 0 stories - refusing to create empty index');
+        console.warn('[MetadataIndex] An empty index would sync to remote and overwrite existing data');
+        console.warn('[MetadataIndex] If sync is in progress, the index will arrive shortly');
+        console.warn('[MetadataIndex] Use force=true to override this safety check');
+
+        // Check if an index exists remotely (we might be mid-sync)
+        try {
+          const existing = await this.db!.get('story-metadata-index');
+          console.info('[MetadataIndex] Found existing index, returning it instead of creating empty one');
+          const deserializedIndex = this.deserializeIndex(existing as StoryMetadataIndex);
+          this.metadataCache = deserializedIndex;
+          return deserializedIndex;
+        } catch {
+          // No existing index either - throw error instead of creating empty one
+          throw new Error('Cannot rebuild index: local database is empty and no existing index found. Wait for sync to complete or add stories first.');
+        }
+      }
 
       // Create new index
       const index: StoryMetadataIndex = {
