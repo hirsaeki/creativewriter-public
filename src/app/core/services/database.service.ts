@@ -315,8 +315,30 @@ export class DatabaseService {
           return false;
         }
 
-        // If no active story is set, sync everything (backward compatible)
+        // ALWAYS sync the story metadata index (lightweight document for story list)
+        if (docId === 'story-metadata-index' || docType === 'story-metadata-index') {
+          return true;
+        }
+
+        // Sync user-wide documents (not story-specific)
+        // These include: custom backgrounds, videos, etc.
+        const userWideTypes = ['custom-background', 'video', 'image-video-association'];
+        if (docType && userWideTypes.includes(docType)) {
+          return true;
+        }
+
+        // If no active story is set (viewing story list), ONLY sync index + user-wide docs
+        // DO NOT sync individual story documents - they're not needed for the list view
         if (!this.activeStoryId) {
+          // Story documents have no type field - exclude them
+          if (!docType) {
+            return false;
+          }
+          // Codex documents are story-specific - exclude them
+          if (docType === 'codex') {
+            return false;
+          }
+          // Allow other document types (already handled user-wide types above)
           return true;
         }
 
@@ -333,14 +355,7 @@ export class DatabaseService {
           return true;
         }
 
-        // 3. Sync user-wide documents (not story-specific)
-        // These include: custom backgrounds, videos, etc.
-        const userWideTypes = ['custom-background', 'video', 'image-video-association'];
-        if (docType && userWideTypes.includes(docType)) {
-          return true;
-        }
-
-        // 4. Exclude all other documents (other stories, their codex entries, etc.)
+        // 3. Exclude all other documents (other stories, their codex entries, etc.)
         return false;
       }
     }) as unknown as PouchSync;
