@@ -63,6 +63,14 @@
         </ng-template>
         
         <ion-content [scrollEvents]="true">
+          <!-- Phase 5: Loading overlay for story sync -->
+          <div *ngIf="isLoadingStory" class="story-loading-overlay">
+            <div class="loading-content">
+              <ion-spinner name="crescent"></ion-spinner>
+              <p class="loading-message">{{ loadingMessage }}</p>
+            </div>
+          </div>
+
           <div class="editor-container">
             <div class="editor-main">
             <div class="editor-content" [style.--editor-text-color]="currentTextColor">

@@ -3,7 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
-  IonButton, IonIcon,
+  IonButton, IonIcon, IonSpinner,
   IonContent, IonChip, IonLabel, IonMenu, IonSplitPane, MenuController, LoadingController, ModalController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -50,7 +50,7 @@ import { StoryEditorStateService } from '../../services/story-editor-state.servi
   standalone: true,
   imports: [
     CommonModule, FormsModule,
-    IonContent, IonChip, IonLabel, IonButton, IonIcon,
+    IonContent, IonChip, IonLabel, IonButton, IonIcon, IonSpinner,
     IonMenu, IonSplitPane,
     StoryStructureComponent, SlashCommandDropdownComponent, ImageUploadDialogComponent,
     VideoModalComponent, ImageViewerModalComponent, AppHeaderComponent, StoryStatsComponent, VersionTooltipComponent,
@@ -152,6 +152,10 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   // Beat navigation panel functionality
   showBeatNavPanel = false;
 
+  // Story loading state (Phase 5: Sync indicator)
+  isLoadingStory = false;
+  loadingMessage = 'Loading story...';
+
   debugModeEnabled = false;
   private saveSubject = new Subject<void>();
   private contentChangeSubject = new Subject<string>();
@@ -238,10 +242,23 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
 
         if (storyId) {
           try {
+            // Phase 5: Show loading indicator and wait for story to sync
+            this.isLoadingStory = true;
+            this.loadingMessage = 'Loading story...';
+            this.cdr.markForCheck();
+
+            // Wait for story to sync from remote (with 5s timeout)
+            await this.waitForStorySynced(storyId);
+
+            // Update loading message
+            this.loadingMessage = 'Opening story...';
+            this.cdr.markForCheck();
+
             // Load story using editor state service
             await this.editorState.loadStory(storyId, preferredChapterId || undefined, preferredSceneId || undefined);
 
-            // Trigger change detection to ensure template is updated
+            // Hide loading indicator
+            this.isLoadingStory = false;
             this.cdr.markForCheck();
 
             // Initialize editor after story is loaded and view is available
@@ -270,6 +287,9 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
             }, 0);
           } catch (error) {
             console.error('Failed to load story:', error);
+            // Hide loading indicator on error
+            this.isLoadingStory = false;
+            this.cdr.markForCheck();
             // Story not found, navigate back
             this.router.navigate(['/']);
           }
@@ -625,6 +645,61 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       this.rightActions[1].chipContent = `${this.wordCount}w`;
       this.rightActions[1].action = () => this.showStoryStatsModal();
     }
+  }
+
+  /**
+   * Wait for the active story to sync from remote
+   * Phase 5: Provides better UX by waiting for story data to be available
+   *
+   * @param storyId - The ID of the story to wait for
+   * @param timeoutMs - Maximum time to wait (default: 5 seconds)
+   * @returns Promise that resolves when story is synced or timeout occurs
+   */
+  private async waitForStorySynced(storyId: string, timeoutMs = 5000): Promise<void> {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      let syncSubscription: Subscription | null = null;
+
+      const checkTimeout = () => {
+        if (Date.now() - startTime >= timeoutMs) {
+          if (syncSubscription) {
+            syncSubscription.unsubscribe();
+          }
+          resolve(); // Timeout - proceed anyway
+        }
+      };
+
+      // Subscribe to sync status changes
+      syncSubscription = this.databaseService.syncStatus$.subscribe(status => {
+        // Check if we've exceeded timeout
+        checkTimeout();
+
+        // If sync just completed, check if our story is available
+        if (status.lastSync && status.lastSync > new Date(startTime)) {
+          // Story might be synced now - resolve
+          if (syncSubscription) {
+            syncSubscription.unsubscribe();
+          }
+          resolve();
+        }
+
+        // If not syncing and not connecting, resolve (story is already local or won't sync)
+        if (!status.isSync && !status.isConnecting) {
+          if (syncSubscription) {
+            syncSubscription.unsubscribe();
+          }
+          resolve();
+        }
+      });
+
+      // Also set a hard timeout
+      setTimeout(() => {
+        if (syncSubscription) {
+          syncSubscription.unsubscribe();
+        }
+        resolve();
+      }, timeoutMs);
+    });
   }
 
   // Consider a story an "empty draft" only if it's in the default structure

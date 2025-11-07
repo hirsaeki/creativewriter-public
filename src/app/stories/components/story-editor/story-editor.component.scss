@@ -1,3 +1,43 @@
+    // Phase 5: Loading overlay for story sync
+    .story-loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      backdrop-filter: blur(4px);
+
+      .loading-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 32px;
+        background-color: var(--ion-color-step-100);
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+
+        ion-spinner {
+          width: 48px;
+          height: 48px;
+          --color: var(--ion-color-primary);
+        }
+
+        .loading-message {
+          margin: 0;
+          color: var(--ion-color-step-800);
+          font-size: 16px;
+          font-weight: 500;
+          text-align: center;
+        }
+      }
+    }
+
     :host {
       background: transparent;
       min-height: 100vh;
