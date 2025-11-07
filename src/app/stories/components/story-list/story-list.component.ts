@@ -13,7 +13,8 @@ import { CdkDropList, CdkDrag, CdkDragDrop, moveItemInArray } from '@angular/cdk
 import { addIcons } from 'ionicons';
 import { add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline, cloudDownload, warning, checkmarkCircle, alertCircle, sync } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
-import { Story } from '../../models/story.interface';
+import { StoryMetadata } from '../../models/story-metadata.interface';
+import { StoryMetadataIndexService } from '../../services/story-metadata-index.service';
 import { StoryLanguage } from '../../../ui/components/language-selection-dialog/language-selection-dialog.component';
 import { SyncStatusComponent } from '../../../ui/components/sync-status.component';
 import { LoginComponent } from '../../../ui/components/login.component';
@@ -39,6 +40,7 @@ import { DatabaseService, SyncStatus } from '../../../core/services/database.ser
 })
 export class StoryListComponent implements OnInit, OnDestroy {
   private storyService = inject(StoryService);
+  private metadataIndexService = inject(StoryMetadataIndexService);
   private router = inject(Router);
   private authService = inject(AuthService);
   private headerNavService = inject(HeaderNavigationService);
@@ -52,7 +54,7 @@ export class StoryListComponent implements OnInit, OnDestroy {
   private lastSyncTime: Date | undefined;
 
   @ViewChild('burgerMenuFooter', { static: true }) burgerMenuFooter!: TemplateRef<unknown>;
-  stories: Story[] = [];
+  stories: StoryMetadata[] = [];
   currentUser: User | null = null;
   fabMenuOpen = false;
   burgerMenuItems: BurgerMenuItem[] = [];
@@ -194,15 +196,30 @@ export class StoryListComponent implements OnInit, OnDestroy {
     }
 
     try {
-      // Load stories for current page
-      const newStories = await this.storyService.getAllStories(
-        this.pageSize,
-        this.currentPage * this.pageSize
-      );
+      // Load story metadata from index (lightweight)
+      const index = await this.metadataIndexService.getMetadataIndex();
 
-      // Get total count (only on first load for efficiency)
+      // Sort stories by order field (ascending), then by updatedAt (descending)
+      const sortedStories = [...index.stories].sort((a, b) => {
+        // First sort by order if both have it
+        if (a.order !== undefined && b.order !== undefined) {
+          return a.order - b.order;
+        }
+        // Stories with order come before those without
+        if (a.order !== undefined) return -1;
+        if (b.order !== undefined) return 1;
+        // Fall back to updatedAt (newest first)
+        return b.updatedAt.getTime() - a.updatedAt.getTime();
+      });
+
+      // Implement pagination on metadata
+      const startIndex = this.currentPage * this.pageSize;
+      const endIndex = startIndex + this.pageSize;
+      const newStories = sortedStories.slice(startIndex, endIndex);
+
+      // Get total count
       if (reset) {
-        this.totalStories = await this.storyService.getTotalStoriesCount();
+        this.totalStories = sortedStories.length;
       }
 
       // Append or replace stories
@@ -225,6 +242,46 @@ export class StoryListComponent implements OnInit, OnDestroy {
         this.checkForMissingStories();
       }
 
+    } catch (error) {
+      console.error('[StoryList] Failed to load metadata index, falling back to full stories:', error);
+      // Fallback to loading full stories if metadata index fails
+      try {
+        const newStories = await this.storyService.getAllStories(
+          this.pageSize,
+          this.currentPage * this.pageSize
+        );
+
+        if (reset) {
+          this.totalStories = await this.storyService.getTotalStoriesCount();
+        }
+
+        // Map Story to StoryMetadata for display
+        const metadata: StoryMetadata[] = newStories.map(story => ({
+          id: story.id,
+          title: story.title,
+          coverImageThumbnail: story.coverImage,
+          previewText: this.storyService.getStoryPreview(story),
+          chapterCount: story.chapters.length,
+          sceneCount: story.chapters.reduce((sum, ch) => sum + ch.scenes.length, 0),
+          wordCount: this.storyService.getWordCount(story),
+          createdAt: story.createdAt,
+          updatedAt: story.updatedAt,
+          order: story.order
+        }));
+
+        if (reset) {
+          this.stories = metadata;
+        } else {
+          this.stories = [...this.stories, ...metadata];
+        }
+
+        const loadedCount = (this.currentPage + 1) * this.pageSize;
+        this.hasMoreStories = loadedCount < this.totalStories && newStories.length === this.pageSize;
+
+      } catch (fallbackError) {
+        console.error('[StoryList] Fallback loading also failed:', fallbackError);
+        throw fallbackError;
+      }
     } finally {
       this.isLoadingStories = false;
       this.isLoadingMore = false;
@@ -241,14 +298,29 @@ export class StoryListComponent implements OnInit, OnDestroy {
     await this.loadStories(false);
   }
 
-  async drop(event: CdkDragDrop<Story[]>): Promise<void> {
+  async drop(event: CdkDragDrop<StoryMetadata[]>): Promise<void> {
     if (event.previousIndex !== event.currentIndex) {
       // Move item in local array
       moveItemInArray(this.stories, event.previousIndex, event.currentIndex);
-      
+
       try {
-        // Persist the new order to the database
-        await this.storyService.reorderStories(this.stories);
+        // Update the order field for each story based on new position
+        const updatedStories = this.stories.map((story, index) => ({
+          ...story,
+          order: index
+        }));
+
+        // Update metadata index with new order
+        for (const story of updatedStories) {
+          // Load full story, update order, save
+          const fullStory = await this.storyService.getStory(story.id);
+          if (fullStory) {
+            fullStory.order = story.order;
+            await this.storyService.updateStory(fullStory);
+          }
+        }
+
+        this.stories = updatedStories;
       } catch (error) {
         console.error('Failed to save story order:', error);
         // Reload stories to reset to previous state if save fails
@@ -357,23 +429,23 @@ export class StoryListComponent implements OnInit, OnDestroy {
     }
   }
 
-  getStoryPreview(story: Story): string {
-    // Delegate to service for caching
-    return this.storyService.getStoryPreview(story);
+  getStoryPreview(story: StoryMetadata): string {
+    // Metadata already includes preview text
+    return story.previewText;
   }
 
-  getWordCount(story: Story): number {
-    // Delegate to service for caching
-    return this.storyService.getWordCount(story);
+  getWordCount(story: StoryMetadata): number {
+    // Metadata already includes word count
+    return story.wordCount;
   }
 
-  getCoverImageUrl(story: Story): string | null {
-    if (!story.coverImage) return null;
-    return `data:image/png;base64,${story.coverImage}`;
+  getCoverImageUrl(story: StoryMetadata): string | null {
+    if (!story.coverImageThumbnail) return null;
+    return `data:image/png;base64,${story.coverImageThumbnail}`;
   }
 
-  trackByStoryId(index: number, story: Story): string {
-    return story._id || story.id;
+  trackByStoryId(index: number, story: StoryMetadata): string {
+    return story.id;
   }
 
   /**

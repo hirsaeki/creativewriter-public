@@ -112,12 +112,12 @@
               [class.reordering-enabled]="reorderingEnabled"
               button>
       <!-- Cover Image -->
-      <div class="story-cover" *ngIf="story.coverImage">
+      <div class="story-cover" *ngIf="story.coverImageThumbnail">
         <img [src]="getCoverImageUrl(story)" [alt]="story.title || 'Story cover'" />
         <div class="cover-overlay"></div>
       </div>
-      
-      <ion-card-header [class.with-cover]="!!story.coverImage">
+
+      <ion-card-header [class.with-cover]="!!story.coverImageThumbnail">
         <div class="card-header-content">
           <ion-button fill="clear" size="small" color="medium" 
                       class="drag-handle" 
