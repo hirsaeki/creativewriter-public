@@ -8,16 +8,17 @@ import {
   IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
   IonSearchbar, IonList, IonChip, IonTextarea, IonInput, IonButton, IonIcon,
   IonModal, IonGrid, IonRow, IonCol, IonText, IonNote, IonButtons, IonToolbar, IonTitle, IonHeader, IonFooter,
-  IonSelect, IonSelectOption, IonToggle
+  IonSelect, IonSelectOption, IonToggle, ModalController
 } from '@ionic/angular/standalone';
 import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
 import { addIcons } from 'ionicons';
 import {
   arrowBack, add, ellipsisVertical, create, trash, save, close,
-  search, person, bookmark, pricetag, star
+  search, person, bookmark, pricetag, star, swapHorizontal, helpCircle
 } from 'ionicons/icons';
 import { CodexService } from '../../services/codex.service';
 import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole } from '../../models/codex.interface';
+import { CodexTransferModalComponent } from '../codex-transfer-modal/codex-transfer-modal.component';
 
 @Component({
   selector: 'app-codex',
@@ -37,6 +38,7 @@ export class CodexComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private codexService = inject(CodexService);
+  private modalController = inject(ModalController);
   private cdr = inject(ChangeDetectorRef);
   private subscriptions = new Subscription();
 
@@ -50,6 +52,7 @@ export class CodexComponent implements OnInit, OnDestroy {
 
   // Modals
   showAddCategoryModal = signal<boolean>(false);
+  showHelpCard = signal<boolean>(true);
 
   // Form data
   newCategory = { title: '', icon: '', description: '' };
@@ -68,7 +71,7 @@ export class CodexComponent implements OnInit, OnDestroy {
   constructor() {
     addIcons({
       arrowBack, add, ellipsisVertical, create, trash, save, close,
-      search, person, bookmark, pricetag, star
+      search, person, bookmark, pricetag, star, swapHorizontal, helpCircle
     });
     this.initializeHeaderActions();
   }
@@ -96,36 +99,6 @@ export class CodexComponent implements OnInit, OnDestroy {
     if (!category) return [];
     return [...category.entries].sort((a: CodexEntry, b: CodexEntry) => a.order - b.order);
   });
-
-  ngOnInit() {
-    this.subscriptions.add(
-      this.route.params.subscribe(params => {
-        const storyId = params['id'];
-        this.storyId.set(storyId);
-        this.loadCodex(storyId);
-        this.cdr.markForCheck();
-      })
-    );
-    
-    // Subscribe to codex changes from service
-    this.subscriptions.add(
-      this.codexService.codex$.subscribe(codexMap => {
-        const storyId = this.storyId();
-        if (storyId && codexMap.has(storyId)) {
-          const codex = codexMap.get(storyId);
-          this.codex.set(codex);
-          
-          // Auto-select first category if none selected and categories exist
-          if (codex && codex.categories.length > 0 && !this.selectedCategoryId()) {
-            this.selectedCategoryId.set(codex.categories[0].id);
-          }
-          
-          // Force change detection
-          this.cdr.markForCheck();
-        }
-      })
-    );
-  }
 
   ngOnDestroy() {
     this.subscriptions.unsubscribe();
@@ -454,6 +427,13 @@ export class CodexComponent implements OnInit, OnDestroy {
   private initializeHeaderActions(): void {
     this.headerActions = [
       {
+        icon: 'swap-horizontal',
+        label: 'Transfer',
+        action: () => this.openTransferModal(),
+        showOnMobile: true,
+        showOnDesktop: true
+      },
+      {
         icon: 'add',
         label: 'Category',
         action: () => this.showAddCategoryModal.set(true),
@@ -461,5 +441,71 @@ export class CodexComponent implements OnInit, OnDestroy {
         showOnDesktop: true
       }
     ];
+  }
+
+  async openTransferModal() {
+    const modal = await this.modalController.create({
+      component: CodexTransferModalComponent
+    });
+
+    await modal.present();
+
+    const { data } = await modal.onDidDismiss();
+    if (data?.transferred && data?.count > 0) {
+      // Show success feedback
+      console.log(`Successfully transferred ${data.count} entries`);
+      // Optionally reload codex if needed
+      // await this.loadCodex(this.storyId());
+    }
+  }
+
+  dismissHelpCard() {
+    this.showHelpCard.set(false);
+    // Store preference in localStorage
+    try {
+      localStorage.setItem('codex-transfer-help-dismissed', 'true');
+    } catch (error) {
+      console.error('Error saving help card preference:', error);
+    }
+  }
+
+  ngOnInit() {
+    // Check if help card was previously dismissed
+    try {
+      const dismissed = localStorage.getItem('codex-transfer-help-dismissed');
+      if (dismissed === 'true') {
+        this.showHelpCard.set(false);
+      }
+    } catch (error) {
+      console.error('Error reading help card preference:', error);
+    }
+
+    this.subscriptions.add(
+      this.route.params.subscribe(params => {
+        const storyId = params['id'];
+        this.storyId.set(storyId);
+        this.loadCodex(storyId);
+        this.cdr.markForCheck();
+      })
+    );
+
+    // Subscribe to codex changes from service
+    this.subscriptions.add(
+      this.codexService.codex$.subscribe(codexMap => {
+        const storyId = this.storyId();
+        if (storyId && codexMap.has(storyId)) {
+          const codex = codexMap.get(storyId);
+          this.codex.set(codex);
+
+          // Auto-select first category if none selected and categories exist
+          if (codex && codex.categories.length > 0 && !this.selectedCategoryId()) {
+            this.selectedCategoryId.set(codex.categories[0].id);
+          }
+
+          // Force change detection
+          this.cdr.markForCheck();
+        }
+      })
+    );
   }
 }

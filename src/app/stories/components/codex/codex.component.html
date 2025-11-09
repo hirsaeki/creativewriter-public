@@ -20,6 +20,54 @@
 
       <!-- Content -->
       <ion-content>
+        <!-- Help Card for Transfer Feature -->
+        <ion-card *ngIf="showHelpCard()" class="help-card">
+          <ion-card-header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <ion-icon name="help-circle" color="primary" style="font-size: 1.5rem;"></ion-icon>
+                <ion-card-title>Transfer Codex Entries</ion-card-title>
+              </div>
+              <ion-button fill="clear" size="small" (click)="dismissHelpCard()">
+                <ion-icon name="close" slot="icon-only"></ion-icon>
+              </ion-button>
+            </div>
+          </ion-card-header>
+          <ion-card-content>
+            <p><strong>New Feature!</strong> You can now transfer Codex entries between stories.</p>
+            <div class="help-steps">
+              <div class="help-step">
+                <ion-icon name="swap-horizontal" color="primary"></ion-icon>
+                <div>
+                  <strong>Step 1:</strong> Click the <strong>Transfer</strong> button in the header
+                </div>
+              </div>
+              <div class="help-step">
+                <ion-icon name="checkmark-circle" color="success"></ion-icon>
+                <div>
+                  <strong>Step 2:</strong> Select source and destination stories
+                </div>
+              </div>
+              <div class="help-step">
+                <ion-icon name="list" color="medium"></ion-icon>
+                <div>
+                  <strong>Step 3:</strong> Choose which entries to transfer
+                </div>
+              </div>
+              <div class="help-step">
+                <ion-icon name="checkmark-done" color="success"></ion-icon>
+                <div>
+                  <strong>Step 4:</strong> Review and confirm the transfer
+                </div>
+              </div>
+            </div>
+            <ion-note color="medium">
+              <ion-icon name="information-circle"></ion-icon>
+              Entries are copied to the destination story. Categories are created automatically if needed. Duplicate entries get a numbered suffix.
+            </ion-note>
+          </ion-card-content>
+        </ion-card>
+
         <ion-grid class="codex-grid">
           <ion-row>
             <!-- Sidebar with categories -->
