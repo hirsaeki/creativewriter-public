@@ -903,41 +903,26 @@ ion-card-content {
 
 /* Codex Transfer Modal */
 .codex-transfer-modal {
-  // Desktop/tablet - full modal
+  // Desktop/tablet - centered modal
   @media (min-width: 769px) {
     --width: 90%;
     --max-width: 900px;
-    --height: 85vh;
-    --max-height: 85vh;
+    --height: 80vh;
     --border-radius: 12px;
   }
 
-  // Mobile - sheet style from bottom
+  // Mobile - bottom sheet
   @media (max-width: 768px) {
     --width: 100%;
-    --height: auto;
-    --max-height: 90vh;
+    --height: 85vh;
     --border-radius: 12px 12px 0 0;
-
     align-items: flex-end;
-
-    .ion-page {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      max-height: 90vh;
-    }
   }
 
   // Ensure proper backdrop
   &::part(backdrop) {
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(4px);
-  }
-
-  // Ensure content is scrollable
-  ion-content {
-    --overflow: auto;
   }
 
   // Ensure footer is always visible
