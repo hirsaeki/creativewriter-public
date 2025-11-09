@@ -915,8 +915,8 @@ ion-card-content {
   // Mobile - constrained height
   @media (max-width: 768px) {
     --width: 100%;
-    --height: 80vh;
-    --max-height: 80vh;
+    --height: 70vh;
+    --max-height: 70vh;
     --border-radius: 12px 12px 0 0;
 
     align-items: flex-end;
@@ -926,16 +926,16 @@ ion-card-content {
       bottom: 0;
       left: 0;
       right: 0;
-      height: 80vh;
-      max-height: 80vh;
+      height: 70vh;
+      max-height: 70vh;
     }
 
     .ion-page {
       position: relative;
       display: flex;
       flex-direction: column;
-      height: 80vh;
-      max-height: 80vh;
+      height: 70vh;
+      max-height: 70vh;
       overflow: hidden;
     }
   }

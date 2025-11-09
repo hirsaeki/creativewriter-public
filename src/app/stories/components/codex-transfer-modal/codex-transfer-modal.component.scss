@@ -35,11 +35,11 @@
 // Ensure modal fits within viewport on mobile
 @media (max-width: 768px) {
   :host {
-    max-height: 80vh;
+    max-height: 70vh;
 
     ion-header {
       ion-toolbar {
-        --min-height: 52px;
+        --min-height: 48px;
         padding-top: 0.25rem;
         padding-bottom: 0.25rem;
       }
@@ -48,16 +48,16 @@
     ion-content {
       --padding-top: 0;
       --padding-bottom: 0;
-      // Calculate max height: 80vh - header (~115px) - footer (~75px)
-      max-height: calc(80vh - 190px);
+      // Calculate max height: 70vh - header (~100px) - footer (~70px)
+      max-height: calc(70vh - 170px);
     }
 
     ion-footer {
       // Ensure footer is always visible on mobile
       ion-toolbar {
-        --min-height: 75px;
-        --padding-top: 12px;
-        --padding-bottom: 12px;
+        --min-height: 70px;
+        --padding-top: 10px;
+        --padding-bottom: 10px;
       }
     }
   }
