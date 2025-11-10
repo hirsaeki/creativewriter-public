@@ -31,31 +31,53 @@
             <p>Loading models from Replicate...</p>
           </div>
 
-          <ion-item  *ngIf="!modelsLoading">
-            <ion-label>Modell</ion-label>
-            <ion-select
-              [(ngModel)]="selectedModelId"
-              (ionChange)="onModelChange()"
-              [disabled]="availableModels.length === 0"
-              interface="alert"
-              [interfaceOptions]="{
-                header: 'Select Model',
-                subHeader: 'Search and select an image generation model',
-                cssClass: 'model-select-alert'
-              }">
-              <ion-select-option *ngFor="let model of availableModels" [value]="model.id">
-                {{ model.name }}
-              </ion-select-option>
-            </ion-select>
-          </ion-item>
+          <div *ngIf="!modelsLoading">
+            <!-- Search bar for filtering models -->
+            <ion-searchbar
+              [(ngModel)]="modelSearchTerm"
+              (ionInput)="filterModels($event)"
+              placeholder="Search models..."
+              debounce="300"
+              [disabled]="availableModels.length === 0">
+            </ion-searchbar>
 
-          <p *ngIf="!modelsLoading && availableModels.length === 0" class="no-models-message">
-            No models available. Please configure your Replicate API key in settings.
-          </p>
+            <!-- Currently selected model -->
+            <ion-item *ngIf="selectedModel">
+              <ion-label>
+                <h3>Selected Model</h3>
+                <p>{{ selectedModel.name }}</p>
+              </ion-label>
+            </ion-item>
 
-          <p *ngIf="selectedModel && !modelsLoading" class="model-description">
-            {{ selectedModel.description }}
-          </p>
+            <!-- Filtered models list -->
+            <ion-list *ngIf="modelSearchTerm && filteredModels.length > 0" class="model-search-results">
+              <ion-item
+                *ngFor="let model of filteredModels"
+                button
+                (click)="selectModel(model.id)"
+                [class.selected]="model.id === selectedModelId">
+                <ion-label>
+                  <h3>{{ model.name }}</h3>
+                  <p>{{ model.owner }} - {{ model.description | slice:0:80 }}{{ model.description.length > 80 ? '...' : '' }}</p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+
+            <!-- No results message -->
+            <p *ngIf="modelSearchTerm && filteredModels.length === 0" class="no-results-message">
+              No models found matching "{{ modelSearchTerm }}"
+            </p>
+
+            <!-- No models available message -->
+            <p *ngIf="availableModels.length === 0" class="no-models-message">
+              No models available. Please configure your Replicate API key in settings.
+            </p>
+
+            <!-- Model description -->
+            <p *ngIf="selectedModel && !modelSearchTerm" class="model-description">
+              {{ selectedModel.description }}
+            </p>
+          </div>
         </ion-card-content>
       </ion-card>
 

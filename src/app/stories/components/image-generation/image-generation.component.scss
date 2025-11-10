@@ -112,6 +112,50 @@ ion-card-title {
   font-size: 0.9rem;
 }
 
+.no-results-message {
+  color: #6c757d;
+  text-align: center;
+  padding: 1rem;
+  margin: 0;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.model-search-results {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+  border-radius: 8px;
+  background: rgba(25, 25, 25, 0.4);
+
+  ion-item {
+    --background: transparent;
+    --color: #f8f9fa;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      --background: rgba(71, 118, 230, 0.2);
+    }
+
+    &.selected {
+      --background: rgba(71, 118, 230, 0.3);
+      border-left: 3px solid #4776e6;
+    }
+
+    h3 {
+      color: #f8f9fa;
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+
+    p {
+      color: #adb5bd;
+      font-size: 0.85rem;
+    }
+  }
+}
+
 .parameter-item {
   margin-bottom: 1rem;
 }

@@ -2,12 +2,12 @@ import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { 
-  IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, 
+import {
+  IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle,
   IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption,
   IonRange, IonCheckbox, IonSpinner, IonGrid, IonRow, IonCol,
-  IonImg, IonChip, IonProgressBar, IonToast
+  IonImg, IonChip, IonProgressBar, IonToast, IonSearchbar, IonList
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
@@ -31,7 +31,7 @@ import { Subscription } from 'rxjs';
     IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
     IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption,
     IonRange, IonCheckbox, IonSpinner, IonGrid, IonRow, IonCol,
-    IonImg, IonChip, IonProgressBar, IonToast
+    IonImg, IonChip, IonProgressBar, IonToast, IonSearchbar, IonList
   ],
   templateUrl: './image-generation.component.html',
   styleUrls: ['./image-generation.component.scss']
@@ -41,6 +41,8 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
   private imageGenService = inject(ImageGenerationService);
 
   availableModels: ImageGenerationModel[] = [];
+  filteredModels: ImageGenerationModel[] = [];
+  modelSearchTerm = '';
   modelsLoading = false;
   selectedModelId = '';
   selectedModel: ImageGenerationModel | null = null;
@@ -64,6 +66,7 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
     this.subscription.add(
       this.imageGenService.availableModels$.subscribe(models => {
         this.availableModels = models;
+        this.filteredModels = models; // Initialize filtered list
 
         // Initialize selection when models first load
         if (models.length > 0 && !this.selectedModelId) {
@@ -229,6 +232,30 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
     
     // Default step sizes for other inputs
     return input.type === 'integer' ? 1 : 0.1;
+  }
+
+  filterModels(event: any): void {
+    const searchTerm = event.target.value?.toLowerCase() || '';
+    this.modelSearchTerm = searchTerm;
+
+    if (!searchTerm.trim()) {
+      this.filteredModels = this.availableModels;
+      return;
+    }
+
+    this.filteredModels = this.availableModels.filter(model =>
+      model.name.toLowerCase().includes(searchTerm) ||
+      model.description.toLowerCase().includes(searchTerm) ||
+      model.id.toLowerCase().includes(searchTerm) ||
+      model.owner.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  selectModel(modelId: string): void {
+    this.selectedModelId = modelId;
+    this.onModelChange();
+    this.modelSearchTerm = ''; // Clear search
+    this.filteredModels = this.availableModels; // Reset filter
   }
 
   private showToastMessage(message: string): void {
