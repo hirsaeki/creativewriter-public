@@ -263,14 +263,12 @@ export class ImageGenerationService {
           return of({ models: [] });
         })
       ),
-      searchResults: this.http.get<any>(`${this.apiUrl}/models?search=text-to-image`, { headers }).pipe(
-        catchError(error => {
-          console.error('Failed to search for models:', error);
-          return of({ results: [] });
-        })
-      )
+      // Fetch all pages of search results for multiple queries
+      searchImage: this.fetchAllPages(`${this.apiUrl}/models?search=image`, headers),
+      searchDiffusion: this.fetchAllPages(`${this.apiUrl}/models?search=diffusion`, headers),
+      searchNSFW: this.fetchAllPages(`${this.apiUrl}/models?search=nsfw`, headers)
     }).pipe(
-      map(({ collection, searchResults }) => {
+      map(({ collection, searchImage, searchDiffusion, searchNSFW }) => {
         // Transform collection models
         const collectionModels: ImageGenerationModel[] = (collection.models || []).map((model: any) => ({
           id: model.url.replace('https://replicate.com/', ''),
@@ -281,8 +279,11 @@ export class ImageGenerationService {
           inputs: this.getDefaultInputsForModel(model.url.replace('https://replicate.com/', ''))
         }));
 
+        // Combine all search results
+        const allSearchResults = [...searchImage, ...searchDiffusion, ...searchNSFW];
+
         // Transform search results
-        const communityModels: ImageGenerationModel[] = (searchResults.results || []).map((model: any) => ({
+        const communityModels: ImageGenerationModel[] = allSearchResults.map((model: any) => ({
           id: model.url?.replace('https://replicate.com/', '') || `${model.owner}/${model.name}`,
           name: model.name,
           description: model.description || '',
@@ -297,6 +298,8 @@ export class ImageGenerationService {
           new Map(allModels.map(model => [model.id, model])).values()
         );
 
+        console.log(`Loaded ${uniqueModels.length} unique image generation models`);
+
         // Combine with hardcoded models (put hardcoded first)
         return [...this.models, ...uniqueModels];
       }),
@@ -309,6 +312,29 @@ export class ImageGenerationService {
       this.availableModelsSubject.next(models);
       this.modelsLoadingSubject.next(false);
     });
+  }
+
+  private fetchAllPages(url: string, headers: HttpHeaders, cursor?: string, accumulatedResults: any[] = []): Observable<any[]> {
+    const urlWithCursor = cursor ? `${url}&cursor=${cursor}` : url;
+
+    return this.http.get<any>(urlWithCursor, { headers }).pipe(
+      switchMap(response => {
+        const results = [...accumulatedResults, ...(response.results || [])];
+
+        // If there's a next cursor, fetch the next page
+        if (response.next) {
+          return this.fetchAllPages(url, headers, response.next, results);
+        }
+
+        // No more pages, return accumulated results
+        return of(results);
+      }),
+      catchError(error => {
+        console.error(`Failed to fetch models from ${url}:`, error);
+        // Return what we have so far
+        return of(accumulatedResults);
+      })
+    );
   }
 
   private getDefaultInputsForModel(modelId: string): any[] {
