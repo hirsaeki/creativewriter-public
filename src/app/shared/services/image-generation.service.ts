@@ -336,6 +336,61 @@ export class ImageGenerationService {
     return this.availableModelsSubject.value.find(model => model.id === modelId);
   }
 
+  addCustomModel(modelIdInput: string): Observable<ImageGenerationModel> {
+    const settings = this.settingsService.getSettings();
+
+    if (!settings.replicate.enabled || !settings.replicate.apiKey) {
+      throw new Error('Replicate API key not configured');
+    }
+
+    // Parse model ID - handle both "owner/name" and "owner/name:version" formats
+    let modelId = modelIdInput.trim();
+    let version = '';
+
+    // Remove https://replicate.com/ if present
+    modelId = modelId.replace('https://replicate.com/', '');
+
+    // Extract version if present
+    if (modelId.includes(':')) {
+      [modelId, version] = modelId.split(':');
+    }
+
+    const headers = new HttpHeaders({
+      'X-API-Token': settings.replicate.apiKey,
+      'Content-Type': 'application/json'
+    });
+
+    // Fetch model details from Replicate
+    return this.http.get<any>(`${this.apiUrl}/models/${modelId}`, { headers }).pipe(
+      map(response => {
+        const modelVersion = version || response.latest_version?.id || '';
+
+        const newModel: ImageGenerationModel = {
+          id: modelId,
+          name: response.name || modelId,
+          description: response.description || 'Custom model',
+          version: modelVersion,
+          owner: response.owner || modelId.split('/')[0],
+          inputs: this.getDefaultInputsForModel(modelId)
+        };
+
+        // Add to available models if not already present
+        const currentModels = this.availableModelsSubject.value;
+        const exists = currentModels.find(m => m.id === modelId);
+
+        if (!exists) {
+          this.availableModelsSubject.next([...currentModels, newModel]);
+        }
+
+        return newModel;
+      }),
+      catchError(error => {
+        console.error('Failed to fetch custom model:', error);
+        throw new Error(`Could not find model: ${modelId}`);
+      })
+    );
+  }
+
   generateImage(modelId: string, input: Record<string, unknown>): Observable<ImageGenerationJob> {
     const model = this.getModel(modelId);
     if (!model) {

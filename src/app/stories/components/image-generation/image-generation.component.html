@@ -77,6 +77,28 @@
             <p *ngIf="selectedModel && !modelSearchTerm" class="model-description">
               {{ selectedModel.description }}
             </p>
+
+            <!-- Add custom model -->
+            <div class="custom-model-input">
+              <ion-item>
+                <ion-label position="stacked">Add Custom Model</ion-label>
+                <ion-input
+                  [(ngModel)]="customModelId"
+                  placeholder="owner/model-name or owner/model-name:version"
+                  type="text"
+                  [disabled]="addingCustomModel">
+                </ion-input>
+              </ion-item>
+              <ion-button
+                expand="block"
+                fill="outline"
+                (click)="addCustomModel()"
+                [disabled]="!customModelId.trim() || addingCustomModel">
+                <ion-spinner *ngIf="addingCustomModel" name="crescent" slot="start"></ion-spinner>
+                <span *ngIf="!addingCustomModel">Add Model</span>
+                <span *ngIf="addingCustomModel">Adding...</span>
+              </ion-button>
+            </div>
           </div>
         </ion-card-content>
       </ion-card>

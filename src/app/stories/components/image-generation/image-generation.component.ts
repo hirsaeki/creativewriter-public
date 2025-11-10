@@ -43,7 +43,9 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
   availableModels: ImageGenerationModel[] = [];
   filteredModels: ImageGenerationModel[] = [];
   modelSearchTerm = '';
+  customModelId = '';
   modelsLoading = false;
+  addingCustomModel = false;
   selectedModelId = '';
   selectedModel: ImageGenerationModel | null = null;
   parameters: Record<string, unknown> = {};
@@ -256,6 +258,31 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
     this.onModelChange();
     this.modelSearchTerm = ''; // Clear search
     this.filteredModels = this.availableModels; // Reset filter
+  }
+
+  addCustomModel(): void {
+    if (!this.customModelId.trim()) {
+      this.showToastMessage('Please enter a model ID');
+      return;
+    }
+
+    this.addingCustomModel = true;
+
+    this.subscription.add(
+      this.imageGenService.addCustomModel(this.customModelId.trim()).subscribe({
+        next: (model) => {
+          this.addingCustomModel = false;
+          this.customModelId = '';
+          this.showToastMessage(`Added model: ${model.name}`);
+          this.selectModel(model.id);
+        },
+        error: (error) => {
+          this.addingCustomModel = false;
+          console.error('Failed to add custom model:', error);
+          this.showToastMessage(`Failed to add model: ${error.message || 'Unknown error'}`);
+        }
+      })
+    );
   }
 
   private showToastMessage(message: string): void {

@@ -156,6 +156,39 @@ ion-card-title {
   }
 }
 
+.custom-model-input {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+  ion-item {
+    --background: transparent;
+    --color: #f8f9fa;
+    margin-bottom: 0.5rem;
+  }
+
+  ion-label {
+    color: #adb5bd;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+
+  ion-input {
+    --color: #f8f9fa;
+    --placeholder-color: #6c757d;
+  }
+
+  ion-button {
+    margin-top: 0.5rem;
+    --color: #4776e6;
+    --border-color: #4776e6;
+
+    &:hover:not([disabled]) {
+      --background: rgba(71, 118, 230, 0.1);
+    }
+  }
+}
+
 .parameter-item {
   margin-bottom: 1rem;
 }
