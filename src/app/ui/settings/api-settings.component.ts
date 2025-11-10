@@ -12,7 +12,6 @@ import { ModelOption } from '../../core/models/model.interface';
 import { OllamaApiService } from '../../core/services/ollama-api.service';
 import { ClaudeApiService } from '../../core/services/claude-api.service';
 import { ModelService } from '../../core/services/model.service';
-import { SettingsService } from '../../core/services/settings.service';
 import { OpenRouterIconComponent } from '../icons/openrouter-icon.component';
 import { ClaudeIconComponent } from '../icons/claude-icon.component';
 import { ReplicateIconComponent } from '../icons/replicate-icon.component';
@@ -892,7 +891,6 @@ export class ApiSettingsComponent implements OnDestroy {
   private ollamaApiService = inject(OllamaApiService);
   private claudeApiService = inject(ClaudeApiService);
   private modelService = inject(ModelService);
-  private settingsService = inject(SettingsService);
   private subscriptions = new Subscription();
 
   @Input() settings!: Settings;
@@ -970,9 +968,6 @@ export class ApiSettingsComponent implements OnDestroy {
   onApiKeyChange(provider: 'openRouter' | 'replicate' | 'googleGemini' | 'claude'): void {
     this.settingsChange.emit();
 
-    // Update settings in the service immediately so they're available for model loading
-    this.settingsService.updateSettings(this.settings);
-
     // Auto-load models when API key is entered and provider is enabled
     if (provider === 'openRouter' && this.settings.openRouter.enabled && this.settings.openRouter.apiKey) {
       this.subscriptions.add(this.modelService.loadOpenRouterModels().subscribe());
@@ -989,9 +984,6 @@ export class ApiSettingsComponent implements OnDestroy {
     this.settingsChange.emit();
     this.ollamaConnectionStatus = null; // Reset connection status when URL changes
 
-    // Update settings in the service immediately so they're available for model loading
-    this.settingsService.updateSettings(this.settings);
-
     // Auto-load models when URL is entered and provider is enabled
     if (this.settings.ollama.enabled && this.settings.ollama.baseUrl) {
       this.subscriptions.add(this.modelService.loadOllamaModels().subscribe());
@@ -1000,9 +992,6 @@ export class ApiSettingsComponent implements OnDestroy {
   
   onProviderToggle(provider: 'openRouter' | 'replicate' | 'googleGemini' | 'ollama' | 'claude'): void {
     this.settingsChange.emit();
-
-    // Update settings in the service immediately so they're available for model loading
-    this.settingsService.updateSettings(this.settings);
 
     // Load models when provider is enabled and has credentials
     if (provider === 'openRouter' && this.settings.openRouter.enabled && this.settings.openRouter.apiKey) {
