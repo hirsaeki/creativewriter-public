@@ -259,7 +259,7 @@ export class ImageGenerationService {
       .pipe(
         map(response => {
           // Transform Replicate models to our format
-          const apiModels: ImageGenerationModel[] = response.models.slice(0, 20).map((model: any) => ({
+          const apiModels: ImageGenerationModel[] = response.models.map((model: any) => ({
             id: model.url.replace('https://replicate.com/', ''),
             name: model.name,
             description: model.description || '',
