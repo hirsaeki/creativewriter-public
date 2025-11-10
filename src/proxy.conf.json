@@ -5,15 +5,6 @@
     "changeOrigin": true,
     "logLevel": "debug"
   },
-  "/api/replicate-direct/*": {
-    "target": "https://api.replicate.com",
-    "secure": true,
-    "changeOrigin": true,
-    "logLevel": "debug",
-    "pathRewrite": {
-      "^/api/replicate-direct": ""
-    }
-  },
   "/api/replicate": {
     "target": "http://localhost:3001",
     "secure": false,
