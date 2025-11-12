@@ -55,6 +55,7 @@
 - Do not commit secrets; use `.env` (see `.env.example`) and app Settings for API keys.
 - For Docker, ensure persistent volumes for CouchDB data; never run without persistence.
 - Validate CORS and proxy settings only in config files—avoid hardcoded URLs/keys in source.
+- remember how we curently handle bottom padding calculation
 
 ## Dual Repository Release Workflow:
   - Private repo (creativewriter2): Development on main branch. Merging to release branch triggers sync.
