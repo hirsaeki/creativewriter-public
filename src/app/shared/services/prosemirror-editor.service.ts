@@ -2073,6 +2073,10 @@ export class ProseMirrorEditorService {
 
   private async openAIRewriteModal(view: EditorView, selectedText: string, from: number, to: number): Promise<void> {
     try {
+      // Save current scroll position before opening modal
+      const scrollElement = view.dom.closest('.content-editor') || view.dom.parentElement;
+      const savedScrollTop = scrollElement?.scrollTop || 0;
+
       const modal = await this.modalController.create({
         component: AIRewriteModalComponent,
         componentProps: {
@@ -2088,7 +2092,29 @@ export class ProseMirrorEditorService {
       const { data } = await modal.onDidDismiss();
 
       if (data?.rewrittenText) {
+        // Replace text with proper cursor positioning
         this.replaceSelectedText(view, data as AIRewriteResult, from, to);
+
+        // Restore scroll position and focus after DOM updates
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (scrollElement) {
+              scrollElement.scrollTop = savedScrollTop;
+            }
+            // Restore focus to editor
+            view.focus();
+          }, 50);
+        });
+      } else {
+        // Modal dismissed without changes - restore state anyway
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (scrollElement) {
+              scrollElement.scrollTop = savedScrollTop;
+            }
+            view.focus();
+          }, 50);
+        });
       }
     } catch (error) {
       console.error('Error opening AI rewrite modal:', error);
@@ -2101,6 +2127,10 @@ export class ProseMirrorEditorService {
 
     // Replace the selected text with the rewritten text
     tr.insertText(result.rewrittenText, from, to);
+
+    // Set cursor position to end of replaced text to prevent jumping
+    const newCursorPos = from + result.rewrittenText.length;
+    tr.setSelection(TextSelection.create(tr.doc, newCursorPos));
 
     view.dispatch(tr);
 
