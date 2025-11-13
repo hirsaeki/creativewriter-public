@@ -47,12 +47,6 @@ export interface SimpleEditorConfig {
   };
 }
 
-/**
- * Delay in milliseconds to wait for DOM updates to complete before restoring editor state.
- * This ensures that any layout changes from modal dismissal have finished rendering.
- */
-const DOM_UPDATE_DELAY_MS = 50;
-
 @Injectable({
   providedIn: 'root'
 })
@@ -2084,8 +2078,8 @@ export class ProseMirrorEditorService {
    * the DOM has been updated after the modal dismissal before restoring state.
    *
    * Note: If timing issues occur (e.g., scroll position not restored correctly),
-   * consider adding setTimeout(fn, DOM_UPDATE_DELAY_MS) with documentation
-   * explaining why the additional delay is necessary.
+   * consider wrapping the restoration logic in setTimeout with a small delay
+   * (e.g., 50ms) and document why the additional delay is necessary.
    */
   private restoreEditorState(view: EditorView, scrollElement: Element | null, savedScrollTop: number): void {
     requestAnimationFrame(() => {
