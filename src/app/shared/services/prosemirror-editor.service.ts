@@ -2071,6 +2071,20 @@ export class ProseMirrorEditorService {
     return menuItem;
   }
 
+  /**
+   * Restore editor scroll position and focus after modal interaction
+   */
+  private restoreEditorState(view: EditorView, scrollElement: Element | null, savedScrollTop: number): void {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (scrollElement) {
+          scrollElement.scrollTop = savedScrollTop;
+        }
+        view.focus();
+      }, 50);
+    });
+  }
+
   private async openAIRewriteModal(view: EditorView, selectedText: string, from: number, to: number): Promise<void> {
     try {
       // Save current scroll position before opening modal
@@ -2094,28 +2108,10 @@ export class ProseMirrorEditorService {
       if (data?.rewrittenText) {
         // Replace text with proper cursor positioning
         this.replaceSelectedText(view, data as AIRewriteResult, from, to);
-
-        // Restore scroll position and focus after DOM updates
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (scrollElement) {
-              scrollElement.scrollTop = savedScrollTop;
-            }
-            // Restore focus to editor
-            view.focus();
-          }, 50);
-        });
-      } else {
-        // Modal dismissed without changes - restore state anyway
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (scrollElement) {
-              scrollElement.scrollTop = savedScrollTop;
-            }
-            view.focus();
-          }, 50);
-        });
       }
+
+      // Always restore editor state after modal interaction
+      this.restoreEditorState(view, scrollElement, savedScrollTop);
     } catch (error) {
       console.error('Error opening AI rewrite modal:', error);
     }
