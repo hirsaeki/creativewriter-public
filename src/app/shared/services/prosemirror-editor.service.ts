@@ -2071,8 +2071,38 @@ export class ProseMirrorEditorService {
     return menuItem;
   }
 
+  /**
+   * Restore editor scroll position and focus after modal interaction.
+   *
+   * Uses requestAnimationFrame to wait for the next browser repaint, ensuring
+   * the DOM has been updated after the modal dismissal before restoring state.
+   *
+   * Note: Scroll restoration and focus restoration are independent operations.
+   * Focus is always restored, even if scroll restoration is skipped (e.g., when
+   * scrollElement is null). This ensures the editor remains interactive.
+   *
+   * If timing issues occur (e.g., scroll position not restored correctly),
+   * consider wrapping the restoration logic in setTimeout with a small delay
+   * (e.g., 50ms) and document why the additional delay is necessary.
+   */
+  private restoreEditorState(view: EditorView, scrollElement: Element | null, savedScrollTop: number): void {
+    requestAnimationFrame(() => {
+      // Restore scroll position if available
+      if (scrollElement) {
+        scrollElement.scrollTop = savedScrollTop;
+      }
+
+      // Always restore focus, regardless of scroll restoration success
+      view.focus();
+    });
+  }
+
   private async openAIRewriteModal(view: EditorView, selectedText: string, from: number, to: number): Promise<void> {
     try {
+      // Save current scroll position before opening modal
+      const scrollElement = view.dom.closest('.content-editor') || view.dom.parentElement;
+      const savedScrollTop = scrollElement?.scrollTop || 0;
+
       const modal = await this.modalController.create({
         component: AIRewriteModalComponent,
         componentProps: {
@@ -2088,8 +2118,12 @@ export class ProseMirrorEditorService {
       const { data } = await modal.onDidDismiss();
 
       if (data?.rewrittenText) {
+        // Replace text with proper cursor positioning
         this.replaceSelectedText(view, data as AIRewriteResult, from, to);
       }
+
+      // Always restore editor state after modal interaction
+      this.restoreEditorState(view, scrollElement, savedScrollTop);
     } catch (error) {
       console.error('Error opening AI rewrite modal:', error);
     }
@@ -2101,6 +2135,10 @@ export class ProseMirrorEditorService {
 
     // Replace the selected text with the rewritten text
     tr.insertText(result.rewrittenText, from, to);
+
+    // Set cursor position to end of replaced text to prevent jumping
+    const newCursorPos = from + result.rewrittenText.length;
+    tr.setSelection(TextSelection.create(tr.doc, newCursorPos));
 
     view.dispatch(tr);
 
