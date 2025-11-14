@@ -1,0 +1,684 @@
+import { Injectable, inject } from '@angular/core';
+import { EditorView } from 'prosemirror-view';
+import { Schema, DOMParser, Node as ProseMirrorNode } from 'prosemirror-model';
+import { Subject } from 'rxjs';
+import { IonContent } from '@ionic/angular/standalone';
+import { BeatAI, BeatAIPromptEvent } from '../../stories/models/beat-ai.interface';
+import { BeatAIService } from './beat-ai.service';
+import { BeatHistoryService } from './beat-history.service';
+import { PromptManagerService } from './prompt-manager.service';
+import { BeatInfo } from './prosemirror-editor.interfaces';
+import { findNextBeatPosition, convertTextToHtml } from './prosemirror-editor.utils';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class BeatOperationsService {
+  private beatAIService = inject(BeatAIService);
+  private beatHistoryService = inject(BeatHistoryService);
+  private promptManager = inject(PromptManagerService);
+
+  private beatStreamingPositions = new Map<string, number>();
+
+  public contentUpdate$ = new Subject<string>();
+
+  /**
+   * Insert a new Beat AI node at the specified position
+   */
+  insertBeatAI(
+    editorView: EditorView | null,
+    schema: Schema,
+    position?: number,
+    replaceSlash = false,
+    beatType: 'story' | 'scene' = 'story'
+  ): void {
+    if (!editorView) return;
+
+    try {
+      const { state } = editorView;
+      const pos = position ?? state.selection.from;
+
+      const beatData = this.beatAIService.createNewBeat(beatType);
+      const beatNode = schema.nodes['beatAI'].create({
+        id: beatData.id,
+        prompt: beatData.prompt,
+        generatedContent: beatData.generatedContent,
+        isGenerating: beatData.isGenerating,
+        isCollapsed: beatData.isCollapsed,
+        createdAt: beatData.createdAt.toISOString(),
+        updatedAt: beatData.updatedAt.toISOString(),
+        wordCount: beatData.wordCount,
+        beatType: beatData.beatType,
+        model: beatData.model || '',
+        includeStoryOutline: beatData.includeStoryOutline
+      });
+
+      let tr;
+      if (replaceSlash) {
+        // Find the actual slash position by looking backwards from cursor position
+        let slashPos = pos - 1;
+        let foundSlash = false;
+
+        // Look backwards up to 10 characters to find the slash
+        for (let i = 1; i <= 10 && slashPos >= 0; i++) {
+          const checkPos = pos - i;
+          const textAtCheck = state.doc.textBetween(checkPos, checkPos + 1);
+
+          if (textAtCheck === '/') {
+            slashPos = checkPos;
+            foundSlash = true;
+            break;
+          }
+        }
+
+        if (foundSlash) {
+          // Replace the slash with the beat node
+          tr = state.tr.replaceRangeWith(slashPos, slashPos + 1, beatNode);
+        } else {
+          console.warn('No slash found, inserting at current position');
+          tr = state.tr.replaceRangeWith(pos, pos, beatNode);
+        }
+      } else {
+        // Insert at position
+        tr = state.tr.replaceRangeWith(pos, pos, beatNode);
+      }
+
+      editorView.dispatch(tr);
+    } catch (error) {
+      console.error('Failed to insert Beat AI node:', error);
+    }
+  }
+
+  /**
+   * Update beat node attributes
+   */
+  updateBeatNode(editorView: EditorView | null, beatId: string, updates: Partial<BeatAI>): void {
+    if (!editorView) return;
+
+    const { state } = editorView;
+    let nodePos: number | null = null;
+    let targetNode: ProseMirrorNode | null = null;
+
+    // Find the beat node with the given ID
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === 'beatAI' && node.attrs['id'] === beatId) {
+        nodePos = pos;
+        targetNode = node;
+        return false; // Stop iteration
+      }
+      return true;
+    });
+
+    if (nodePos !== null && targetNode) {
+      const newAttrs = {
+        ...(targetNode as ProseMirrorNode).attrs,
+        ...updates,
+        updatedAt: new Date().toISOString()
+      };
+
+      const tr = state.tr.setNodeMarkup(nodePos, undefined, newAttrs);
+      editorView.dispatch(tr);
+    }
+  }
+
+  /**
+   * Find the position of a beat node by ID
+   */
+  findBeatNodePosition(editorView: EditorView | null, beatId: string): number | null {
+    if (!editorView) return null;
+
+    const { state } = editorView;
+    let nodePos: number | null = null;
+
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === 'beatAI' && node.attrs['id'] === beatId) {
+        nodePos = pos;
+        return false; // Stop iteration
+      }
+      return true;
+    });
+
+    return nodePos;
+  }
+
+  /**
+   * Get the text content between a beat and the next beat (or end of scene)
+   */
+  getTextAfterBeat(editorView: EditorView | null, beatId: string): string | null {
+    if (!editorView) return null;
+
+    const beatPos = this.findBeatNodePosition(editorView, beatId);
+    if (beatPos === null) return null;
+
+    const { state } = editorView;
+    const beatNode = state.doc.nodeAt(beatPos);
+    if (!beatNode) return null;
+
+    const contentStartPos = beatPos + beatNode.nodeSize;
+    const nextBeatPos = findNextBeatPosition(contentStartPos, state);
+    const contentEndPos = nextBeatPos ?? state.doc.content.size;
+
+    if (contentEndPos <= contentStartPos) {
+      return '';
+    }
+
+    // Extract text content between the beat and next beat
+    const textContent = state.doc.textBetween(contentStartPos, contentEndPos, '\n\n', '\n');
+
+    return textContent;
+  }
+
+  /**
+   * Delete content after a beat node
+   */
+  deleteContentAfterBeat(editorView: EditorView | null, beatId: string, getHTMLContent: () => string): boolean {
+    if (!editorView) return false;
+
+    const beatPos = this.findBeatNodePosition(editorView, beatId);
+    if (beatPos === null) return false;
+
+    const { state } = editorView;
+    const beatNode = state.doc.nodeAt(beatPos);
+    if (!beatNode) return false;
+
+    const deleteStartPos = beatPos + beatNode.nodeSize;
+    const nextBeatPos = findNextBeatPosition(deleteStartPos, state);
+    const deleteEndPos = nextBeatPos ?? state.doc.content.size;
+
+    if (deleteEndPos <= deleteStartPos) {
+      return false;
+    }
+
+    const tr = state.tr.delete(deleteStartPos, deleteEndPos);
+    editorView.dispatch(tr);
+
+    const content = getHTMLContent();
+    this.contentUpdate$.next(content);
+
+    // Refresh prompt manager after the deletion so context stays accurate
+    setTimeout(() => {
+      this.promptManager.refresh().catch(error => {
+        console.error('Error refreshing prompt manager:', error);
+      });
+    }, 500);
+
+    return true;
+  }
+
+  /**
+   * Handle beat prompt submission and generation
+   */
+  handleBeatPromptSubmit(
+    editorView: EditorView | null,
+    event: BeatAIPromptEvent,
+    getHTMLContent: () => string
+  ): void {
+    if (!editorView) return;
+
+    // Handle delete after beat action
+    if (event.action === 'deleteAfter') {
+      this.deleteContentAfterBeat(editorView, event.beatId, getHTMLContent);
+      return;
+    }
+
+    // Handle rewrite action - delete old content before rewriting
+    if (event.action === 'rewrite' && event.existingText) {
+      this.deleteContentAfterBeat(editorView, event.beatId, getHTMLContent);
+    }
+
+    // Start generation process and update prompt
+    this.updateBeatNode(editorView, event.beatId, {
+      isGenerating: true,
+      generatedContent: '',
+      prompt: event.prompt || ''
+    });
+
+    // Find the beat node position to insert content after it
+    const beatNodePosition = this.findBeatNodePosition(editorView, event.beatId);
+    if (beatNodePosition === null) return;
+
+    // Track accumulating content for real-time insertion
+    let accumulatedContent = '';
+    let isFirstChunk = true;
+
+    // Subscribe to streaming generation events
+    const generationSubscription = this.beatAIService.generation$.subscribe(generationEvent => {
+      if (generationEvent.beatId !== event.beatId) return;
+
+      if (!generationEvent.isComplete && generationEvent.chunk) {
+        // Stream chunk received - append to accumulated content
+        accumulatedContent += generationEvent.chunk;
+
+        // For streaming, we append each chunk directly
+        if (generationEvent.chunk) {
+          this.appendContentAfterBeatNode(editorView, event.beatId, generationEvent.chunk, isFirstChunk);
+          isFirstChunk = false;
+        }
+      } else if (generationEvent.isComplete) {
+        // Generation completed
+        this.updateBeatNode(editorView, event.beatId, {
+          isGenerating: false,
+          generatedContent: accumulatedContent,
+          prompt: event.prompt || '',
+          hasHistory: true
+        });
+        // Clean up stored position
+        this.beatStreamingPositions.delete(event.beatId);
+        generationSubscription.unsubscribe();
+      }
+    });
+
+    // Generate AI content with streaming
+    this.beatAIService.generateBeatContent(event.prompt || '', event.beatId, {
+      wordCount: event.wordCount,
+      model: event.model,
+      storyId: event.storyId,
+      chapterId: event.chapterId,
+      sceneId: event.sceneId,
+      beatPosition: beatNodePosition,
+      beatType: event.beatType,
+      customContext: event.customContext,
+      action: event.action === 'rewrite' ? 'rewrite' : 'generate',
+      existingText: event.existingText
+    }).subscribe({
+      next: (finalContent) => {
+        // Final content received - ensure beat node is updated
+        this.updateBeatNode(editorView, event.beatId, {
+          isGenerating: false,
+          generatedContent: finalContent,
+          prompt: event.prompt || '',
+          hasHistory: true
+        });
+      },
+      error: (error) => {
+        console.error('Beat generation failed:', error);
+
+        // Insert error message
+        this.appendContentAfterBeatNode(editorView, event.beatId, 'Error during generation. Please try again.', true);
+
+        this.updateBeatNode(editorView, event.beatId, {
+          isGenerating: false,
+          generatedContent: 'Error during generation. Please try again.',
+          prompt: event.prompt || ''
+        });
+
+        generationSubscription.unsubscribe();
+      }
+    });
+  }
+
+  /**
+   * Switch beat to a different version from history
+   */
+  async switchBeatVersion(
+    editorView: EditorView | null,
+    beatId: string,
+    versionId: string,
+    getHTMLContent: () => string
+  ): Promise<void> {
+    if (!editorView) {
+      throw new Error('Editor not initialized');
+    }
+
+    // 1. Get version content from history
+    const history = await this.beatHistoryService.getHistory(beatId);
+    if (!history) {
+      throw new Error(`No history found for beat ${beatId}`);
+    }
+
+    const version = history.versions.find(v => v.versionId === versionId);
+    if (!version) {
+      throw new Error(`Version ${versionId} not found in history`);
+    }
+
+    // 2. Delete current content after beat
+    const deleteSuccess = this.deleteContentAfterBeat(editorView, beatId, getHTMLContent);
+    if (!deleteSuccess) {
+      console.warn('[BeatOperations] Failed to delete content, continuing anyway');
+    }
+
+    // 3. Insert version content
+    const beatPos = this.findBeatNodePosition(editorView, beatId);
+    if (beatPos === null) {
+      throw new Error(`Beat node ${beatId} not found`);
+    }
+
+    const beatNode = editorView.state.doc.nodeAt(beatPos);
+    if (!beatNode) {
+      throw new Error(`Beat node ${beatId} not found in document`);
+    }
+
+    const afterBeatPos = beatPos + beatNode.nodeSize;
+
+    // Convert plain text content to HTML format, preserving newlines as paragraphs
+    const htmlContent = convertTextToHtml(version.content);
+
+    // Insert the version content as HTML
+    this.insertHtmlContent(editorView, beatId, htmlContent, afterBeatPos);
+
+    // 4. Update beat node attributes
+    this.updateBeatNode(editorView, beatId, {
+      currentVersionId: versionId,
+      hasHistory: true
+    });
+
+    // 5. Mark version as current in history
+    await this.beatHistoryService.setCurrentVersion(beatId, versionId);
+
+    // Emit content update
+    const content = getHTMLContent();
+    this.contentUpdate$.next(content);
+
+    // Refresh prompt manager
+    setTimeout(() => {
+      this.promptManager.refresh().catch(error => {
+        console.error('Error refreshing prompt manager:', error);
+      });
+    }, 500);
+
+    console.log(`[BeatOperations] Switched beat ${beatId} to version ${versionId}`);
+  }
+
+  /**
+   * Extract all beats from the editor for beat navigation panel
+   */
+  extractBeatsFromEditor(editorView: EditorView | null): BeatInfo[] {
+    if (!editorView) return [];
+
+    const beats: BeatInfo[] = [];
+    const { state } = editorView;
+
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === 'beatAI') {
+        const beatData = node.attrs as BeatAI;
+
+        // Check if there's content after this beat
+        let hasContent = false;
+        let checkPos = pos + node.nodeSize;
+
+        while (checkPos < state.doc.content.size) {
+          const nextNode = state.doc.nodeAt(checkPos);
+          if (!nextNode) break;
+
+          // Stop if we hit another beat
+          if (nextNode.type.name === 'beatAI') {
+            break;
+          }
+
+          // Check if paragraph has content
+          if (nextNode.type.name === 'paragraph' && nextNode.textContent.trim()) {
+            hasContent = true;
+            break;
+          }
+
+          checkPos += nextNode.nodeSize;
+        }
+
+        beats.push({
+          beatId: beatData.id,
+          prompt: beatData.prompt || 'No prompt',
+          position: pos,
+          isGenerating: beatData.isGenerating || false,
+          hasContent
+        });
+      }
+      return true;
+    });
+
+    return beats;
+  }
+
+  /**
+   * Scroll to a specific beat in the editor
+   */
+  async scrollToBeat(beatId: string, ionContent?: IonContent): Promise<void> {
+    // Find the beat element by data-beat-id attribute
+    const beatElement = document.querySelector(`[data-beat-id="${beatId}"]`) as HTMLElement;
+
+    if (beatElement) {
+      if (ionContent) {
+        // Use IonContent's scroll methods to keep header fixed
+        const contentElement = await ionContent.getScrollElement();
+        const beatRect = beatElement.getBoundingClientRect();
+        const contentRect = contentElement.getBoundingClientRect();
+
+        // Calculate the scroll position
+        const scrollTop = contentElement.scrollTop + beatRect.top - contentRect.top - 80;
+
+        // Scroll to the position smoothly
+        await ionContent.scrollToPoint(0, scrollTop, 500);
+      } else {
+        // Fallback to native scrollIntoView
+        beatElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      }
+
+      // Flash the beat to indicate selection
+      setTimeout(() => {
+        this.flashBeat(beatElement);
+      }, 300);
+    } else {
+      console.warn(`Could not find beat element with ID: ${beatId}`);
+    }
+  }
+
+  /**
+   * Flash a beat to indicate selection
+   */
+  private flashBeat(beatElement: HTMLElement): void {
+    const container = beatElement.closest('.beat-ai-container') as HTMLElement;
+    if (container) {
+      // Add flash animation
+      container.style.transition = 'background-color 0.3s ease';
+      container.style.backgroundColor = 'rgba(56, 128, 255, 0.3)';
+
+      setTimeout(() => {
+        container.style.backgroundColor = '';
+        setTimeout(() => {
+          container.style.transition = '';
+        }, 300);
+      }, 600);
+    }
+  }
+
+  /**
+   * Append content after a beat node (used for streaming)
+   */
+  private appendContentAfterBeatNode(editorView: EditorView, beatId: string, newContent: string, isFirstChunk = false): void {
+    if (!editorView) return;
+
+    const beatPos = this.findBeatNodePosition(editorView, beatId);
+    if (beatPos === null) return;
+
+    const { state } = editorView;
+    const beatNode = state.doc.nodeAt(beatPos);
+    if (!beatNode) return;
+
+    // Position immediately after the beat node
+    const afterBeatPos = beatPos + beatNode.nodeSize;
+
+    if (isFirstChunk) {
+      // First chunk - create HTML with <p> wrapper and process linebreaks
+      const htmlContent = '<p>' + newContent.replace(/\n/g, '</p><p>') + '</p>';
+
+      // Parse HTML and insert into document
+      this.insertHtmlContent(editorView, beatId, htmlContent, afterBeatPos);
+    } else {
+      // Subsequent chunks - process linebreaks and append to existing content
+      const processedContent = newContent.replace(/\n/g, '</p><p>');
+      this.appendHtmlChunk(editorView, beatId, processedContent);
+    }
+  }
+
+  /**
+   * Insert HTML content at a position
+   */
+  private insertHtmlContent(editorView: EditorView, beatId: string, htmlContent: string, position: number): void {
+    if (!editorView) return;
+
+    try {
+      const div = document.createElement('div');
+      div.innerHTML = htmlContent;
+
+      const fragment = DOMParser.fromSchema(editorView.state.schema).parseSlice(div);
+      const tr = editorView.state.tr.replaceRange(position, position, fragment);
+      editorView.dispatch(tr);
+
+      // Find the actual end position
+      const newState = editorView.state;
+      const insertedSize = fragment.content.size;
+      const insertEndPos = position + insertedSize;
+
+      // Find the last paragraph and get position at end of its text content
+      let endPosition = insertEndPos - 1;
+
+      // Walk backwards to find the last text position
+      for (let pos = insertEndPos - 1; pos >= position; pos--) {
+        try {
+          const $pos = newState.doc.resolve(pos);
+          if ($pos.parent.type.name === 'paragraph' && $pos.parentOffset > 0) {
+            endPosition = pos;
+            break;
+          }
+        } catch {
+          // Position might be invalid, continue searching
+        }
+      }
+
+      this.beatStreamingPositions.set(beatId, endPosition);
+    } catch (error) {
+      console.error('Failed to insert HTML content:', error);
+    }
+  }
+
+  /**
+   * Append HTML chunk to existing content
+   */
+  private appendHtmlChunk(editorView: EditorView, beatId: string, processedContent: string): void {
+    if (!editorView) return;
+
+    const insertPos = this.beatStreamingPositions.get(beatId);
+    if (!insertPos || insertPos > editorView.state.doc.content.size) {
+      return;
+    }
+
+    // Lazy cleanup: Remove empty paragraphs that might have been created by previous chunks
+    this.removeLastEmptyParagraphIfExists(editorView, beatId);
+
+    // Get updated position after potential cleanup
+    const updatedInsertPos = this.beatStreamingPositions.get(beatId);
+    if (!updatedInsertPos || updatedInsertPos > editorView.state.doc.content.size) {
+      return;
+    }
+
+    // If the processed content contains </p><p>, we need to handle it specially
+    if (processedContent.includes('</p><p>')) {
+      // Split by paragraph boundaries
+      const parts = processedContent.split('</p><p>');
+      let currentPos = updatedInsertPos;
+
+      // First part goes into current paragraph
+      if (parts[0]) {
+        const tr1 = editorView.state.tr.insertText(parts[0], currentPos);
+        editorView.dispatch(tr1);
+        currentPos += parts[0].length;
+      }
+
+      // Remaining parts create new paragraphs
+      for (let i = 1; i < parts.length; i++) {
+        if (editorView) {
+          const state = editorView.state;
+
+          // Find the paragraph containing the current position
+          const $pos = state.doc.resolve(currentPos);
+          let paragraphNode = null;
+          let paragraphPos = -1;
+
+          // Walk up to find the paragraph
+          for (let depth = $pos.depth; depth >= 0; depth--) {
+            if ($pos.node(depth).type.name === 'paragraph') {
+              paragraphNode = $pos.node(depth);
+              paragraphPos = $pos.start(depth) - 1;
+              break;
+            }
+          }
+
+          if (paragraphNode && paragraphPos >= 0) {
+            // Insert new paragraph after the current one
+            const afterCurrentParagraph = paragraphPos + paragraphNode.nodeSize;
+
+            // Create new paragraph with content
+            const newParagraphNode = state.schema.nodes['paragraph'].create(null,
+              parts[i] ? [state.schema.text(parts[i])] : []);
+
+            const tr = state.tr.insert(afterCurrentParagraph, newParagraphNode);
+            editorView.dispatch(tr);
+
+            // Update position to end of new paragraph's text content
+            currentPos = afterCurrentParagraph + (parts[i] ? parts[i].length : 0) + 1;
+          }
+        }
+      }
+
+      this.beatStreamingPositions.set(beatId, currentPos);
+    } else {
+      // Simple text append
+      const state = editorView.state;
+      const validPos = Math.min(updatedInsertPos, state.doc.content.size);
+
+      const tr = state.tr.insertText(processedContent, validPos);
+      editorView.dispatch(tr);
+      this.beatStreamingPositions.set(beatId, validPos + processedContent.length);
+    }
+  }
+
+  /**
+   * Remove last empty paragraph if exists
+   */
+  private removeLastEmptyParagraphIfExists(editorView: EditorView, beatId: string): void {
+    if (!editorView) return;
+
+    const currentPos = this.beatStreamingPositions.get(beatId);
+    if (!currentPos) return;
+
+    const state = editorView.state;
+
+    try {
+      // Find the current paragraph containing our position
+      const $pos = state.doc.resolve(currentPos);
+      let currentParagraphNode = null;
+      let currentParagraphPos = -1;
+
+      // Walk up to find the paragraph
+      for (let depth = $pos.depth; depth >= 0; depth--) {
+        if ($pos.node(depth).type.name === 'paragraph') {
+          currentParagraphNode = $pos.node(depth);
+          currentParagraphPos = $pos.start(depth) - 1;
+          break;
+        }
+      }
+
+      if (currentParagraphNode && currentParagraphPos >= 0) {
+        // Check if current paragraph is empty
+        const paragraphContent = currentParagraphNode.textContent.trim();
+
+        if (paragraphContent === '') {
+          // This paragraph is empty, remove it
+          const paragraphEndPos = currentParagraphPos + currentParagraphNode.nodeSize;
+          const tr = state.tr.delete(currentParagraphPos, paragraphEndPos);
+          editorView.dispatch(tr);
+
+          // Update the stored position
+          const newState = editorView.state;
+          const newPos = Math.max(0, currentParagraphPos - 1);
+
+          // Make sure we're at a valid position
+          if (newPos < newState.doc.content.size) {
+            this.beatStreamingPositions.set(beatId, newPos);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to remove empty paragraph:', error);
+    }
+  }
+}
