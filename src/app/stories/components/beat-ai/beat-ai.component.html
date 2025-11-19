@@ -128,8 +128,7 @@
                            [clearable]="false"
                            [searchable]="false"
                            placeholder="Choose beat type..."
-                           class="model-select"
-                           appendTo="body"
+                           class="model-select beat-type-select"
                            (change)="onBeatTypeChange()">
                   <ng-template ng-option-tmp let-item="item">
                     <div class="beat-type-option">
@@ -147,8 +146,7 @@
                            [clearable]="false"
                            [searchable]="false"
                            placeholder="Choose word count..."
-                           class="model-select"
-                           appendTo="body"
+                           class="model-select word-count-select"
                            (change)="onWordCountChange()">
                 </ng-select>
                 <input 
@@ -169,8 +167,7 @@
                            [clearable]="false"
                            [searchable]="true"
                            placeholder="Select model..."
-                           class="model-select"
-                           appendTo="body"
+                           class="model-select ai-model-select"
                            (change)="onModelChange()">
                   <ng-template ng-label-tmp let-item="item">
                     <div class="model-option-inline">

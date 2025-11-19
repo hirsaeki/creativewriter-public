@@ -4,7 +4,7 @@
       background: rgba(42, 42, 42, 0.2);
       backdrop-filter: blur(8px);
       margin: 1rem 0;
-      overflow: hidden;
+      overflow: visible; /* Changed from hidden to visible to allow dropdowns */
       transition: all 0.3s ease;
       max-width: 100%;
       -webkit-user-select: none;
@@ -16,21 +16,26 @@
     /* Allow interactive controls to receive touch/click focus on mobile */
     .beat-ai-container .generation-options,
     .beat-ai-container .generation-options * {
-      -webkit-user-select: text;
-      -moz-user-select: text;
-      -ms-user-select: text;
-      user-select: text;
+      -webkit-user-select: auto;
+      -moz-user-select: auto;
+      -ms-user-select: auto;
+      user-select: auto;
       -webkit-touch-callout: default;
+      /* Enable pointer events for mobile touch */
+      pointer-events: auto;
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
     }
 
     :global(.model-select),
     :global(.model-select .ng-select-container),
     :global(.model-select input) {
-      -webkit-user-select: text !important;
-      -moz-user-select: text !important;
-      -ms-user-select: text !important;
-      user-select: text !important;
+      -webkit-user-select: auto !important;
+      -moz-user-select: auto !important;
+      -ms-user-select: auto !important;
+      user-select: auto !important;
       -webkit-touch-callout: default !important;
+      pointer-events: auto !important;
+      touch-action: manipulation !important;
     }
     
     .beat-ai-container.expanded {
@@ -56,6 +61,8 @@
     .beat-prompt-section {
       padding: 0.5rem;
       transition: all 0.3s ease;
+      /* Ensure dropdowns can overflow */
+      overflow: visible;
     }
     
     .beat-prompt-section.collapsed {
@@ -383,6 +390,8 @@
     
     .prompt-input-container {
       margin-top: 0.1rem;
+      /* Ensure dropdowns don't get clipped */
+      overflow: visible;
     }
     
     .prompt-input.prosemirror-container {
@@ -543,6 +552,10 @@
     .generation-options {
       margin-top: 0.5rem;
       margin-bottom: 0.5rem;
+      /* Ensure dropdowns can overflow properly */
+      overflow: visible;
+      position: relative;
+      z-index: 10;
     }
     
     .options-row {
@@ -562,6 +575,9 @@
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
+      /* Allow dropdowns to overflow parent */
+      overflow: visible;
+      position: relative;
     }
     
     .model-selection-group {
@@ -1162,14 +1178,25 @@
       border: 1px solid #404040 !important;
       border-radius: 4px !important;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-      z-index: 9999 !important;
+      /* Increased z-index to appear above ProseMirror editor and other elements */
+      z-index: 99999 !important;
+      /* Mobile touch improvements */
+      -webkit-overflow-scrolling: touch;
+      /* Ensure panel is clickable on mobile */
+      pointer-events: auto !important;
+      touch-action: manipulation !important;
     }
     
     :global(.model-select .ng-dropdown-panel .ng-dropdown-panel-items .ng-option) {
       color: #e0e0e0 !important;
       background: #2d2d2d !important;
-      padding: 0.5rem !important;
+      padding: 0.75rem !important; /* Increased for better touch targets on mobile */
       font-size: 0.9rem !important;
+      min-height: 44px !important; /* iOS minimum touch target size */
+      cursor: pointer !important;
+      /* Mobile touch improvements */
+      -webkit-tap-highlight-color: rgba(13, 110, 253, 0.2);
+      touch-action: manipulation;
     }
     
     :global(.model-select .ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-highlighted) {
@@ -1182,6 +1209,22 @@
 
     /* Mobile optimizations for Beat AI */
     @media (max-width: 768px) {
+      :global(.model-select .ng-select-container) {
+        touch-action: manipulation !important;
+        -webkit-tap-highlight-color: rgba(13, 110, 253, 0.2) !important;
+      }
+
+      :global(.model-select .ng-dropdown-panel) {
+        z-index: 999999 !important;
+        -webkit-overflow-scrolling: touch !important;
+        pointer-events: auto !important;
+      }
+
+      :global(.model-select .ng-dropdown-panel .ng-dropdown-panel-items) {
+        -webkit-overflow-scrolling: touch;
+        max-height: 60vh !important;
+      }
+
       .favorite-models {
         padding: 0.3rem 0.4rem;
         gap: 0.3rem;
