@@ -619,7 +619,9 @@
       padding: 0;
       flex: 0 1 auto;
       border-radius: 8px;
-      overflow: hidden;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
       border: 1px solid rgba(255, 255, 255, 0.12);
       background: rgba(30, 30, 38, 0.4);
       box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
@@ -628,6 +630,11 @@
 
     .favorite-buttons::-webkit-scrollbar {
       display: none;
+    }
+
+    .favorite-buttons {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
     }
 
     .favorite-btn {
@@ -645,7 +652,8 @@
       font-weight: 600;
       cursor: pointer;
       transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-      min-width: 0;
+      min-width: max-content;
+      flex: 0 0 auto;
       white-space: nowrap;
       position: relative;
       overflow: hidden;

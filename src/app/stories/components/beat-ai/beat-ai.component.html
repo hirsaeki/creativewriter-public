@@ -111,11 +111,13 @@
                           role="listitem"
                           [class.active]="selectedModel === model.id"
                           (click)="selectFavoriteModel(model)"
-                          [title]="model.label">
+                          [title]="'Select ' + model.label"
+                          [attr.aria-label]="'Select ' + model.label"
+                          [attr.aria-pressed]="selectedModel === model.id">
                     <span class="favorite-btn-content">
                       <app-openrouter-icon *ngIf="model.provider === 'openrouter'" size="14" color="#6467f2" class="provider-icon-inline openrouter"></app-openrouter-icon>
                       <ion-icon *ngIf="model.provider !== 'openrouter'" [name]="getProviderIcon(model.provider)" class="provider-icon-inline" [class.gemini]="model.provider === 'gemini'"></ion-icon>
-                      <span class="model-short-name">{{ getShortModelName(model.label) }}</span>
+                      <span class="model-short-name">{{ model.label }}</span>
                     </span>
                   </button>
                 </div>
