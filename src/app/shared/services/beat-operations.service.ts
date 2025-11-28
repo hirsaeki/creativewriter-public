@@ -221,6 +221,22 @@ export class BeatOperationsService {
       return;
     }
 
+    // Save existing content to history BEFORE it gets overwritten
+    if (event.storyId) {
+      const existingContent = this.getTextAfterBeat(editorView, event.beatId);
+      if (existingContent && existingContent.trim().length > 0) {
+        // Save existing content as a previous version (don't block generation)
+        this.savePreviousContentToHistory(
+          event.beatId,
+          event.storyId,
+          existingContent,
+          event.beatType || 'story'
+        ).catch(error => {
+          console.error('[BeatOperations] Failed to save previous content to history:', error);
+        });
+      }
+    }
+
     // Handle rewrite action - delete old content before rewriting
     if (event.action === 'rewrite' && event.existingText) {
       this.deleteContentAfterBeat(editorView, event.beatId, getHTMLContent);
@@ -680,5 +696,48 @@ export class BeatOperationsService {
     } catch (error) {
       console.warn('Failed to remove empty paragraph:', error);
     }
+  }
+
+  /**
+   * Save existing beat content to history before it gets overwritten
+   * This ensures the previous version is preserved for later retrieval
+   */
+  private async savePreviousContentToHistory(
+    beatId: string,
+    storyId: string,
+    content: string,
+    beatType: 'story' | 'scene'
+  ): Promise<void> {
+    // Check if this content already exists in history to avoid duplicates
+    const existingHistory = await this.beatHistoryService.getHistory(beatId);
+    if (existingHistory) {
+      // Check if the most recent version has the same content
+      const sortedVersions = [...existingHistory.versions].sort(
+        (a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
+      );
+      if (sortedVersions.length > 0) {
+        const latestVersion = sortedVersions[0];
+        // Normalize content for comparison (trim whitespace)
+        if (latestVersion.content.trim() === content.trim()) {
+          console.log('[BeatOperations] Content unchanged, skipping history save');
+          return;
+        }
+      }
+    }
+
+    // Save the existing content as a previous version
+    await this.beatHistoryService.saveVersion(beatId, storyId, {
+      content,
+      prompt: '(previous content)',
+      model: 'manual',
+      beatType,
+      wordCount: content.split(/\s+/).length,
+      generatedAt: new Date(),
+      characterCount: content.length,
+      isCurrent: false,
+      action: 'generate'
+    });
+
+    console.log(`[BeatOperations] Saved previous content to history for beat ${beatId}`);
   }
 }
