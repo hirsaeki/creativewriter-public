@@ -1,181 +1,125 @@
-# Release Notes
+# 🚀 CreativeWriter v2.0 - Feature Release
 
-## New Features
+> **Major update with AI Image Generation, Beat Version History, Enhanced Sync, and Mobile Improvements!**
 
-- **image-gen**: Introduce image generation feature with dedicated service, component, and Replicate API integration
-- **image-gen**: Add dynamic loading of text-to-image models from Replicate
-- **image-gen**: Fetch all community models from Replicate search
-- **image-gen**: Add searchable/filterable model selection dropdown
-- **image-gen**: Implement pagination and multiple search queries
-- **image-gen**: Replace dropdown with searchable model selector
-- **image-gen**: Add ability to manually enter custom model IDs
-- **image-gen**: Disable safety checker for all image generation models
-- **release**: Add Claude release agent with comprehensive release notes
-- **beat-navigation**: Add vertical scrolling improvements
-- **beat-ai**: Add rewrite beat functionality
-- **beat-ai**: Group related buttons to save horizontal space
-- **beat-ai**: Add tooltip to truncated scene chips
-- **beat-ai**: Truncate current scene context at beat position
-- **beat-history**: Implement Phase 1 - beat version history foundation
-- **beat-history**: Implement Phase 2 - version history UI components
-- **beat-history**: Add database maintenance UI for beat version histories
-- **beat-history**: Store original text and action type in version history
-- **ai-rewrite**: Add explicit instructions to return only rewritten text
-- **sync**: Implement selective sync for active story only
-- **sync**: Phase 1 - Add Story Metadata Index service and data models
-- **sync**: Phase 2 - Integrate metadata index with StoryService
-- **sync**: Phase 3 - Update Story List to use Metadata Index
-- **sync**: Phase 4 - Optimize sync filter for metadata index
-- **sync**: Phase 5 - Add loading indicator for story sync
-- **sync**: Add device tracking and sync history component
-- **sync**: Add missing stories check on start page
-- **sync**: Add detailed loading indicator during initial sync
-- **sync**: Add granular document-level sync progress indicators
-- **sync**: Auto-refresh story list and active story on sync completion
-- **sync**: Improve remote database connection feedback on app startup
-- **codex**: Add transfer button UI and help documentation
-- **codex**: Add codex transfer modal component
-- **editor**: Add swipe-accessible beat navigation panel for mobile
-- **editor**: Add backward compatibility for beat ID attributes
-- **stories**: Add automatic beat ID migration on story load
-- **stories**: Ensure all beats have unique IDs during migration
-- **stories**: Add media gallery for viewing all images and videos in a story
-- **settings**: Add manual metadata index sync buttons
-- **snapshots**: Implement server-side snapshot service with Docker
-- **snapshots**: Implement Angular client with filtered replication and HTTP queries
-- **snapshots**: Add version history UI with snapshot timeline modal
-- **dev**: Update Angular CLI to 20.3.9 for MCP server support
-- **debug**: Add visible debug panel for mobile story loading
+## 📋 Release Information
+- **Version**: v2.0.202511280702
+- **Release Date**: November 28, 2025
+- **130+ Commits** since v2.0.202510150738 with extensive new features, improvements, and fixes
 
-## Bug Fixes
+## 🎯 Major New Features
 
-- **workflow**: Resolve YAML syntax error in sync-public.yml
-- **stories**: Improve beat AI favorite labels
-- **stories**: Exclude beat AI content from story preview text
-- **beat-ai**: Resolve mobile dropdown issues with ng-select on iOS/Android
-- **beat-ai**: Preserve original prompt when using rewrite feature
-- **beat-ai**: Fix refreshCustomContext overwriting truncated scene content
-- **beat-ai**: Comprehensive fix for scene truncation at beat position
-- **beat-ai**: Use correct data-beat-id attribute in prompt-manager
-- **beat-ai**: Fix broken regeneration for rewrite beats
-- **beat-generation**: Correct POV auto-detection from 'first person' to 'third person limited'
-- **beat-nav**: Fix scroll-to-beat failure after rewrite by correcting attribute name
-- **beat-nav**: Replace distracting red badge with subtle white design
-- **beat-nav**: Correct scroll-to-beat positioning
-- **beat-nav**: Improve scroll-to-beat positioning accuracy
-- **beat-nav**: Generate IDs for legacy beats without data-id attribute
-- **beat-history**: Convert date strings to Date objects when loading history
-- **beat-history**: Use theme-aware colors in version history modal
-- **beat-history**: Trigger change detection when updating beat node
-- **beat-history**: Add missing hasHistory and currentVersionId to node view
-- **beat-history**: Preserve newlines and formatting when restoring beat history versions
-- **editor**: Preserve scroll and cursor position in AI rewrite modal
-- **story-editor**: Resolve stale state issue in saveStory causing data loss
-- **story-editor**: Trigger save after beat generation completes
-- **story-editor**: Eliminate double-save race condition in persistSceneBeforeBeatAction
-- **outline-overview**: Fix event handling and improve performance
-- **outline-overview**: Preserve accordion expanded state during save operations
-- **outline-overview**: Comprehensive fix for accordion collapse issue
-- **ui**: Fix header viewport overlap during beat editing and generation
-- **ui**: Prevent header from scrolling out of view on mobile beat navigation
-- **mobile**: Prevent header from scrolling out of view during beat navigation
-- **sync**: Wait for initial sync before loading metadata index
-- **sync**: Prevent empty metadata index from overwriting remote data
-- **sync**: Set activeStoryId before loading to enable selective sync
-- **sync**: Force immediate replication of story document when opening
-- **sync**: Resolve story loading delay after cache clear and improve sync status
-- **sync**: Exclude all system documents from story count
-- **metadata**: Ensure metadata index updates when reordering stories
-- **codex**: Fix transfer modal viewport on mobile
-- **codex**: Fix missing footer buttons in transfer modal
-- **codex**: Enforce strict height constraints for mobile modal
-- **codex**: Reduce transfer modal height to 80vh for mobile visibility
-- **codex**: Reduce transfer modal to 70vh for mobile viewport
-- **codex**: Use fixed footer positioning for mobile modal visibility
-- **codex**: Restore proper flexbox layout for transfer modal
-- **codex**: Add safe-area padding for Android navigation bar
-- **codex**: Use app-wide Android nav bar pattern (+48px)
-- **settings**: Persist Ollama and Replicate model selections
-- **replicate**: Add proxy configuration for CORS-free API access
-- **replicate**: Use language-models collection endpoint to load LLM models
-- **replicate**: Correct API endpoint and authentication for model loading
-- **replicate**: Add /v1 to API path for correct proxy routing
-- **replicate**: Correct API URL path to prevent duplicate /v1
-- **nginx**: Correct proxy_pass to preserve full request path
-- **image-generation**: Preserve prompt when switching models
-- **image-gen**: Simplify model loading to prevent infinite loading
-- **image-gen**: Remove 20 model limit, fetch all text-to-image models
-- **database**: Correct story counting logic to properly identify story documents
-- **database**: Remove setTimeout to prevent race condition on user login
-- **database**: Add automatic cleanup of old IndexedDB databases to prevent mobile crashes
-- **tests**: Fix TokenCounterService tests by adding HttpClient provider
-- **snapshots**: Fix CouchDB view query encoding and missing icon
-- **snapshot-service**: Properly update existing design documents
-- **snapshots**: Reverse startkey/endkey for descending CouchDB query
-- **browser-compat**: Improve Vivaldi browser compatibility and error handling
-- **media-gallery**: Display all images from database instead of filtering by content references
-- **media-gallery**: Show only images actually used in the current story
+### AI Image Generation
+- 🖼️ **Generate images with AI** - New dedicated image generation feature powered by Replicate
+- 🔍 **Searchable model selector** - Browse and filter thousands of text-to-image models
+- 📊 **Pagination support** - Efficiently browse large model collections
+- ⚙️ **Custom model IDs** - Manually enter any Replicate model identifier
+- 🔄 **Dynamic model loading** - Fetch community models from Replicate search
+- 🛡️ **Safety checker bypass** - Disabled for creative freedom
 
-## Refactoring
+### Beat Version History
+- 📜 **Version tracking** - Automatic history for all beat changes
+- 🔄 **Restore previous versions** - Roll back to any saved state
+- 🎨 **Theme-aware UI** - Version history modal matches app theme
+- 💾 **Persistent storage** - History survives app restarts
+- 🗑️ **Database maintenance** - UI for managing beat history storage
+- ✏️ **Action type tracking** - Know if change was from generation, rewrite, or edit
 
-- **beat-prompts**: Restructure instructions using CO-STAR framework (2025 best practices)
-- **beat-prompts**: Apply CO-STAR framework to French and Spanish templates
-- **beat-ai**: Consolidate rewrite prompt construction into template system
-- **beat-nav**: Redesign edge indicator with subtle transparent styling
-- **beat-nav**: Change icon from wand to git-commit
-- **editor**: Extract restoreEditorState helper method
-- **editor**: Replace magic number with named constant
-- **editor**: Simplify state restoration to use only requestAnimationFrame
-- **editor**: Remove unused DOM_UPDATE_DELAY_MS constant
-- **editor**: Split ProseMirrorEditorService into logical sub-services
-- **story-editor**: Integrate SceneNavigationService and StoryEditorStateService
-- **sync**: Improve missing stories UI with toast and template optimization
-- **ai**: Create centralized AI provider validation service
+### Enhanced Sync & Data Management
+- 🔄 **Selective sync** - Only sync active story for faster performance
+- 📊 **Metadata index** - Optimized story list loading with 5-phase implementation
+- 📱 **Device tracking** - See sync history across devices
+- ⚡ **Granular progress** - Document-level sync indicators
+- 🔔 **Auto-refresh** - Story list updates automatically after sync
+- 🔍 **Missing stories check** - Detect and recover unsynchronized content
 
-## Performance Improvements
+### Mobile Experience Improvements
+- 👆 **Swipe navigation** - Access beat navigation panel with swipe gesture
+- 📐 **Safe area handling** - Proper padding for Android navigation bars
+- 🎯 **Fixed keyboard issues** - Resolved stuck input problems
+- 📜 **Scroll improvements** - Better scrolling with Ionic components
+- 🐛 **Debug console** - Mobile-accessible debugging from settings
 
-- **stories**: Implement caching for story previews and word counts (Phase 1)
-- **stories**: Implement indexed queries and pagination (Phase 2)
-- **stories**: Implement schema versioning to skip unnecessary migrations
-- **stories**: Add performance logging and fix blocking sync initialization
-- **stories**: Revert to allDocs() and simplify indexes for dramatic performance improvement
+## ✨ Additional Features
 
-## Tests
+### Beat AI Enhancements
+- ⭐ **Rewrite beat functionality** - AI-powered rewriting of existing beats
+- 📝 **Truncated context** - Scene context truncated at beat position for relevance
+- 💡 **Tooltips** - Helpful hints on truncated scene chips
+- ⚡ **Grouped buttons** - Cleaner UI with related actions grouped together
+- 🔄 **CO-STAR framework** - Restructured prompts using 2025 best practices
 
-- **editor**: Add comprehensive unit tests for editor sub-services
-- **beat-nav**: Add comprehensive tests for attribute name consistency
-- Fix timing issues in service observable tests
-- Fix failing test suite - add HttpClient providers and remove obsolete test
+### Beat Navigation
+- 🎯 **Vertical scrolling** - Improved beat-to-beat navigation
+- 🔗 **Scroll-to-beat fixes** - Reliable positioning after rewrites
+- 🎨 **Redesigned indicators** - Subtle, non-distracting edge indicators
+- 🆔 **Legacy beat support** - Automatic ID migration for older stories
 
-## Documentation
+### Codex Transfer
+- 📤 **Transfer UI** - Move codex entries between stories
+- 📱 **Mobile-optimized modal** - Proper viewport handling on mobile
+- 📚 **Help documentation** - Built-in transfer instructions
 
-- **beat-history**: Reorganize documentation into dedicated folder
-- **beat-history**: Add user guide and automatic cleanup on story deletion
-- **beat-history**: Add comprehensive feature specification and implementation plan
-- **editor**: Clarify independence of scroll and focus restoration
-- **snapshots**: Add comprehensive design document for snapshot and rollback system
-- **snapshots**: Add server-side snapshot service design with Docker architecture
-- **snapshots**: Add tradeoffs analysis and server-only implementation guide
-- **performance**: Add comprehensive performance optimization plan
-- **performance**: Document Phase 2 rollback and lessons learned
-- **performance**: Document Phase 4 - performance logging and sync fix
-- Mark all phases complete with comprehensive Phase 5 documentation
-- Add comprehensive implementation progress tracking document
+### Media & Content
+- 🖼️ **Media gallery** - View all images and videos in a story
+- 📋 **Story preview** - Excludes beat AI content from previews
+- ⭐ **Favorite labels** - Improved beat AI favorite model labels
 
-## Maintenance
+### Snapshots & Rollback
+- 📸 **Server-side snapshots** - Docker-based snapshot service
+- 🔄 **Filtered replication** - Efficient snapshot syncing
+- 📜 **Timeline UI** - Visual snapshot history
 
-- Rename release command to /release_creativewriter
-- Remove proxy/node_modules from git and update .gitignore
-- Remove debug console logs from services and components
-- Create sample-beat-prompt.txt
-- Remove snapshot service tradeoffs and story loading performance analysis documents
+## 🔧 Bug Fixes
 
-## Other
+### Editor & Story Management
+- 💾 **Stale state fix** - Resolved data loss from stale saveStory state
+- 🔄 **Double-save prevention** - Eliminated race condition in beat actions
+- ✏️ **Cursor preservation** - Scroll and cursor position maintained in AI rewrite
+- 📊 **Accordion state** - Preserved expanded state during save operations
 
-- Add logging for multiple image outputs (debug)
-- Add diagnostic logging for story sync troubleshooting (debug)
-- Revert several changes (sync, UI fixes)
-- Update CLAUDE.md
+### Sync & Database
+- 🔄 **Initial sync timing** - Wait for sync before loading metadata
+- 🛡️ **Empty index protection** - Prevent overwriting remote data
+- 📊 **Story counting** - Correct logic for identifying story documents
+- ⏱️ **Race condition fix** - Removed setTimeout preventing login issues
+- 🗑️ **IndexedDB cleanup** - Automatic cleanup of old databases on mobile
+
+### Mobile & UI
+- 📱 **Header scroll fix** - Prevent header from scrolling out of view
+- 🎯 **Viewport overlap** - Fixed overlap during beat editing
+- 📐 **Modal heights** - Proper sizing for mobile viewports
+- 👆 **Footer visibility** - Fixed missing buttons on Android
+
+### API & Proxy
+- 🔌 **Replicate proxy** - CORS-free API access configuration
+- 🔗 **API path fixes** - Correct routing for Replicate endpoints
+- 🌐 **Nginx proxy** - Preserved full request paths
+- 🌐 **Browser compatibility** - Improved Vivaldi browser support
+
+## 🏗️ Technical Improvements
+
+### Architecture
+- **Service splitting** - ProseMirrorEditorService split into logical sub-services
+- **State management** - New SceneNavigationService and StoryEditorStateService
+- **AI validation** - Centralized AI provider validation service
+
+### Performance
+- 🚀 **Caching** - Story preview and word count caching
+- 📊 **Indexed queries** - Database query optimization
+- ⚡ **Schema versioning** - Skip unnecessary migrations
+- 🔄 **Simplified indexes** - Dramatic performance improvement with allDocs()
+
+### Testing
+- ✅ **Editor tests** - Comprehensive unit tests for sub-services
+- ✅ **Beat navigation tests** - Attribute consistency verification
+- 🔧 **Test fixes** - HttpClient providers and timing fixes
+
+## 📝 Documentation
+- 📚 **Beat history docs** - User guide and implementation specs
+- 📊 **Performance docs** - Optimization plan and rollback documentation
+- 🏗️ **Snapshot architecture** - Server-side service design docs
+- 📋 **Progress tracking** - Comprehensive implementation progress documents
 
 ---
-*Release prepared by Claude Code*
+*Release prepared with [Claude Code](https://claude.com/claude-code)*
