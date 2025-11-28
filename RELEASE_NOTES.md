@@ -49,6 +49,7 @@
 
 ## Bug Fixes
 
+- **workflow**: Resolve YAML syntax error in sync-public.yml
 - **stories**: Improve beat AI favorite labels
 - **stories**: Exclude beat AI content from story preview text
 - **beat-ai**: Resolve mobile dropdown issues with ng-select on iOS/Android
