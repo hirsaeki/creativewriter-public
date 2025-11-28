@@ -80,9 +80,11 @@ export class BeatVersionHistoryModalComponent implements OnInit {
       const history = await this.beatHistoryService.getHistory(this.beatId);
 
       if (history) {
-        // Sort by newest first and add expanded flag
+        // Sort by newest first, filter out current version, and add expanded flag
+        // The current version is already visible in the editor, no need to show it here
         // Convert generatedAt to Date if it's a string
         this.versions = history.versions
+          .filter(v => !v.isCurrent) // Exclude current version from display
           .map(v => ({
             ...v,
             generatedAt: typeof v.generatedAt === 'string' ? new Date(v.generatedAt) : v.generatedAt,

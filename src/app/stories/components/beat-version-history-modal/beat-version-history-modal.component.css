@@ -166,6 +166,12 @@
   border: 1px solid rgba(var(--ion-color-warning-rgb), 0.3);
 }
 
+.action-badge.manual-badge {
+  background: rgba(var(--ion-color-medium-rgb), 0.15);
+  color: var(--ion-color-medium);
+  border: 1px solid rgba(var(--ion-color-medium-rgb), 0.3);
+}
+
 .version-timestamp {
   font-size: 0.875rem;
   color: var(--ion-color-medium);

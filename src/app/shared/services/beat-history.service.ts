@@ -92,8 +92,10 @@ export class BeatHistoryService {
         const existingDoc = await this.historyDb.get<BeatVersionHistory>(docId);
         history = existingDoc;
 
-        // Mark all existing versions as not current
-        history.versions.forEach(v => v.isCurrent = false);
+        // Only mark all existing versions as not current if new version will be current
+        if (versionData.isCurrent !== false) {
+          history.versions.forEach(v => v.isCurrent = false);
+        }
       } catch (error) {
         // Document doesn't exist, create new history
         if ((error as {status?: number}).status === 404) {
@@ -112,10 +114,11 @@ export class BeatHistoryService {
       }
 
       // Add new version
+      // Respect the isCurrent flag from versionData if explicitly set to false
       const newVersion: BeatVersion = {
         ...versionData,
         versionId,
-        isCurrent: true
+        isCurrent: versionData.isCurrent !== false // Default to true unless explicitly false
       };
 
       history.versions.push(newVersion);
