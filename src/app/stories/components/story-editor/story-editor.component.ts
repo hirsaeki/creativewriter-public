@@ -11,7 +11,7 @@ import {
   arrowBack, bookOutline, book, settingsOutline, statsChartOutline, statsChart,
   saveOutline, checkmarkCircleOutline, menuOutline, chevronBack, chevronForward,
   chatbubblesOutline, bugOutline, menu, close, images, documentTextOutline, heart, search,
-  listOutline, list, flaskOutline, videocamOutline, timeOutline
+  listOutline, list, flaskOutline, videocamOutline, timeOutline, personCircleOutline
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { Story, Scene } from '../../models/story.interface';
@@ -182,7 +182,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       arrowBack, bookOutline, book, settingsOutline, statsChartOutline, statsChart,
       saveOutline, checkmarkCircleOutline, menuOutline, chevronBack, chevronForward,
       chatbubblesOutline, bugOutline, menu, close, images, documentTextOutline, heart, search,
-      listOutline, list, flaskOutline, videocamOutline, timeOutline
+      listOutline, list, flaskOutline, videocamOutline, timeOutline, personCircleOutline
     });
   }
 
@@ -623,6 +623,12 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
         action: () => this.goToSceneChat()
       },
       {
+        icon: 'person-circle-outline',
+        label: 'Character Chat',
+        action: () => this.goToCharacterChat(),
+        color: 'tertiary'
+      },
+      {
         icon: 'stats-chart',
         label: 'AI Logs',
         action: () => this.headerNavService.goToAILogger()
@@ -658,6 +664,11 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   goToStoryResearch(): void {
     if (!this.story?.id) return;
     this.router.navigate(['/stories/research', this.story.id]);
+  }
+
+  goToCharacterChat(): void {
+    if (!this.story?.id) return;
+    this.router.navigate(['/stories/character-chat', this.story.id]);
   }
 
   private updateHeaderActions(): void {
