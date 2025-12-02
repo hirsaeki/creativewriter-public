@@ -8,7 +8,7 @@ import {
   IonChip, IonLabel
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, sparklesOutline, bug } from 'ionicons/icons';
+import { arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, sparklesOutline, bug, star } from 'ionicons/icons';
 import { SettingsService } from '../core/services/settings.service';
 import { ModelService } from '../core/services/model.service';
 import { Settings } from '../core/models/settings.interface';
@@ -21,6 +21,7 @@ import { ApiSettingsComponent } from '../ui/settings/api-settings.component';
 import { UiSettingsComponent } from '../ui/settings/ui-settings.component';
 import { PromptsSettingsComponent } from '../ui/settings/prompts-settings.component';
 import { SceneGenerationSettingsComponent } from '../ui/settings/scene-generation-settings.component';
+import { PremiumSettingsComponent } from '../ui/settings/premium-settings.component';
 
 @Component({
   selector: 'app-settings',
@@ -30,7 +31,8 @@ import { SceneGenerationSettingsComponent } from '../ui/settings/scene-generatio
     IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonChip, IonLabel,
     SettingsTabsComponent, SettingsContentComponent, DatabaseBackupComponent,
-    ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent, SceneGenerationSettingsComponent
+    ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent, SceneGenerationSettingsComponent,
+    PremiumSettingsComponent
   ],
   template: `
     <div class="ion-page">
@@ -119,6 +121,11 @@ import { SceneGenerationSettingsComponent } from '../ui/settings/scene-generatio
               [modelsDisabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey)"
               (settingsChange)="onSettingsChange()">
             </app-scene-generation-settings>
+          </div>
+
+          <!-- Premium Tab -->
+          <div *ngSwitchCase="'premium'">
+            <app-premium-settings></app-premium-settings>
           </div>
 
           <!-- Backup & Restore Tab -->
@@ -887,13 +894,14 @@ export class SettingsComponent implements OnInit, OnDestroy {
     { value: 'scene-title', icon: 'document-text-outline', label: 'Scene Titles' },
     { value: 'scene-summary', icon: 'list-outline', label: 'Scene Summary' },
     { value: 'scene-generation', icon: 'sparkles-outline', label: 'Scene Generation' },
+    { value: 'premium', icon: 'star', label: 'Premium' },
     { value: 'backup', icon: 'archive-outline', label: 'Backup & Restore' }
   ];
 
   constructor() {
     this.settings = this.settingsService.getSettings();
     // Register Ionic icons
-    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, sparklesOutline, bug });
+    addIcons({ arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline, documentTextOutline, cloudOutline, listOutline, archiveOutline, globeOutline, logoGoogle, libraryOutline, hardwareChip, chatbubbleOutline, gitNetworkOutline, cloudUploadOutline, sparklesOutline, bug, star });
   }
 
   ngOnInit(): void {
