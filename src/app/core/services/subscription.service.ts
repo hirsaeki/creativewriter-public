@@ -14,6 +14,7 @@ export interface SubscriptionStatus {
   providedIn: 'root'
 })
 export class SubscriptionService {
+  private readonly API_URL = 'https://creativewriter-api.nostramo.workers.dev/api';
   private readonly CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
   private readonly GRACE_PERIOD = 3 * 24 * 60 * 60 * 1000; // 3 days offline grace
 
@@ -99,7 +100,7 @@ export class SubscriptionService {
     const settings = this.settingsService.getSettings();
     const premium = settings.premium;
 
-    if (!premium?.email || !premium?.apiUrl) {
+    if (!premium?.email) {
       this.isPremium$.next(false);
       return false;
     }
@@ -107,7 +108,7 @@ export class SubscriptionService {
     this.isVerifying$.next(true);
 
     try {
-      const status = await this.fetchSubscriptionStatus(premium.email, premium.apiUrl);
+      const status = await this.fetchSubscriptionStatus(premium.email);
 
       // Update cache
       this.settingsService.updateSettings({
@@ -147,8 +148,8 @@ export class SubscriptionService {
   /**
    * Fetch subscription status from API
    */
-  private async fetchSubscriptionStatus(email: string, apiUrl: string): Promise<SubscriptionStatus> {
-    const url = `${apiUrl}/verify?email=${encodeURIComponent(email)}`;
+  private async fetchSubscriptionStatus(email: string): Promise<SubscriptionStatus> {
+    const url = `${this.API_URL}/verify?email=${encodeURIComponent(email)}`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -205,19 +206,5 @@ export class SubscriptionService {
 
     this.isPremium$.next(false);
     return false;
-  }
-
-  /**
-   * Update API URL
-   */
-  setApiUrl(apiUrl: string): void {
-    const settings = this.settingsService.getSettings();
-
-    this.settingsService.updateSettings({
-      premium: {
-        ...settings.premium,
-        apiUrl: apiUrl.trim()
-      }
-    });
   }
 }

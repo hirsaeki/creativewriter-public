@@ -56,22 +56,6 @@ import { SettingsService } from '../../core/services/settings.service';
           Enter the email address you used to purchase your subscription.
         </ion-note>
 
-        <!-- API URL (Advanced) -->
-        <div class="advanced-section">
-          <ion-item>
-            <ion-label position="stacked">API URL (Advanced)</ion-label>
-            <ion-input
-              type="url"
-              [(ngModel)]="apiUrl"
-              placeholder="https://creativewriter-api.nostramo.workers.dev/api"
-              (ionBlur)="onApiUrlBlur()">
-            </ion-input>
-          </ion-item>
-          <ion-note class="input-note">
-            Only change this if you're using a custom subscription server.
-          </ion-note>
-        </div>
-
         <!-- Actions -->
         <div class="actions">
           <ion-button
@@ -160,12 +144,6 @@ import { SettingsService } from '../../core/services/settings.service';
       padding: 0.25rem 1rem 1rem;
     }
 
-    .advanced-section {
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid rgba(139, 180, 248, 0.1);
-    }
-
     .actions {
       display: flex;
       flex-direction: column;
@@ -225,7 +203,6 @@ export class PremiumSettingsComponent implements OnInit, OnDestroy {
   private settingsService = inject(SettingsService);
 
   email = '';
-  apiUrl = '';
   isPremium = false;
   isVerifying = false;
   plan?: 'monthly' | 'yearly';
@@ -243,7 +220,6 @@ export class PremiumSettingsComponent implements OnInit, OnDestroy {
     // Load current settings
     const settings = this.settingsService.getSettings();
     this.email = settings.premium?.email || '';
-    this.apiUrl = settings.premium?.apiUrl || 'https://creativewriter-api.nostramo.workers.dev/api';
 
     // Subscribe to premium status
     this.subscriptions.add(
@@ -286,13 +262,6 @@ export class PremiumSettingsComponent implements OnInit, OnDestroy {
           email: this.email.trim().toLowerCase()
         }
       });
-    }
-  }
-
-  onApiUrlBlur(): void {
-    const settings = this.settingsService.getSettings();
-    if (this.apiUrl !== settings.premium?.apiUrl) {
-      this.subscriptionService.setApiUrl(this.apiUrl);
     }
   }
 
