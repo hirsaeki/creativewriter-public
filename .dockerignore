@@ -28,6 +28,9 @@ docker-compose*
 # CI/CD
 .github
 
+# Premium backend (Cloudflare Worker - deployed separately)
+backend
+
 # Logs
 logs
 *.log
