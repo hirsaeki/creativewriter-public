@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, ViewChild, ElementRef, inject } from '@an
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subscription, firstValueFrom } from 'rxjs';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
   IonFooter, IonTextarea, IonAvatar, IonChip, IonLabel, IonSpinner,
@@ -17,8 +17,17 @@ import {
 import { StoryService } from '../../services/story.service';
 import { CodexService } from '../../services/codex.service';
 import { SubscriptionService } from '../../../core/services/subscription.service';
-import { PremiumModuleService, CharacterInfo, ChatMessage, KnowledgeCutoff, StoryContext } from '../../../core/services/premium-module.service';
+import {
+  PremiumModuleService,
+  CharacterInfo,
+  KnowledgeCutoff,
+  StoryContext,
+  CharacterChatServiceInterface
+} from '../../../core/services/premium-module.service';
 import { ModelService } from '../../../core/services/model.service';
+import { OpenRouterApiService } from '../../../core/services/openrouter-api.service';
+import { GoogleGeminiApiService } from '../../../core/services/google-gemini-api.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { Story } from '../../models/story.interface';
 import { CodexEntry, Codex } from '../../models/codex.interface';
 import { ModelOption } from '../../../core/models/model.interface';
@@ -28,6 +37,17 @@ interface ConversationMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+}
+
+/**
+ * AI Service Adapter - bridges the remote module with local AI services
+ * This adapter wraps OpenRouter/Gemini services for use by the premium module
+ */
+interface AIServiceAdapter {
+  generateChatResponse(
+    messages: { role: string; content: string }[],
+    modelId: string
+  ): Promise<string>;
 }
 
 @Component({
@@ -54,6 +74,9 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   private subscriptionService = inject(SubscriptionService);
   private premiumModuleService = inject(PremiumModuleService);
   private modelService = inject(ModelService);
+  private openRouterService = inject(OpenRouterApiService);
+  private geminiService = inject(GoogleGeminiApiService);
+  private settingsService = inject(SettingsService);
 
   // State
   story: Story | null = null;
@@ -66,6 +89,9 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   isPremium = false;
   isModuleLoading = false;
   moduleError: string | null = null;
+
+  // Premium module service instance
+  private chatService: CharacterChatServiceInterface | null = null;
 
   // Knowledge cutoff
   knowledgeCutoff: KnowledgeCutoff | null = null;
@@ -175,8 +201,63 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
 
   async loadPremiumModule(): Promise<void> {
     if (!this.premiumModuleService.isCharacterChatLoaded) {
-      await this.premiumModuleService.loadCharacterChatModule();
+      const module = await this.premiumModuleService.loadCharacterChatModule();
+      if (module) {
+        // Create AI adapter that bridges to local AI services
+        const aiAdapter = this.createAIAdapter();
+        // Instantiate the CharacterChatService from the loaded module
+        this.chatService = new module.CharacterChatService(aiAdapter);
+      }
     }
+  }
+
+  /**
+   * Creates an AI service adapter that bridges the remote module
+   * to the local OpenRouter/Gemini services
+   */
+  private createAIAdapter(): AIServiceAdapter {
+    return {
+      generateChatResponse: async (
+        messages: { role: string; content: string }[],
+        modelId: string
+      ): Promise<string> => {
+        const settings = this.settingsService.getSettings();
+
+        // Determine which AI service to use based on model ID
+        const isGemini = modelId.startsWith('gemini:') || modelId.includes('gemini');
+
+        // Convert messages to the format expected by the services
+        const formattedMessages = messages.map(m => ({
+          role: m.role as 'system' | 'user' | 'assistant',
+          content: m.content
+        }));
+
+        // Extract model name from ID (format: "provider:model")
+        const modelName = modelId.includes(':') ? modelId.split(':')[1] : modelId;
+
+        if (isGemini && settings.googleGemini?.enabled) {
+          const response = await firstValueFrom(
+            this.geminiService.generateText('', {
+              model: modelName,
+              messages: formattedMessages,
+              maxTokens: 2000
+            })
+          );
+          return response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } else if (settings.openRouter?.enabled) {
+          const response = await firstValueFrom(
+            this.openRouterService.generateText('', {
+              model: modelName,
+              messages: formattedMessages,
+              maxTokens: 2000
+            })
+          );
+          return response.choices?.[0]?.message?.content || '';
+        } else {
+          throw new Error('No AI service configured. Please enable OpenRouter or Gemini in settings.');
+        }
+      }
+    };
   }
 
   selectCharacter(character: CodexEntry): void {
@@ -191,13 +272,18 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const name = this.selectedCharacter.title;
-    this.suggestedStarters = [
-      `Tell me about yourself, ${name}.`,
-      `What's on your mind lately?`,
-      `How do you feel about the current situation?`,
-      `What are your hopes and fears?`
-    ];
+    // Use the premium module for suggested starters if available
+    if (this.chatService) {
+      const characterInfo = this.buildCharacterInfo(this.selectedCharacter);
+      this.suggestedStarters = this.chatService.getSuggestedStarters(characterInfo);
+    } else {
+      // Fallback: simple starters (no secret logic exposed)
+      const name = this.selectedCharacter.title;
+      this.suggestedStarters = [
+        `Hello, ${name}.`,
+        `What's on your mind?`
+      ];
+    }
   }
 
   useStarter(starter: string): void {
@@ -215,6 +301,11 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (!this.chatService) {
+      this.moduleError = 'Premium module not loaded. Please try again.';
+      return;
+    }
+
     const userMessage = this.currentMessage.trim();
     this.currentMessage = '';
 
@@ -229,17 +320,23 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
     this.isGenerating = true;
 
     try {
-      // Build character info from codex entry
+      // Build inputs for the premium module
       const characterInfo = this.buildCharacterInfo(this.selectedCharacter);
       const storyContext = this.buildStoryContext();
       const conversationHistory = this.messages.slice(0, -1).map(m => ({
-        role: m.role,
+        role: m.role as 'user' | 'assistant',
         content: m.content
       }));
 
-      // Get response using the AI service directly with the character prompt
-      const systemPrompt = this.buildSystemPrompt(characterInfo, storyContext);
-      const response = await this.generateResponse(systemPrompt, userMessage, conversationHistory);
+      // Use the premium module's chat method
+      const response = await this.chatService.chat(
+        characterInfo,
+        userMessage,
+        conversationHistory,
+        storyContext,
+        this.knowledgeCutoff || undefined,
+        this.selectedModel
+      );
 
       // Add assistant response
       this.messages.push({
@@ -262,23 +359,30 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Build character info from codex entry
+   * Note: This only extracts data - the actual prompt construction
+   * happens in the premium module on the server
+   */
   private buildCharacterInfo(entry: CodexEntry): CharacterInfo {
-    // Parse the content field which may contain structured info
-    const content = entry.content || '';
-
     return {
       name: entry.title,
-      description: content,
+      description: entry.content || undefined,
       notes: entry.tags?.join(', ')
     };
   }
 
+  /**
+   * Build story context from current story
+   * Note: This only extracts data - the actual context processing
+   * happens in the premium module on the server
+   */
   private buildStoryContext(): StoryContext {
     if (!this.story) return {};
 
     const chapters = this.story.chapters?.map(ch => ({
       title: ch.title,
-      summary: ch.scenes?.map(s => s.summary || s.title).join(' ') || '', // Build chapter summary from scenes
+      summary: ch.scenes?.map(s => s.summary || s.title).join(' ') || '',
       order: ch.order,
       scenes: ch.scenes?.map(s => ({
         title: s.title,
@@ -287,92 +391,7 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
       }))
     }));
 
-    // Build overall story summary from chapter/scene content
-    const storySummary = this.story.chapters
-      ?.flatMap(ch => ch.scenes?.map(s => s.summary).filter(Boolean) || [])
-      .slice(0, 5) // Limit to first 5 scene summaries
-      .join(' ') || this.story.title;
-
-    return {
-      summary: storySummary,
-      chapters
-    };
-  }
-
-  private buildSystemPrompt(character: CharacterInfo, storyContext: StoryContext): string {
-    let contextInfo = storyContext.summary || '';
-
-    if (this.knowledgeCutoff && storyContext.chapters) {
-      // Filter chapters up to cutoff
-      const relevantChapters = storyContext.chapters
-        .filter(ch => ch.order <= this.knowledgeCutoff!.chapterOrder)
-        .map(ch => {
-          if (this.knowledgeCutoff!.sceneOrder && ch.order === this.knowledgeCutoff!.chapterOrder) {
-            const relevantScenes = ch.scenes
-              ?.filter(s => s.order <= this.knowledgeCutoff!.sceneOrder!)
-              .map(s => s.summary || s.title)
-              .join('\n');
-            return `${ch.title}:\n${relevantScenes}`;
-          }
-          return `${ch.title}: ${ch.summary || ''}`;
-        })
-        .join('\n\n');
-      contextInfo = relevantChapters;
-    }
-
-    return `You are roleplaying as ${character.name} from a story. Stay completely in character.
-
-CHARACTER PROFILE:
-Name: ${character.name}
-${character.description ? `Description: ${character.description}` : ''}
-${character.personality ? `Personality: ${character.personality}` : ''}
-${character.background ? `Background: ${character.background}` : ''}
-${character.goals ? `Goals: ${character.goals}` : ''}
-${character.notes ? `Notes: ${character.notes}` : ''}
-
-STORY CONTEXT (what your character knows):
-${contextInfo}
-
-IMPORTANT RULES:
-- Respond as ${character.name} would, based on their personality, background, and knowledge
-- Only reference events and information your character would know about
-- Stay consistent with the character's voice, mannerisms, and speech patterns
-- If asked about something your character wouldn't know, respond as the character would to unknown information
-- Never break character or acknowledge you are an AI
-- Keep responses conversational and natural`;
-  }
-
-  private async generateResponse(
-    systemPrompt: string,
-    userMessage: string,
-    history: ChatMessage[]
-  ): Promise<string> {
-    // Use the model service to generate response
-    // This is a simplified implementation - you may want to use a dedicated chat service
-    const messages = [
-      { role: 'system' as const, content: systemPrompt },
-      ...history,
-      { role: 'user' as const, content: userMessage }
-    ];
-
-    // Call the appropriate AI service based on selected model
-    // const [provider] = this.selectedModel.split(':');
-
-    // For now, use a simple fetch to OpenRouter or Gemini
-    // This should be refactored to use a proper chat service
-    const response = await this.callAIService(messages);
-    return response;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private async callAIService(_messages: { role: string; content: string }[]): Promise<string> {
-    // Get settings and call appropriate service
-    // This is a placeholder - implement based on your existing AI service architecture
-    // TODO: Wire up to existing OpenRouter/Gemini services
-
-    // For demo purposes, return a placeholder
-    // In production, wire this up to your existing AI services
-    throw new Error('AI service integration needed - connect to your existing OpenRouter/Gemini services');
+    return { chapters };
   }
 
   private scrollToBottom(): void {
@@ -405,7 +424,6 @@ IMPORTANT RULES:
   }
 
   showHelp(): void {
-    // Show help modal or tooltip
     alert('Character Chat lets you have conversations with characters from your story. Select a character to begin chatting. You can set a knowledge cutoff to limit what the character knows about the story.');
   }
 
