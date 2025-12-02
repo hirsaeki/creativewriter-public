@@ -10,11 +10,11 @@ compatibility_date = "2024-12-01"
 # Then update the id below
 [[kv_namespaces]]
 binding = "SUBSCRIPTIONS"
-id = "YOUR_KV_NAMESPACE_ID"
+id = "cb062a51a4624ad1b8fa043364ce8a7e"
 
 # Environment variables (non-sensitive)
 [vars]
-ALLOWED_ORIGINS = "https://creativewriter.app,http://localhost:4200"
+ALLOWED_ORIGINS = "https://creativewriter.app,http://localhost:4200,http://127.0.0.1:4200"
 SUCCESS_URL = "https://creativewriter.app/settings?subscription=success"
 CANCEL_URL = "https://creativewriter.app/settings?subscription=cancelled"
 
