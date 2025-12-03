@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef, TemplateRef, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
@@ -117,8 +117,6 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   ];
 
   private subscriptions = new Subscription();
-
-  @ViewChild('modelToolbar', { read: TemplateRef }) modelToolbar!: TemplateRef<unknown>;
 
   constructor() {
     addIcons({
