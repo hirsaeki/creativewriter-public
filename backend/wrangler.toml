@@ -33,6 +33,6 @@ binding = "SUBSCRIPTIONS"
 id = "a8b5d39fe3aa4aba8703d732081e1fc4"
 
 [env.dev.vars]
-ALLOWED_ORIGINS = "http://localhost:4200,http://127.0.0.1:4200"
+ALLOWED_ORIGINS = "http://localhost:4200,http://127.0.0.1:4200,https://creativewriter.qw05.de"
 SUCCESS_URL = "http://localhost:4200/settings?subscription=success"
 CANCEL_URL = "http://localhost:4200/settings?subscription=cancelled"

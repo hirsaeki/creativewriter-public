@@ -65,12 +65,10 @@ function getStripe(env: Env): Stripe {
 }
 
 // CORS headers for cross-origin requests
-function corsHeaders(env: Env, origin: string): HeadersInit {
-  const allowed = env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
-  const allowOrigin = allowed.includes(origin) ? origin : allowed[0];
-
+// Allow any origin since the app is self-hosted by customers
+function corsHeaders(_env: Env, origin: string): HeadersInit {
   return {
-    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Origin': origin || '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
