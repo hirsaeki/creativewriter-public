@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, TemplateRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
@@ -11,8 +11,13 @@ import {
 import { addIcons } from 'ionicons';
 import {
   arrowBack, send, personCircle, chatbubbles, copy, refresh,
-  close, helpCircle, timeOutline
+  close, helpCircle, timeOutline, logoGoogle, globeOutline
 } from 'ionicons/icons';
+import { NgSelectModule } from '@ng-select/ng-select';
+import { OpenRouterIconComponent } from '../../../ui/icons/openrouter-icon.component';
+import { ClaudeIconComponent } from '../../../ui/icons/claude-icon.component';
+import { ReplicateIconComponent } from '../../../ui/icons/replicate-icon.component';
+import { OllamaIconComponent } from '../../../ui/icons/ollama-icon.component';
 
 import { StoryService } from '../../services/story.service';
 import { CodexService } from '../../services/codex.service';
@@ -54,11 +59,12 @@ interface AIServiceAdapter {
   selector: 'app-character-chat',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterModule,
+    CommonModule, FormsModule, RouterModule, NgSelectModule,
     IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonFooter, IonTextarea, IonAvatar, IonChip, IonLabel, IonSpinner,
     IonModal, IonList, IonItem,
-    AppHeaderComponent
+    AppHeaderComponent,
+    OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent
   ],
   templateUrl: './character-chat.component.html',
   styleUrls: ['./character-chat.component.scss']
@@ -112,10 +118,12 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
 
   private subscriptions = new Subscription();
 
+  @ViewChild('modelToolbar', { read: TemplateRef }) modelToolbar!: TemplateRef<unknown>;
+
   constructor() {
     addIcons({
       arrowBack, send, personCircle, chatbubbles, copy, refresh,
-      close, helpCircle, timeOutline
+      close, helpCircle, timeOutline, logoGoogle, globeOutline
     });
   }
 
