@@ -33,6 +33,7 @@ import { ModelService } from '../../../core/services/model.service';
 import { OpenRouterApiService } from '../../../core/services/openrouter-api.service';
 import { GoogleGeminiApiService } from '../../../core/services/google-gemini-api.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { AIRequestLoggerService } from '../../../core/services/ai-request-logger.service';
 import { Story } from '../../models/story.interface';
 import { CodexEntry, Codex } from '../../models/codex.interface';
 import { ModelOption } from '../../../core/models/model.interface';
@@ -84,6 +85,7 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   private openRouterService = inject(OpenRouterApiService);
   private geminiService = inject(GoogleGeminiApiService);
   private settingsService = inject(SettingsService);
+  private aiLogger = inject(AIRequestLoggerService);
 
   // State
   story: Story | null = null;
@@ -229,6 +231,7 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
         modelId: string
       ): Promise<string> => {
         const settings = this.settingsService.getSettings();
+        const startTime = Date.now();
 
         // Determine which AI service to use based on model ID
         const isGemini = modelId.startsWith('gemini:') || modelId.includes('gemini');
@@ -242,24 +245,121 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
         // Extract model name from ID (format: "provider:model")
         const modelName = modelId.includes(':') ? modelId.split(':')[1] : modelId;
 
+        // Build a prompt string for logging (combine all messages for context)
+        const promptForLogging = formattedMessages
+          .map(m => `[${m.role.toUpperCase()}]: ${m.content}`)
+          .join('\n\n');
+
+        // Count words for logging
+        const wordCount = promptForLogging.split(/\s+/).length;
+
+        // Log the request to AI-Log
+        let logId: string;
+
         if (isGemini && settings.googleGemini?.enabled) {
-          const response = await firstValueFrom(
-            this.geminiService.generateText('', {
-              model: modelName,
-              messages: formattedMessages,
-              maxTokens: 2000
-            })
-          );
-          return response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+
+          logId = this.aiLogger.logRequest({
+            endpoint,
+            model: modelName,
+            wordCount,
+            maxTokens: 2000,
+            prompt: promptForLogging,
+            apiProvider: 'gemini',
+            streamingMode: false,
+            requestDetails: {
+              source: 'character-chat',
+              temperature: 0.7,
+              messages: formattedMessages.length
+            }
+          });
+
+          try {
+            const response = await firstValueFrom(
+              this.geminiService.generateText('', {
+                model: modelName,
+                messages: formattedMessages,
+                maxTokens: 2000
+              })
+            );
+
+            const responseText = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+            // Log success
+            this.aiLogger.logSuccess(
+              logId,
+              responseText,
+              Date.now() - startTime,
+              {
+                httpStatus: 200
+              }
+            );
+
+            return responseText;
+          } catch (error) {
+            // Log error
+            this.aiLogger.logError(
+              logId,
+              error instanceof Error ? error.message : 'Unknown error',
+              Date.now() - startTime,
+              {
+                errorDetails: error instanceof Error ? { message: error.message, stack: error.stack } : { error }
+              }
+            );
+            throw error;
+          }
         } else if (settings.openRouter?.enabled) {
-          const response = await firstValueFrom(
-            this.openRouterService.generateText('', {
-              model: modelName,
-              messages: formattedMessages,
-              maxTokens: 2000
-            })
-          );
-          return response.choices?.[0]?.message?.content || '';
+          const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+
+          logId = this.aiLogger.logRequest({
+            endpoint,
+            model: modelName,
+            wordCount,
+            maxTokens: 2000,
+            prompt: promptForLogging,
+            apiProvider: 'openrouter',
+            streamingMode: false,
+            requestDetails: {
+              source: 'character-chat',
+              temperature: 0.7,
+              messages: formattedMessages.length
+            }
+          });
+
+          try {
+            const response = await firstValueFrom(
+              this.openRouterService.generateText('', {
+                model: modelName,
+                messages: formattedMessages,
+                maxTokens: 2000
+              })
+            );
+
+            const responseText = response.choices?.[0]?.message?.content || '';
+
+            // Log success
+            this.aiLogger.logSuccess(
+              logId,
+              responseText,
+              Date.now() - startTime,
+              {
+                httpStatus: 200
+              }
+            );
+
+            return responseText;
+          } catch (error) {
+            // Log error
+            this.aiLogger.logError(
+              logId,
+              error instanceof Error ? error.message : 'Unknown error',
+              Date.now() - startTime,
+              {
+                errorDetails: error instanceof Error ? { message: error.message, stack: error.stack } : { error }
+              }
+            );
+            throw error;
+          }
         } else {
           throw new Error('No AI service configured. Please enable OpenRouter or Gemini in settings.');
         }
