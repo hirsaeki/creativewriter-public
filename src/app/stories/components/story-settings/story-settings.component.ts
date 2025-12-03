@@ -3,14 +3,14 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
-  IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
+  IonContent, IonButton, IonIcon,
   IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
   IonTextarea, IonCheckbox, IonRadio, IonRadioGroup, IonChip, IonNote,
   IonText, IonGrid, IonRow, IonCol, IonProgressBar, IonList, IonThumbnail,
   IonBadge, IonSelect, IonSelectOption
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { 
+import {
   arrowBack, saveOutline, refreshOutline, checkmarkCircleOutline,
   warningOutline, informationCircleOutline, codeSlashOutline,
   settingsOutline, chatboxOutline, documentTextOutline, serverOutline,
@@ -29,25 +29,27 @@ import { SettingsContentComponent } from '../../../ui/components/settings-conten
 import { DbMaintenanceService, OrphanedImage, DatabaseStats, DuplicateImage, IntegrityIssue } from '../../../shared/services/db-maintenance.service';
 import { ImageUploadComponent, ImageUploadResult } from '../../../ui/components/image-upload.component';
 import { ModelFavoritesSettingsComponent } from '../../../ui/settings/model-favorites-settings/model-favorites-settings.component';
+import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
 
 @Component({
   selector: 'app-story-settings',
   standalone: true,
   imports: [
     CommonModule, FormsModule,
-    IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
+    IonContent, IonButton, IonIcon,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
     IonTextarea, IonCheckbox, IonRadio, IonRadioGroup, IonChip, IonNote,
     IonText, IonGrid, IonRow, IonCol, IonProgressBar, IonList, IonThumbnail,
     IonBadge, IonSelect, IonSelectOption,
     SettingsTabsComponent, SettingsContentComponent, ImageUploadComponent,
-    ModelFavoritesSettingsComponent
+    ModelFavoritesSettingsComponent, AppHeaderComponent
   ],
   templateUrl: './story-settings.component.html',
   styleUrls: ['./story-settings.component.scss']
 })
 export class StorySettingsComponent implements OnInit {
   story: Story | null = null;
+  private storyId: string | null = null;
   settings: StorySettings = { ...DEFAULT_STORY_SETTINGS };
   hasUnsavedChanges = false;
   private originalSettings!: StorySettings;
@@ -85,6 +87,19 @@ export class StorySettingsComponent implements OnInit {
   loadingModels = false;
   modelLoadError: string | null = null;
 
+  get headerActions(): HeaderAction[] {
+    return [
+      {
+        icon: this.hasUnsavedChanges ? 'warning-outline' : 'checkmark-circle-outline',
+        chipContent: this.hasUnsavedChanges ? 'Not saved' : 'Saved',
+        chipColor: this.hasUnsavedChanges ? 'warning' : 'success',
+        action: () => { /* Status chip - no action needed */ },
+        showOnMobile: true,
+        showOnDesktop: true
+      }
+    ];
+  }
+
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly storyService = inject(StoryService);
@@ -103,17 +118,17 @@ export class StorySettingsComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
-    const storyId = this.route.snapshot.paramMap.get('id');
-    if (storyId) {
-      this.story = await this.storyService.getStory(storyId);
+    this.storyId = this.route.snapshot.paramMap.get('id');
+    if (this.storyId) {
+      this.story = await this.storyService.getStory(this.storyId);
       if (this.story) {
         // Load existing settings or use defaults
-        this.settings = this.story.settings 
-          ? { ...this.story.settings } 
+        this.settings = this.story.settings
+          ? { ...this.story.settings }
           : { ...DEFAULT_STORY_SETTINGS };
 
         this.ensureFavoriteStructure();
-        
+
         this.originalSettings = { ...this.settings };
       } else {
         this.router.navigate(['/']);
@@ -254,8 +269,10 @@ export class StorySettingsComponent implements OnInit {
   }
 
   private navigateBack(): void {
-    if (this.story) {
-      this.router.navigate(['/stories/editor', this.story.id]);
+    // Use storyId from route as fallback to ensure correct navigation
+    const targetId = this.story?.id || this.storyId;
+    if (targetId) {
+      this.router.navigate(['/stories/editor', targetId]);
     } else {
       this.router.navigate(['/']);
     }

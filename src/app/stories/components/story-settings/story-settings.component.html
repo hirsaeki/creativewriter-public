@@ -1,20 +1,10 @@
 <div class="ion-page">
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button (click)="goBack()">
-          <ion-icon name="arrow-back" slot="icon-only"></ion-icon>
-        </ion-button>
-      </ion-buttons>
-      <ion-title>Story Settings</ion-title>
-      <ion-buttons slot="end">
-        <ion-chip [color]="hasUnsavedChanges ? 'warning' : 'success'">
-          <ion-icon [name]="hasUnsavedChanges ? 'warning-outline' : 'checkmark-circle-outline'"></ion-icon>
-          <ion-label>{{ hasUnsavedChanges ? 'Not saved' : 'Saved' }}</ion-label>
-        </ion-chip>
-      </ion-buttons>
-    </ion-toolbar>
-  </ion-header>
+  <app-header
+    title="Story Settings"
+    [showBackButton]="true"
+    [backAction]="goBack.bind(this)"
+    [rightActions]="headerActions">
+  </app-header>
 
   <ion-content *ngIf="story">
     <!-- Tab Navigation -->
