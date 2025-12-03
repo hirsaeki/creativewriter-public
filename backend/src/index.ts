@@ -549,7 +549,7 @@ export class CharacterChatService {
     const characterInfo = this.formatCharacterInfo(character);
     const contextInfo = knowledgeCutoff
       ? this.buildContextWithCutoff(storyContext, knowledgeCutoff)
-      : storyContext;
+      : this.buildFullContext(storyContext);
 
     return \`You are roleplaying as \${character.name} from a story. Stay completely in character.
 
@@ -597,27 +597,63 @@ IMPORTANT RULES:
   }
 
   /**
+   * Build full story context from all scene summaries
+   * Used when no knowledge cutoff is specified
+   */
+  buildFullContext(storyContext) {
+    // If a pre-built summary exists, use it
+    if (storyContext.summary) {
+      return storyContext.summary;
+    }
+
+    // Otherwise build from chapters and scenes
+    if (!storyContext.chapters || storyContext.chapters.length === 0) {
+      return '';
+    }
+
+    return storyContext.chapters
+      .sort((a, b) => a.order - b.order)
+      .map(ch => {
+        const sceneSummaries = ch.scenes
+          ?.sort((a, b) => a.order - b.order)
+          .filter(s => s.summary)
+          .map(s => \`  - \${s.title}: \${s.summary}\`)
+          .join('\\n') || '';
+
+        return \`Chapter: \${ch.title}\\n\${sceneSummaries || '  (no scene summaries available)'}\`;
+      })
+      .join('\\n\\n');
+  }
+
+  /**
    * Build story context with knowledge cutoff
    * Character only knows events up to a certain chapter/scene
    */
   buildContextWithCutoff(storyContext, cutoff) {
     if (!cutoff || !storyContext.chapters) {
-      return storyContext.summary || '';
+      return this.buildFullContext(storyContext);
     }
 
-    // Filter chapters up to cutoff
+    // Filter and format chapters up to cutoff with all scene summaries
     const relevantChapters = storyContext.chapters
       .filter(ch => ch.order <= cutoff.chapterOrder)
+      .sort((a, b) => a.order - b.order)
       .map(ch => {
+        let scenes = ch.scenes || [];
+
+        // If this is the cutoff chapter, filter scenes up to the cutoff scene
         if (cutoff.sceneOrder && ch.order === cutoff.chapterOrder) {
-          // Filter scenes within the cutoff chapter
-          const relevantScenes = ch.scenes
-            ?.filter(s => s.order <= cutoff.sceneOrder)
-            .map(s => s.summary || s.title)
-            .join('\\n');
-          return \`\${ch.title}:\\n\${relevantScenes}\`;
+          scenes = scenes.filter(s => s.order <= cutoff.sceneOrder);
         }
-        return \`\${ch.title}: \${ch.summary || ''}\`;
+
+        // Format scene summaries
+        const sceneSummaries = scenes
+          .sort((a, b) => a.order - b.order)
+          .filter(s => s.summary)
+          .map(s => \`  - \${s.title}: \${s.summary}\`)
+          .join('\\n');
+
+        return \`Chapter: \${ch.title}\\n\${sceneSummaries || '  (no scene summaries available)'}\`;
       })
       .join('\\n\\n');
 

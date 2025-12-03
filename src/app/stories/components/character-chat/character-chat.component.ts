@@ -374,24 +374,46 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
 
   /**
    * Build story context from current story
+   * Includes all scene summaries for comprehensive character knowledge
    * Note: This only extracts data - the actual context processing
    * happens in the premium module on the server
    */
   private buildStoryContext(): StoryContext {
     if (!this.story) return {};
 
-    const chapters = this.story.chapters?.map(ch => ({
-      title: ch.title,
-      summary: ch.scenes?.map(s => s.summary || s.title).join(' ') || '',
-      order: ch.order,
-      scenes: ch.scenes?.map(s => ({
+    // Build a comprehensive summary from all scene summaries
+    const summaryParts: string[] = [];
+
+    const chapters = this.story.chapters?.map(ch => {
+      // Collect all scene summaries for this chapter
+      const sceneSummaries = ch.scenes?.map(s => ({
         title: s.title,
         summary: s.summary,
         order: s.order
-      }))
-    }));
+      })) || [];
 
-    return { chapters };
+      // Build chapter summary from scene summaries
+      const chapterSummary = sceneSummaries
+        .filter(s => s.summary)
+        .map(s => s.summary)
+        .join(' ');
+
+      if (chapterSummary) {
+        summaryParts.push(`Chapter ${ch.chapterNumber || ch.order}: ${ch.title}\n${chapterSummary}`);
+      }
+
+      return {
+        title: ch.title,
+        summary: chapterSummary,
+        order: ch.order,
+        scenes: sceneSummaries
+      };
+    });
+
+    return {
+      summary: summaryParts.join('\n\n'),
+      chapters
+    };
   }
 
   private scrollToBottom(): void {
