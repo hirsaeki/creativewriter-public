@@ -11,6 +11,9 @@
 - NEVER MERGE TO release branch on your own!
 - WHEN CREATING NEW COMPONENTS: They shall follow a common design pattern to put each component into a seperate foldern, split them into template, typescript and css files!
 - After finising a task propose a next step to perform.
+- ALWAYS: After changing backend code (`backend/src/index.ts`), deploy to both dev AND production:
+  - `cd backend && npx wrangler deploy --env dev` (dev environment)
+  - `cd backend && npx wrangler deploy` (production environment)
 ---
 
 # Repository Guidelines
