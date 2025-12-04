@@ -73,13 +73,21 @@ export class OpenRouterApiService {
     const maxTokens = options.maxTokens || 500;
     const wordCount = options.wordCount || Math.floor(maxTokens / 1.3);
 
+    // Build prompt for logging - use messages if prompt is empty
+    let promptForLogging = prompt;
+    if (!promptForLogging && options.messages && options.messages.length > 0) {
+      promptForLogging = options.messages
+        .map(m => `[${m.role.toUpperCase()}]: ${m.content}`)
+        .join('\n\n');
+    }
+
     // Log the request
     const logId = this.aiLogger.logRequest({
       endpoint: this.API_URL,
       model: model,
       wordCount: wordCount,
       maxTokens: maxTokens,
-      prompt: prompt
+      prompt: promptForLogging
     });
 
     const headers = new HttpHeaders({
@@ -203,13 +211,21 @@ export class OpenRouterApiService {
     const maxTokens = options.maxTokens || 500;
     const wordCount = options.wordCount || Math.floor(maxTokens / 1.3);
 
+    // Build prompt for logging - use messages if prompt is empty
+    let promptForLogging = prompt;
+    if (!promptForLogging && options.messages && options.messages.length > 0) {
+      promptForLogging = options.messages
+        .map(m => `[${m.role.toUpperCase()}]: ${m.content}`)
+        .join('\n\n');
+    }
+
     // Log the request
     const logId = this.aiLogger.logRequest({
       endpoint: this.API_URL,
       model: model,
       wordCount: wordCount,
       maxTokens: maxTokens,
-      prompt: prompt
+      prompt: promptForLogging
     });
 
     const request: OpenRouterRequest = {

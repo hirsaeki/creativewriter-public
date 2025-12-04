@@ -142,13 +142,21 @@ export class GoogleGeminiApiService {
 
     const url = `${this.API_BASE_URL}/${model}:generateContent`;
 
+    // Build prompt for logging - use messages if prompt is empty
+    let promptForLogging = prompt;
+    if (!promptForLogging && options.messages && options.messages.length > 0) {
+      promptForLogging = options.messages
+        .map(m => `[${m.role.toUpperCase()}]: ${m.content}`)
+        .join('\n\n');
+    }
+
     // Log the request with comprehensive details (after all variables are declared)
     const logId = this.aiLogger.logRequest({
       endpoint: url,
       model: model,
       wordCount: wordCount,
       maxTokens: maxTokens,
-      prompt: prompt,
+      prompt: promptForLogging,
       apiProvider: 'gemini',
       streamingMode: false,
       requestDetails: {
@@ -416,13 +424,21 @@ export class GoogleGeminiApiService {
     // Use alt=sse for proper Server-Sent Events streaming
     const url = `${this.API_BASE_URL}/${model}:streamGenerateContent?alt=sse`;
 
+    // Build prompt for logging - use messages if prompt is empty
+    let promptForLogging = prompt;
+    if (!promptForLogging && options.messages && options.messages.length > 0) {
+      promptForLogging = options.messages
+        .map(m => `[${m.role.toUpperCase()}]: ${m.content}`)
+        .join('\n\n');
+    }
+
     // Log the request with comprehensive details (after all variables are declared)
     const logId = this.aiLogger.logRequest({
       endpoint: url,
       model: model,
       wordCount: wordCount,
       maxTokens: maxTokens,
-      prompt: prompt,
+      prompt: promptForLogging,
       apiProvider: 'gemini',
       streamingMode: true,
       requestDetails: {
