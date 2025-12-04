@@ -21,16 +21,15 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Wrangler
-        run: npm install -g wrangler
-
-      - name: Deploy to Cloudflare Workers (Production)
+      - name: Install dependencies and deploy
         working-directory: ./backend
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
+          echo "📦 Installing backend dependencies..."
+          npm install
           echo "🚀 Deploying backend to production environment..."
-          wrangler deploy
+          npx wrangler deploy
           echo "✅ Backend deployed to production environment"
 
   sync-public:
