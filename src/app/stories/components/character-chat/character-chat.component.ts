@@ -141,9 +141,9 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
 
   private initializeHeaderActions(): void {
     this.headerActions = [
-      { icon: 'time-outline', action: () => this.openHistoryList(), tooltip: 'Chat History' },
-      { icon: 'refresh', action: () => this.startNewChat(), tooltip: 'New Chat' },
-      { icon: 'help-circle', action: () => this.showHelp(), tooltip: 'Help' }
+      { icon: 'time-outline', action: () => this.openHistoryList(), tooltip: 'Chat History', showOnDesktop: true, showOnMobile: true },
+      { icon: 'refresh', action: () => this.startNewChat(), tooltip: 'New Chat', showOnDesktop: true, showOnMobile: true },
+      { icon: 'help-circle', action: () => this.showHelp(), tooltip: 'Help', showOnDesktop: true, showOnMobile: true }
     ];
   }
 
