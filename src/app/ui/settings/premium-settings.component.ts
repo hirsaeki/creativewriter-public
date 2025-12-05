@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -7,10 +7,11 @@ import {
   IonSpinner, IonBadge, IonNote
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { star, checkmarkCircle, closeCircle, refresh, link } from 'ionicons/icons';
+import { star, checkmarkCircle, closeCircle, refresh } from 'ionicons/icons';
 import { Subscription } from 'rxjs';
 import { SubscriptionService } from '../../core/services/subscription.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-premium-settings',
@@ -21,6 +22,7 @@ import { SettingsService } from '../../core/services/settings.service';
     IonItem, IonLabel, IonInput, IonButton, IonIcon,
     IonSpinner, IonBadge, IonNote
   ],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <ion-card>
       <ion-card-header>
@@ -67,14 +69,6 @@ import { SettingsService } from '../../core/services/settings.service';
             {{ isVerifying ? 'Verifying...' : 'Verify Subscription' }}
           </ion-button>
 
-          <ion-button
-            expand="block"
-            fill="outline"
-            color="primary"
-            (click)="openPremiumPage()">
-            <ion-icon name="link" slot="start"></ion-icon>
-            Get Premium
-          </ion-button>
         </div>
 
         <!-- Error/Success Message -->
@@ -89,6 +83,16 @@ import { SettingsService } from '../../core/services/settings.service';
             <li><strong>Character Chat</strong> - Interview your characters and explore their personalities</li>
             <li><em>More features coming soon...</em></li>
           </ul>
+        </div>
+
+        <!-- Stripe Pricing Table (only shown when not premium) -->
+        <div *ngIf="!isPremium" class="pricing-section">
+          <h4>Get Premium</h4>
+          <stripe-pricing-table
+            [attr.pricing-table-id]="stripePricingTableId"
+            [attr.publishable-key]="stripePublishableKey"
+            [attr.customer-email]="email || null">
+          </stripe-pricing-table>
         </div>
       </ion-card-content>
     </ion-card>
@@ -195,6 +199,23 @@ import { SettingsService } from '../../core/services/settings.service';
     .features-info strong {
       color: #e0e0e0;
     }
+
+    .pricing-section {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(139, 180, 248, 0.1);
+    }
+
+    .pricing-section h4 {
+      color: #f8f9fa;
+      margin: 0 0 1rem 0;
+      font-size: 1rem;
+    }
+
+    stripe-pricing-table {
+      display: block;
+      width: 100%;
+    }
   `]
 })
 export class PremiumSettingsComponent implements OnInit, OnDestroy {
@@ -209,10 +230,14 @@ export class PremiumSettingsComponent implements OnInit, OnDestroy {
   message = '';
   messageType: 'success' | 'error' | '' = '';
 
+  // Stripe configuration from environment
+  stripePublishableKey = environment.stripe.publishableKey;
+  stripePricingTableId = environment.stripe.pricingTableId;
+
   private subscriptions = new Subscription();
 
   constructor() {
-    addIcons({ star, checkmarkCircle, closeCircle, refresh, link });
+    addIcons({ star, checkmarkCircle, closeCircle, refresh });
   }
 
   ngOnInit(): void {
@@ -262,10 +287,6 @@ export class PremiumSettingsComponent implements OnInit, OnDestroy {
         }
       });
     }
-  }
-
-  openPremiumPage(): void {
-    window.open('https://creativewriter.app/premium', '_blank');
   }
 
   async verifySubscription(): Promise<void> {
