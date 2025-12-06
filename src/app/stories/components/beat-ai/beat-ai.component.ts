@@ -815,20 +815,30 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     
     // Map the model based on its label/name instead of trying to parse the ID
     let mappedModel: SupportedModel = 'custom';
-    
+
     if (selectedModelOption) {
       const modelLabel = selectedModelOption.label.toLowerCase();
-      
-      // Map based on the human-readable model name
-      if (modelLabel.includes('claude 3.7') || modelLabel.includes('claude-3.7') || 
+      const modelId = selectedModelOption.id.toLowerCase();
+
+      // Map based on the human-readable model name or model ID
+      if (modelLabel.includes('sonnet 4.5') || modelLabel.includes('sonnet-4-5') ||
+          modelId.includes('sonnet-4-5') || modelId.includes('sonnet-4.5')) {
+        mappedModel = 'claude-sonnet-4-5';
+      } else if (modelLabel.includes('sonnet 4') || modelLabel.includes('sonnet-4') ||
+          modelId.includes('sonnet-4') || (modelLabel.includes('claude 4') && !modelLabel.includes('4.5'))) {
+        mappedModel = 'claude-sonnet-4';
+      } else if (modelLabel.includes('claude 3.7') || modelLabel.includes('claude-3.7') ||
           modelLabel.includes('claude 3.5 sonnet v2') || modelLabel.includes('sonnet v2')) {
         mappedModel = 'claude-3.7-sonnet';
       } else if (modelLabel.includes('claude 3.5') || modelLabel.includes('claude-3.5')) {
         mappedModel = 'claude-3.5-sonnet';
-      } else if (modelLabel.includes('gemini 1.5') || modelLabel.includes('gemini-1.5')) {
-        mappedModel = 'gemini-1.5-pro';
+      } else if (modelLabel.includes('gemini 2.5 flash') || modelLabel.includes('gemini-2.5-flash') ||
+          modelId.includes('flash')) {
+        mappedModel = 'gemini-2.5-flash';
       } else if (modelLabel.includes('gemini 2.5') || modelLabel.includes('gemini-2.5')) {
         mappedModel = 'gemini-2.5-pro';
+      } else if (modelLabel.includes('gemini 1.5') || modelLabel.includes('gemini-1.5')) {
+        mappedModel = 'gemini-1.5-pro';
       } else if (modelLabel.includes('grok')) {
         mappedModel = 'grok-3';
       }
