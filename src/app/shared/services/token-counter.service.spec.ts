@@ -1,14 +1,11 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
 import { TokenCounterService, SupportedModel } from './token-counter.service';
 
 describe('TokenCounterService', () => {
   let service: TokenCounterService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      providers: [provideHttpClient()]
-    });
+    TestBed.configureTestingModule({});
     service = TestBed.inject(TokenCounterService);
   });
 
@@ -21,8 +18,8 @@ describe('TokenCounterService', () => {
       const result = await service.countTokens('Hello world', 'claude-3.7-sonnet');
       expect(result.tokens).toBeGreaterThan(0);
       expect(result.model).toBe('claude-3.7-sonnet');
-      // Claude models use improved estimation which returns 'exact' method
-      expect(result.method).toBe('exact');
+      // Claude models use improved estimation
+      expect(result.method).toBe('improved_estimation');
     });
 
     it('should handle empty string', async () => {
