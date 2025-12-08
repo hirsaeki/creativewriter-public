@@ -190,7 +190,7 @@ export class ProseMirrorSchemaService {
           {
             class: 'beat-end-marker',
             'data-beat-id': node.attrs['beatId'],
-            style: 'display: none; height: 0; margin: 0; padding: 0; overflow: hidden;'
+            style: 'height: 1px; margin: 0.5rem 2rem; background: linear-gradient(90deg, transparent 0%, rgba(128, 128, 128, 0.3) 20%, rgba(128, 128, 128, 0.3) 80%, transparent 100%);'
           }
         ],
         parseDOM: [{
