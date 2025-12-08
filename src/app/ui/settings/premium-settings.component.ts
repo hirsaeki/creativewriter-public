@@ -80,6 +80,7 @@ import { environment } from '../../../environments/environment';
         <div class="features-info">
           <h4>Premium Features</h4>
           <ul>
+            <li><strong>AI Rewrite</strong> - Context-aware text rewriting with AI assistance</li>
             <li><strong>Character Chat</strong> - Interview your characters and explore their personalities</li>
             <li><em>More features coming soon...</em></li>
           </ul>

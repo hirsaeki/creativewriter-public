@@ -4,9 +4,11 @@ import { PromptManagerService } from './prompt-manager.service';
 import { BeatAIService } from './beat-ai.service';
 import { BeatHistoryService } from './beat-history.service';
 import { CodexService } from '../../stories/services/codex.service';
+import { ContextMenuService } from './context-menu.service';
 import { ModalController } from '@ionic/angular/standalone';
 import { ApplicationRef, EnvironmentInjector } from '@angular/core';
 import { EditorView } from 'prosemirror-view';
+import { Subject } from 'rxjs';
 
 describe('ProseMirrorEditorService', () => {
   let service: ProseMirrorEditorService;
@@ -14,6 +16,7 @@ describe('ProseMirrorEditorService', () => {
   let mockBeatAIService: jasmine.SpyObj<BeatAIService>;
   let mockBeatHistoryService: jasmine.SpyObj<BeatHistoryService>;
   let mockCodexService: jasmine.SpyObj<CodexService>;
+  let mockContextMenuService: jasmine.SpyObj<ContextMenuService>;
   let mockModalController: jasmine.SpyObj<ModalController>;
 
   beforeEach(() => {
@@ -22,11 +25,13 @@ describe('ProseMirrorEditorService', () => {
     mockBeatAIService = jasmine.createSpyObj('BeatAIService', ['generate', 'stopGeneration']);
     mockBeatHistoryService = jasmine.createSpyObj('BeatHistoryService', ['saveVersion', 'getHistory']);
     mockCodexService = jasmine.createSpyObj('CodexService', ['getCodex', 'codexUpdated$']);
+    mockContextMenuService = jasmine.createSpyObj('ContextMenuService', ['createContextMenuPlugin', 'hideContextMenu']);
     mockModalController = jasmine.createSpyObj('ModalController', ['create', 'dismiss']);
 
     // Setup default mock behaviors
     mockPromptManager.refresh.and.returnValue(Promise.resolve());
     mockCodexService.getCodex.and.returnValue(undefined);
+    (mockContextMenuService as unknown as { contentUpdate$: Subject<string> }).contentUpdate$ = new Subject<string>();
 
     TestBed.configureTestingModule({
       providers: [
@@ -35,6 +40,7 @@ describe('ProseMirrorEditorService', () => {
         { provide: BeatAIService, useValue: mockBeatAIService },
         { provide: BeatHistoryService, useValue: mockBeatHistoryService },
         { provide: CodexService, useValue: mockCodexService },
+        { provide: ContextMenuService, useValue: mockContextMenuService },
         { provide: ModalController, useValue: mockModalController },
         ApplicationRef,
         EnvironmentInjector

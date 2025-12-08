@@ -740,6 +740,199 @@ export default CharacterChatService;
 `;
 }
 
+/**
+ * Handle GET /api/premium/beat-rewrite - Serve premium Beat Rewrite module
+ * Only serves to verified subscribers
+ */
+async function handlePremiumBeatRewrite(
+  request: Request,
+  env: Env,
+  headers: HeadersInit
+): Promise<Response> {
+  const url = new URL(request.url);
+  const email = url.searchParams.get('email')?.trim().toLowerCase();
+
+  if (!email) {
+    return jsonResponse<ErrorResponse>(
+      { error: 'Email required' },
+      400,
+      headers
+    );
+  }
+
+  // Verify subscription
+  const isActive = await isSubscriptionActive(email, env);
+  if (!isActive) {
+    return jsonResponse<ErrorResponse>(
+      { error: 'Premium subscription required' },
+      403,
+      headers
+    );
+  }
+
+  // Return the Beat Rewrite module
+  const moduleCode = getBeatRewriteModule();
+
+  return new Response(moduleCode, {
+    status: 200,
+    headers: {
+      ...headers,
+      'Content-Type': 'application/javascript',
+      'Cache-Control': 'no-store', // Don't cache - always verify subscription
+    },
+  });
+}
+
+/**
+ * Beat Rewrite Module Code
+ * This is served only to verified premium subscribers
+ */
+function getBeatRewriteModule(): string {
+  return `
+// Beat Rewrite Premium Module
+// This code is only served to verified premium subscribers
+
+export class BeatRewriteService {
+  constructor(aiService) {
+    this.aiService = aiService;
+  }
+
+  /**
+   * Build a context-aware rewrite prompt
+   */
+  buildRewritePrompt(originalText, instruction, context = {}) {
+    let prompt = '';
+
+    // Add story context if available
+    if (context.storyOutline) {
+      prompt += '<story-context>\\n' + context.storyOutline + '\\n</story-context>\\n\\n';
+    }
+
+    // Add scene context if available
+    if (context.sceneContext) {
+      prompt += '<scene-context>\\n' + context.sceneContext + '\\n</scene-context>\\n\\n';
+    }
+
+    // Add codex entries (characters, locations, etc.) if available
+    if (context.codexEntries) {
+      prompt += '<world-info>\\n' + context.codexEntries + '\\n</world-info>\\n\\n';
+    }
+
+    // Add the original text to rewrite
+    prompt += '<original-text>\\n' + originalText + '\\n</original-text>\\n\\n';
+
+    // Add the rewrite instruction
+    prompt += '<rewrite-instruction>\\n' + instruction + '\\n</rewrite-instruction>\\n\\n';
+
+    // Final instruction
+    prompt += 'Please rewrite the original text according to the instruction. ';
+    prompt += 'Maintain consistency with any provided story context and world information. ';
+    prompt += 'Preserve the narrative voice and style of the original. ';
+    prompt += 'Return ONLY the rewritten text, nothing else - no explanations, no markdown formatting, just the rewritten prose.';
+
+    return prompt;
+  }
+
+  /**
+   * Execute a rewrite using the AI service
+   */
+  async rewrite(originalText, instruction, context, modelId) {
+    const prompt = this.buildRewritePrompt(originalText, instruction, context);
+    const messages = [{ role: 'user', content: prompt }];
+    return await this.aiService.generateChatResponse(messages, modelId);
+  }
+
+  /**
+   * Get suggested rewrite prompts based on language
+   */
+  getSuggestedPrompts(text, language = 'en') {
+    const prompts = {
+      en: [
+        'Make it more dramatic',
+        'Write it more emotionally',
+        'Shorten it',
+        'Expand with more details',
+        'Make it more formal',
+        'Make it more casual',
+        'Improve the pacing',
+        'Add more sensory details',
+        'Make the dialogue more natural',
+        'Increase the tension'
+      ],
+      de: [
+        'Dramatischer gestalten',
+        'Emotionaler schreiben',
+        'Kürzer fassen',
+        'Mit mehr Details erweitern',
+        'Formeller formulieren',
+        'Lockerer formulieren',
+        'Tempo verbessern',
+        'Mehr sensorische Details hinzufügen',
+        'Dialog natürlicher gestalten',
+        'Spannung erhöhen'
+      ],
+      fr: [
+        'Rendre plus dramatique',
+        'Écrire plus émotionnellement',
+        'Raccourcir',
+        'Développer avec plus de détails',
+        'Rendre plus formel',
+        'Rendre plus décontracté',
+        'Améliorer le rythme',
+        'Ajouter plus de détails sensoriels',
+        'Rendre le dialogue plus naturel',
+        'Augmenter la tension'
+      ],
+      es: [
+        'Hacerlo más dramático',
+        'Escribirlo más emocionalmente',
+        'Acortarlo',
+        'Expandir con más detalles',
+        'Hacerlo más formal',
+        'Hacerlo más casual',
+        'Mejorar el ritmo',
+        'Añadir más detalles sensoriales',
+        'Hacer el diálogo más natural',
+        'Aumentar la tensión'
+      ]
+    };
+
+    return prompts[language] || prompts.en;
+  }
+
+  /**
+   * Analyze text and suggest appropriate rewrite actions
+   */
+  analyzeForSuggestions(text) {
+    const suggestions = [];
+    const wordCount = text.split(/\\s+/).length;
+
+    // Length-based suggestions
+    if (wordCount > 200) {
+      suggestions.push('Consider shortening for better pacing');
+    } else if (wordCount < 50) {
+      suggestions.push('Could expand with more details');
+    }
+
+    // Dialogue detection
+    if (text.includes('"') || text.includes("'")) {
+      suggestions.push('Polish the dialogue');
+    }
+
+    // Action detection
+    if (/\\b(ran|jumped|fought|grabbed|threw)\\b/i.test(text)) {
+      suggestions.push('Enhance the action sequence');
+    }
+
+    return suggestions;
+  }
+}
+
+// Export the service class
+export default BeatRewriteService;
+`;
+}
+
 // Main Worker entry point
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -818,6 +1011,16 @@ export default {
             );
           }
           return handlePremiumCharacterChat(request, env, headers);
+
+        case '/api/premium/beat-rewrite':
+          if (request.method !== 'GET') {
+            return jsonResponse<ErrorResponse>(
+              { error: 'Method not allowed' },
+              405,
+              headers
+            );
+          }
+          return handlePremiumBeatRewrite(request, env, headers);
 
         default:
           return jsonResponse<ErrorResponse>(

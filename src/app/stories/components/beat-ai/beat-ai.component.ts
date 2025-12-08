@@ -27,6 +27,7 @@ import { OpenRouterIconComponent } from '../../../ui/icons/openrouter-icon.compo
 import { ClaudeIconComponent } from '../../../ui/icons/claude-icon.component';
 import { ReplicateIconComponent } from '../../../ui/icons/replicate-icon.component';
 import { OllamaIconComponent } from '../../../ui/icons/ollama-icon.component';
+import { PremiumRewriteService } from '../../../shared/services/premium-rewrite.service';
 
 interface SceneContext {
   chapterId: string;
@@ -65,6 +66,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   private modalService = inject(BeatAIModalService);
   private databaseService = inject(DatabaseService);
   private cdr = inject(ChangeDetectorRef);
+  private premiumRewriteService = inject(PremiumRewriteService);
 
   @Input() beatData!: BeatAI;
   @Input() storyId?: string;
@@ -433,6 +435,12 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
    * Rewrite the generated content with a custom rewrite prompt
    */
   async rewriteContent(): Promise<void> {
+    // Premium gate check
+    const hasAccess = await this.premiumRewriteService.checkAndGateAccess();
+    if (!hasAccess) {
+      return;
+    }
+
     // First, get the text after this beat
     const existingText = this.proseMirrorService.getTextAfterBeat(this.beatData.id);
 
