@@ -1460,7 +1460,9 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const deleted = this.proseMirrorService.deleteContentAfterBeat(event.beatId);
+    // Use marker-aware deletion to preserve pre-existing text that was pushed down
+    // when the beat was inserted in the middle of content
+    const deleted = this.proseMirrorService.deleteGeneratedContentOnly(event.beatId);
     if (!deleted) {
       console.warn('Beat regeneration skipped: could not remove existing generated content.');
       return;

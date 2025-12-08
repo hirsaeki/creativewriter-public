@@ -272,6 +272,15 @@ export class ProseMirrorEditorService {
     return this.beatOpsService.deleteContentAfterBeat(this.editorView, beatId, () => this.getHTMLContent());
   }
 
+  /**
+   * Delete only the generated content between a beat and its end marker.
+   * Preserves any pre-existing text that was pushed down when the beat was inserted.
+   * Falls back to deleteContentAfterBeat if no marker exists (backward compatibility).
+   */
+  deleteGeneratedContentOnly(beatId: string): boolean {
+    return this.beatOpsService.deleteGeneratedContentOnly(this.editorView, beatId, () => this.getHTMLContent());
+  }
+
   async switchBeatVersion(beatId: string, versionId: string): Promise<void> {
     return this.beatOpsService.switchBeatVersion(this.editorView, beatId, versionId, () => this.getHTMLContent());
   }
