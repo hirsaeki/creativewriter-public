@@ -1315,8 +1315,6 @@ Please rewrite the above text according to the instructions. Only output the rew
           existingText: options.existingText
         }
       );
-
-      console.log(`[BeatAIService] Saved version ${versionId} to history for beat ${beatId}`);
     } catch (error) {
       console.error(`[BeatAIService] Failed to save version history for beat ${beatId}:`, error);
       // Don't throw - history saving failure shouldn't break generation

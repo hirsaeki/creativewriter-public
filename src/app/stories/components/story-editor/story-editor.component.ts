@@ -1423,13 +1423,10 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   }
 
   private async handleBeatPromptSubmit(event: BeatAIPromptEvent): Promise<void> {
-    console.log('[StoryEditor] handleBeatPromptSubmit called with action:', event.action, 'beatId:', event.beatId);
-
     // Make sure dropdown is hidden when working with beat AI
     this.hideSlashDropdown();
 
     if (event.action === 'regenerate') {
-      console.log('[StoryEditor] Routing to handleBeatRegenerate');
       await this.handleBeatRegenerate(event);
       return;
     }
@@ -1459,20 +1456,14 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   }
 
   private async handleBeatRegenerate(event: BeatAIPromptEvent): Promise<void> {
-    console.log('[StoryEditor] handleBeatRegenerate called for beat:', event.beatId);
-
     if (!this.proseMirrorService) {
-      console.log('[StoryEditor] No proseMirrorService!');
       return;
     }
 
     // Use marker-aware deletion to preserve pre-existing text that was pushed down
     // when the beat was inserted in the middle of content
-    console.log('[StoryEditor] Calling deleteGeneratedContentOnly...');
     const deleted = this.proseMirrorService.deleteGeneratedContentOnly(event.beatId);
-    console.log('[StoryEditor] deleteGeneratedContentOnly returned:', deleted);
     if (!deleted) {
-      console.warn('Beat regeneration skipped: could not remove existing generated content.');
       return;
     }
 

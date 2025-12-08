@@ -66,9 +66,7 @@ export class BeatAINodeView implements NodeView {
     
     // Subscribe to component outputs
     this.componentRef.instance.promptSubmit.subscribe((event: BeatAIPromptEvent) => {
-      console.log('[BeatAINodeView] Received promptSubmit event, action:', event.action);
       this.onPromptSubmit(event);
-      console.log('[BeatAINodeView] Called onPromptSubmit callback');
     });
     
     this.componentRef.instance.contentUpdate.subscribe((beatData: BeatAI) => {

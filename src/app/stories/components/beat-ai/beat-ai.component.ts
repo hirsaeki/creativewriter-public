@@ -375,14 +375,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   
   async regenerateContent(): Promise<void> {
-    // This log MUST appear if the method is called
-    console.log('=== REGENERATE CLICKED ===');
-    alert('Regenerate clicked!'); // This will show a popup if the method runs
-
-    console.log('[BeatAI] regenerateContent called for beat:', this.beatData.id);
-
     if (!this.beatData.prompt) {
-      console.log('[BeatAI] No prompt, returning early');
       return;
     }
 
@@ -419,7 +412,6 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       action = 'regenerate';
     }
 
-    console.log('[BeatAI] Emitting promptSubmit with action:', action);
     this.promptSubmit.emit({
       beatId: this.beatData.id,
       prompt: promptToUse,
@@ -433,7 +425,6 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       customContext: customContext,
       existingText: existingText // Pass the text to rewrite if applicable
     });
-    console.log('[BeatAI] promptSubmit emitted');
 
     this.contentUpdate.emit(this.beatData);
   }

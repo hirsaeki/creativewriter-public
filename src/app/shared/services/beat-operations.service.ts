@@ -471,8 +471,6 @@ export class BeatOperationsService {
         console.error('Error refreshing prompt manager:', error);
       });
     }, 500);
-
-    console.log(`[BeatOperations] Switched beat ${beatId} to version ${versionId}`);
   }
 
   /**
@@ -814,7 +812,6 @@ export class BeatOperationsService {
         const latestVersion = sortedVersions[0];
         // Normalize content for comparison (trim whitespace)
         if (latestVersion.content.trim() === content.trim()) {
-          console.log('[BeatOperations] Content unchanged, skipping history save');
           return;
         }
       }
@@ -832,7 +829,5 @@ export class BeatOperationsService {
       isCurrent: false,
       action: 'generate'
     });
-
-    console.log(`[BeatOperations] Saved previous content to history for beat ${beatId}`);
   }
 }
