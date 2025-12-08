@@ -36,6 +36,6 @@ export class PremiumUpsellDialogComponent {
 
   goToSettings(): void {
     this.modalController.dismiss();
-    this.router.navigate(['/settings'], { fragment: 'premium' });
+    this.router.navigate(['/settings'], { queryParams: { tab: 'premium' } });
   }
 }

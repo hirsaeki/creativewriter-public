@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { 
   IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
@@ -871,6 +871,7 @@ import { PremiumSettingsComponent } from '../ui/settings/premium-settings.compon
 })
 export class SettingsComponent implements OnInit, OnDestroy {
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private settingsService = inject(SettingsService);
   private modelService = inject(ModelService);
   private backgroundService = inject(BackgroundService);
@@ -905,6 +906,15 @@ export class SettingsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Check for tab query parameter (e.g., from premium upsell dialog)
+    this.subscription.add(
+      this.route.queryParams.subscribe(params => {
+        if (params['tab'] && this.tabItems.some(t => t.value === params['tab'])) {
+          this.selectedTab = params['tab'];
+        }
+      })
+    );
+
     // Subscribe to settings changes
     this.subscription.add(
       this.settingsService.settings$.subscribe(settings => {
