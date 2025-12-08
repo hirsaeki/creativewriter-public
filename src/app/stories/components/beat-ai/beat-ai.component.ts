@@ -375,6 +375,10 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   
   async regenerateContent(): Promise<void> {
+    // This log MUST appear if the method is called
+    console.log('=== REGENERATE CLICKED ===');
+    alert('Regenerate clicked!'); // This will show a popup if the method runs
+
     console.log('[BeatAI] regenerateContent called for beat:', this.beatData.id);
 
     if (!this.beatData.prompt) {
