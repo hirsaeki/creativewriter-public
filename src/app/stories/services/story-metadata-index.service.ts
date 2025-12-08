@@ -105,31 +105,54 @@ export class StoryMetadataIndexService {
   async updateStoryMetadata(story: Story): Promise<void> {
     await this.ensureInitialized();
 
-    try {
-      const index = await this.getMetadataIndex();
+    // Retry up to 3 times for conflict resolution
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // On retry, clear cache to get fresh _rev from database
+        if (attempt > 0) {
+          this.metadataCache = null;
+        }
 
-      // Find existing entry
-      const existingIndex = index.stories.findIndex(s => s.id === story.id);
-      const metadata = this.extractMetadata(story);
+        const index = await this.getMetadataIndex();
 
-      if (existingIndex >= 0) {
-        // Update existing entry
-        index.stories[existingIndex] = metadata;
-      } else {
-        // Add new entry
-        index.stories.push(metadata);
+        // Find existing entry
+        const existingIndex = index.stories.findIndex(s => s.id === story.id);
+        const metadata = this.extractMetadata(story);
+
+        if (existingIndex >= 0) {
+          // Update existing entry
+          index.stories[existingIndex] = metadata;
+        } else {
+          // Add new entry
+          index.stories.push(metadata);
+        }
+
+        index.lastUpdated = new Date();
+
+        // Save to database and update _rev in cached object
+        const result = await this.db!.put(index);
+        index._rev = result.rev;
+        this.metadataCache = index;
+        return; // Success - exit retry loop
+
+      } catch (error) {
+        const pouchError = error as { status?: number; name?: string };
+
+        // If conflict, retry with fresh data
+        if (pouchError.status === 409 || pouchError.name === 'conflict') {
+          if (attempt < maxRetries - 1) {
+            console.warn(`[MetadataIndex] Conflict on attempt ${attempt + 1}, retrying...`);
+            continue;
+          }
+          console.error('[MetadataIndex] Conflict after max retries');
+        }
+
+        console.error('Error updating story metadata:', error);
+        // Don't throw - gracefully degrade
+        // Index can be rebuilt later if needed
+        return;
       }
-
-      index.lastUpdated = new Date();
-
-      // Save to database
-      await this.db!.put(index);
-      this.metadataCache = index;
-
-    } catch (error) {
-      console.error('Error updating story metadata:', error);
-      // Don't throw - gracefully degrade
-      // Index can be rebuilt later if needed
     }
   }
 
@@ -143,22 +166,45 @@ export class StoryMetadataIndexService {
   async removeStoryMetadata(storyId: string): Promise<void> {
     await this.ensureInitialized();
 
-    try {
-      const index = await this.getMetadataIndex();
-      const originalCount = index.stories.length;
+    // Retry up to 3 times for conflict resolution
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // On retry, clear cache to get fresh _rev from database
+        if (attempt > 0) {
+          this.metadataCache = null;
+        }
 
-      index.stories = index.stories.filter(s => s.id !== storyId);
+        const index = await this.getMetadataIndex();
+        const originalCount = index.stories.length;
 
-      // Only update if something was actually removed
-      if (index.stories.length < originalCount) {
-        index.lastUpdated = new Date();
-        await this.db!.put(index);
-        this.metadataCache = index;
+        index.stories = index.stories.filter(s => s.id !== storyId);
+
+        // Only update if something was actually removed
+        if (index.stories.length < originalCount) {
+          index.lastUpdated = new Date();
+          const result = await this.db!.put(index);
+          index._rev = result.rev;
+          this.metadataCache = index;
+        }
+        return; // Success - exit retry loop
+
+      } catch (error) {
+        const pouchError = error as { status?: number; name?: string };
+
+        // If conflict, retry with fresh data
+        if (pouchError.status === 409 || pouchError.name === 'conflict') {
+          if (attempt < maxRetries - 1) {
+            console.warn(`[MetadataIndex] Conflict on remove attempt ${attempt + 1}, retrying...`);
+            continue;
+          }
+          console.error('[MetadataIndex] Conflict after max retries');
+        }
+
+        console.error('Error removing story metadata:', error);
+        // Don't throw - gracefully degrade
+        return;
       }
-
-    } catch (error) {
-      console.error('Error removing story metadata:', error);
-      // Don't throw - gracefully degrade
     }
   }
 
