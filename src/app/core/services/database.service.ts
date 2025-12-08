@@ -846,11 +846,20 @@ export class DatabaseService {
         return countStories(result.rows);
       };
 
-      // Count stories in both databases
-      const [localCount, remoteCount] = await Promise.all([
-        countStoriesInDb(localDb),
-        countStoriesInDb(this.remoteDb)
-      ]);
+      // Count local stories first
+      const localCount = await countStoriesInDb(localDb);
+
+      // Count remote stories with separate error handling
+      // Remote DB may be unavailable or return malformed responses
+      let remoteCount: number;
+      try {
+        remoteCount = await countStoriesInDb(this.remoteDb);
+      } catch {
+        // Remote database unavailable or returned invalid response
+        // This is expected when offline or server is unreachable
+        console.warn('[DatabaseService] Remote database unavailable for story count check');
+        return null;
+      }
 
       return {
         hasMissing: remoteCount > localCount,
