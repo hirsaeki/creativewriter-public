@@ -2,11 +2,15 @@ import { TestBed } from '@angular/core/testing';
 import { StoryService } from './story.service';
 import { DatabaseService } from '../../core/services/database.service';
 import { BeatHistoryService } from '../../shared/services/beat-history.service';
+import { DeviceService } from '../../core/services/device.service';
+import { StoryMetadataIndexService } from './story-metadata-index.service';
 
 describe('StoryService', () => {
   let service: StoryService;
   let mockDatabaseService: jasmine.SpyObj<DatabaseService>;
   let mockBeatHistoryService: jasmine.SpyObj<BeatHistoryService>;
+  let mockDeviceService: jasmine.SpyObj<DeviceService>;
+  let mockMetadataIndexService: jasmine.SpyObj<StoryMetadataIndexService>;
   let mockDb: jasmine.SpyObj<PouchDB.Database>;
 
   beforeEach(() => {
@@ -31,11 +35,30 @@ describe('StoryService', () => {
       'deleteAllHistoriesForStory'
     ]);
 
+    mockDeviceService = jasmine.createSpyObj('DeviceService', ['getDeviceId']);
+    mockDeviceService.getDeviceId.and.returnValue('test-device-id');
+
+    mockMetadataIndexService = jasmine.createSpyObj('StoryMetadataIndexService', [
+      'getMetadataIndex',
+      'updateStoryMetadata',
+      'removeStoryMetadata',
+      'clearCache'
+    ]);
+    mockMetadataIndexService.getMetadataIndex.and.returnValue(Promise.resolve({
+      _id: 'story-metadata-index',
+      type: 'story-metadata-index',
+      lastUpdated: new Date(),
+      stories: []
+    }));
+    mockMetadataIndexService.updateStoryMetadata.and.returnValue(Promise.resolve());
+
     TestBed.configureTestingModule({
       providers: [
         StoryService,
         { provide: DatabaseService, useValue: mockDatabaseService },
-        { provide: BeatHistoryService, useValue: mockBeatHistoryService }
+        { provide: BeatHistoryService, useValue: mockBeatHistoryService },
+        { provide: DeviceService, useValue: mockDeviceService },
+        { provide: StoryMetadataIndexService, useValue: mockMetadataIndexService }
       ]
     });
 

@@ -10,6 +10,16 @@ export class SelectionHighlightService {
   private flashTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   /**
+   * Clear any pending flash timeout. Useful for cleanup in tests or when destroying views.
+   */
+  clearPendingFlash(): void {
+    if (this.flashTimeoutId) {
+      clearTimeout(this.flashTimeoutId);
+      this.flashTimeoutId = null;
+    }
+  }
+
+  /**
    * Create the flash highlight plugin
    */
   createFlashHighlightPlugin(): Plugin {
@@ -106,9 +116,14 @@ export class SelectionHighlightService {
 
       // Auto-clear after duration
       this.flashTimeoutId = setTimeout(() => {
-        if (!editorView) return;
-        const clearTr = editorView.state.tr.setMeta(this.flashHighlightKey, { clear: true });
-        editorView.dispatch(clearTr);
+        // Check if editorView is still valid (not destroyed)
+        if (!editorView || !editorView.dom || !editorView.dom.parentNode) return;
+        try {
+          const clearTr = editorView.state.tr.setMeta(this.flashHighlightKey, { clear: true });
+          editorView.dispatch(clearTr);
+        } catch {
+          // View may have been destroyed, ignore
+        }
       }, Math.max(300, durationMs));
     } catch (err) {
       console.warn('Failed to flash highlight:', err);

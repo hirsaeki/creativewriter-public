@@ -640,12 +640,13 @@ describe('ProseMirrorEditorService', () => {
        * This test verifies that scrollToBeat uses the correct querySelector
        * to find beat elements by data-beat-id attribute.
        *
-       * Note: This is a documentation test - it verifies the implementation
-       * uses the correct selector without requiring full DOM integration.
+       * Note: scrollToBeat is now delegated to BeatOperationsService.
+       * We verify the implementation by checking the delegate service.
        */
 
-      // Get the scrollToBeat method implementation as a string to verify selector
-      const scrollToBeatSource = service.scrollToBeat.toString();
+      // @ts-expect-error - accessing private property for testing
+      const beatOpsService = service.beatOpsService;
+      const scrollToBeatSource = beatOpsService.scrollToBeat.toString();
 
       // Verify the method searches for data-beat-id (not data-id)
       expect(scrollToBeatSource).toContain('data-beat-id');
@@ -716,8 +717,10 @@ describe('ProseMirrorEditorService', () => {
       expect(attrs2['data-beat-id']).toBe(beatId);
       expect(attrs2['data-id']).toBeUndefined(); // Should NOT revert to data-id
 
-      // Verify scrollToBeat also uses data-beat-id
-      const scrollToBeatSource = service.scrollToBeat.toString();
+      // Verify scrollToBeat also uses data-beat-id (via BeatOperationsService)
+      // @ts-expect-error - accessing private property for testing
+      const beatOpsService = service.beatOpsService;
+      const scrollToBeatSource = beatOpsService.scrollToBeat.toString();
       expect(scrollToBeatSource).toContain('data-beat-id');
     });
 

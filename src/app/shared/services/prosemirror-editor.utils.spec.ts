@@ -147,9 +147,10 @@ describe('prosemirror-editor.utils', () => {
       expect(hasEmptyParagraphs(state)).toBe(false);
     });
 
-    it('should return false for empty document', () => {
+    it('should return true for default empty document (ProseMirror creates with empty paragraph)', () => {
+      // ProseMirror's default document has an empty paragraph
       const state = EditorState.create({ schema });
-      expect(hasEmptyParagraphs(state)).toBe(false);
+      expect(hasEmptyParagraphs(state)).toBe(true);
     });
   });
 });
