@@ -60,6 +60,10 @@ export class DatabaseService {
   // Track the active story for selective sync
   private activeStoryId: string | null = null;
 
+  // Track if sync is temporarily paused (e.g., during AI streaming)
+  private syncPaused = false;
+  private activePauseCount = 0;
+
   public syncStatus$: Observable<SyncStatus> = this.syncStatusSubject.asObservable();
 
   constructor() {
@@ -517,6 +521,43 @@ export class DatabaseService {
       this.syncHandler = null;
     }
     this.updateSyncStatus({ isSync: false });
+  }
+
+  /**
+   * Temporarily pause database sync during performance-critical operations
+   * like AI text streaming. Uses a counter to support nested pause/resume calls.
+   * Safe to call multiple times - sync only resumes when all pausers have resumed.
+   */
+  pauseSync(): void {
+    this.activePauseCount++;
+
+    if (this.syncHandler && !this.syncPaused) {
+      console.info('[DatabaseService] Pausing sync for performance-critical operation');
+      try {
+        this.syncHandler.cancel();
+      } catch (error) {
+        console.warn('Error pausing sync:', error);
+      }
+      this.syncHandler = null;
+      this.syncPaused = true;
+    }
+  }
+
+  /**
+   * Resume database sync after a performance-critical operation completes.
+   * Only actually resumes when all nested pause calls have been matched with resume calls.
+   */
+  resumeSync(): void {
+    if (this.activePauseCount > 0) {
+      this.activePauseCount--;
+    }
+
+    // Only resume if all pausers have resumed and sync was actually paused
+    if (this.activePauseCount === 0 && this.syncPaused && this.remoteDb) {
+      console.info('[DatabaseService] Resuming sync after performance-critical operation');
+      this.syncPaused = false;
+      this.startSync();
+    }
   }
 
   async forcePush(): Promise<{ docsProcessed: number }> {

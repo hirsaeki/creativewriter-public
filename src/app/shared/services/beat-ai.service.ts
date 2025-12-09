@@ -15,6 +15,7 @@ import { PromptManagerService } from './prompt-manager.service';
 import { CodexRelevanceService, CodexEntry as CodexRelevanceEntry } from '../../core/services/codex-relevance.service';
 import { CodexEntry, CustomField } from '../../stories/models/codex.interface';
 import { BeatHistoryService } from './beat-history.service';
+import { DatabaseService } from '../../core/services/database.service';
 
 type ProviderType = 'ollama' | 'claude' | 'gemini' | 'openrouter';
 
@@ -53,6 +54,7 @@ export class BeatAIService implements OnDestroy {
   private readonly beatHistoryService = inject(BeatHistoryService);
   private readonly document = inject(DOCUMENT);
   private readonly aiProviderValidation = inject(AIProviderValidationService);
+  private readonly databaseService = inject(DatabaseService);
   
   private generationSubject = new Subject<BeatAIGenerationEvent>();
   public generation$ = this.generationSubject.asObservable();
@@ -316,6 +318,8 @@ export class BeatAIService implements OnDestroy {
 
     if (this.activeGenerations.size === 0) {
       this.isStreamingSubject.next(false);
+      // Resume database sync now that all generations are complete
+      this.databaseService.resumeSync();
     }
   }
 
@@ -418,6 +422,8 @@ export class BeatAIService implements OnDestroy {
     }
 
     this.isStreamingSubject.next(true);
+    // Pause database sync during streaming to prevent performance issues
+    this.databaseService.pauseSync();
     this.generationSubject.next({
       beatId,
       chunk: '',
