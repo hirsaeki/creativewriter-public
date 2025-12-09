@@ -191,6 +191,22 @@
                 <ion-label>Stay in the moment</ion-label>
               </ion-item>
             </ion-radio-group>
+
+            <ion-item class="setting-item">
+              <ion-label position="stacked">
+                <h3>Narrative Perspective (POV)</h3>
+                <p>Point of view for AI-generated content. POV character is auto-detected from Codex (character with Protagonist role).</p>
+              </ion-label>
+              <ion-select
+                [(ngModel)]="settings.narrativePerspective"
+                (ionChange)="onSettingsChange()"
+                interface="popover"
+                aria-label="Select narrative perspective">
+                <ion-select-option *ngFor="let option of narrativePerspectiveOptions" [value]="option.value">
+                  {{ option.label }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
           </ion-card-content>
         </ion-card>
 

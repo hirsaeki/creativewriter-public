@@ -2,7 +2,7 @@ import { Injectable, OnDestroy, inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Observable, ReplaySubject, Subject, Subscription, catchError, finalize, from, map, of, scan, switchMap, tap } from 'rxjs';
 import { BeatAI, BeatAIGenerationEvent } from '../../stories/models/beat-ai.interface';
-import { Story } from '../../stories/models/story.interface';
+import { Story, NarrativePerspective } from '../../stories/models/story.interface';
 import { OpenRouterApiService } from '../../core/services/openrouter-api.service';
 import { GoogleGeminiApiService } from '../../core/services/google-gemini-api.service';
 import { OllamaApiService } from '../../core/services/ollama-api.service';
@@ -1040,13 +1040,12 @@ export class BeatAIService implements OnDestroy {
               }
             }
         
-            // Find protagonist for point of view
-            // Default to "third person limited" as it's the most common narrative mode
-            // TODO: Add narrativePerspective field to StorySettings for user configuration
+            // Find protagonist for point of view from Codex
             const protagonist = this.findProtagonist(filteredCodexEntries);
-            const pointOfView = protagonist
-              ? `<pointOfView type="third person limited" character="${this.escapeXml(protagonist)}"/>`
-              : '<pointOfView type="third person"/>';
+            const pointOfView = this.generatePointOfViewXml(
+              story.settings?.narrativePerspective,
+              protagonist
+            );
         
         
         const codexText = filteredCodexEntries.length > 0 
@@ -1510,6 +1509,29 @@ ${bridgingSection}
       }
     }
     return null;
+  }
+
+  private generatePointOfViewXml(
+    perspective: NarrativePerspective | undefined,
+    protagonistName: string | null
+  ): string {
+    const effectivePerspective = perspective || 'third-person-limited';
+
+    const povTypeMap: Record<NarrativePerspective, string> = {
+      'first-person': 'first person',
+      'third-person-limited': 'third person limited',
+      'third-person-omniscient': 'third person omniscient',
+      'second-person': 'second person'
+    };
+
+    const povType = povTypeMap[effectivePerspective];
+
+    // Include character for first/third-limited/second person when protagonist is known
+    if (protagonistName && ['first-person', 'third-person-limited', 'second-person'].includes(effectivePerspective)) {
+      return `<pointOfView type="${povType}" character="${this.escapeXml(protagonistName)}"/>`;
+    }
+
+    return `<pointOfView type="${povType}"/>`;
   }
 
   private convertCodexEntriesToRelevanceFormat(codexEntries: { category: string; entries: CodexEntry[]; icon?: string }[]): CodexRelevanceEntry[] {

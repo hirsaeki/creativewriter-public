@@ -19,7 +19,7 @@ import {
   squareOutline, imageOutline
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
-import { Story, StorySettings, DEFAULT_STORY_SETTINGS } from '../../models/story.interface';
+import { Story, StorySettings, DEFAULT_STORY_SETTINGS, NarrativePerspective } from '../../models/story.interface';
 import { ModelOption } from '../../../core/models/model.interface';
 import { ModelService } from '../../../core/services/model.service';
 import { getSystemMessage, getBeatGenerationTemplate } from '../../../shared/resources/system-messages';
@@ -72,6 +72,13 @@ export class StorySettingsComponent implements OnInit {
     '{prompt}',
     '{pointOfView}',
     '{writingStyle}'
+  ];
+
+  narrativePerspectiveOptions: { value: NarrativePerspective; label: string }[] = [
+    { value: 'first-person', label: 'First Person' },
+    { value: 'third-person-limited', label: 'Third Person Limited' },
+    { value: 'third-person-omniscient', label: 'Third Person Omniscient' },
+    { value: 'second-person', label: 'Second Person' }
   ];
 
   // DB Maintenance properties
