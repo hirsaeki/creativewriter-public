@@ -14,6 +14,7 @@ import {
   listOutline, list, flaskOutline, videocamOutline, timeOutline, personCircleOutline
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
+import { CodexService } from '../../services/codex.service';
 import { Story, Scene } from '../../models/story.interface';
 import { StoryStructureComponent } from '../story-structure/story-structure.component';
 import { SlashCommandDropdownComponent } from '../slash-command-dropdown/slash-command-dropdown.component';
@@ -81,6 +82,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   private modalController = inject(ModalController);
   private sceneNav = inject(SceneNavigationService);
   private editorState = inject(StoryEditorStateService);
+  private codexService = inject(CodexService);
   private lastSyncTime: Date | undefined;
 
   @ViewChild('headerTitle', { static: true }) headerTitle!: TemplateRef<unknown>;
@@ -258,16 +260,27 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
             const currentActiveId = this.databaseService.getActiveStoryId();
             this.addDebugLog(`Active story ID confirmed: ${currentActiveId}`);
 
-            // FORCE immediate replication of the story document from remote
-            // This ensures the story is pulled even if live sync hasn't picked it up yet
-            this.addDebugLog(`Force replicating story from remote...`);
+            // FORCE immediate replication of the story document and its codex from remote
+            // This ensures the story and codex are pulled even if live sync hasn't picked them up yet
+            this.addDebugLog(`Force replicating story and codex from remote...`);
+            const codexDocId = `codex_${storyId}`;
             try {
-              await this.databaseService.forceReplicateDocument(storyId);
+              // Replicate both story and codex in parallel
+              await Promise.all([
+                this.databaseService.forceReplicateDocument(storyId),
+                this.databaseService.forceReplicateDocument(codexDocId).catch(() => {
+                  // Codex might not exist yet for new stories - this is fine
+                  console.info(`[StoryEditor] No codex found on remote for story ${storyId}`);
+                })
+              ]);
               this.addDebugLog(`✓ Story replicated successfully`);
             } catch (error) {
               this.addDebugLog(`⚠️ Replication failed: ${error}`);
               console.warn('[StoryEditor] Force replication failed, will wait for live sync:', error);
             }
+
+            // Reload codex from database to ensure we have the latest version
+            await this.codexService.reloadCodexFromDatabase(storyId);
 
             // Wait for story to be available in local database (with 10s timeout)
             await this.waitForStorySynced(storyId);
