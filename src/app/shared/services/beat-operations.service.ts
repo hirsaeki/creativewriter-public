@@ -364,6 +364,16 @@ export class BeatOperationsService {
       }
     });
 
+    // For scene beats, extract text after beat for bridging context (before any deletion)
+    // This helps the AI generate content that connects to what follows
+    let textAfterBeatForBridging: string | undefined;
+    if (event.beatType === 'scene') {
+      const afterText = this.getTextAfterBeat(editorView, event.beatId);
+      if (afterText && afterText.trim().length > 0) {
+        textAfterBeatForBridging = afterText;
+      }
+    }
+
     // Generate AI content with streaming
     this.beatAIService.generateBeatContent(event.prompt || '', event.beatId, {
       wordCount: event.wordCount,
@@ -375,7 +385,8 @@ export class BeatOperationsService {
       beatType: event.beatType,
       customContext: event.customContext,
       action: event.action === 'rewrite' ? 'rewrite' : 'generate',
-      existingText: event.existingText
+      existingText: event.existingText,
+      textAfterBeat: textAfterBeatForBridging
     }).subscribe({
       next: (finalContent) => {
         // Final content received - ensure beat node is updated

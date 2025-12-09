@@ -91,8 +91,8 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   selectedBeatType: 'story' | 'scene' = 'story';
   private saveTimeout?: ReturnType<typeof setTimeout>;
   beatTypeOptions = [
-    { value: 'story', label: 'StoryBeat', description: 'With complete story context' },
-    { value: 'scene', label: 'SceneBeat', description: 'Ohne Szenen-Zusammenfassungen' }
+    { value: 'story', label: 'Story Beat', description: 'Continue the narrative forward' },
+    { value: 'scene', label: 'Scene Beat', description: 'Expand this moment with depth and detail' }
   ];
   wordCountOptions = [
     { value: 20, label: '~20 words' },
