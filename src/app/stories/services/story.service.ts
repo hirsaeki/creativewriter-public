@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Story, Chapter, Scene, DEFAULT_STORY_SETTINGS } from '../models/story.interface';
+import { Story, Chapter, Scene, DEFAULT_STORY_SETTINGS, NarrativePerspective } from '../models/story.interface';
 import { DatabaseService } from '../../core/services/database.service';
 import { DeviceService } from '../../core/services/device.service';
 import { getSystemMessage, getBeatGenerationTemplate } from '../../shared/resources/system-messages';
@@ -190,7 +190,7 @@ export class StoryService {
     }
   }
 
-  async createStory(language: StoryLanguage = 'en'): Promise<Story> {
+  async createStory(language: StoryLanguage = 'en', narrativePerspective?: NarrativePerspective): Promise<Story> {
     this.db = await this.databaseService.getDatabase();
     
     const firstChapter: Chapter = {
@@ -230,7 +230,8 @@ export class StoryService {
         ...DEFAULT_STORY_SETTINGS,
         systemMessage: systemMessage,
         beatGenerationTemplate: beatTemplate,
-        language: language
+        language: language,
+        ...(narrativePerspective && { narrativePerspective })
       },
       schemaVersion: CURRENT_SCHEMA_VERSION, // Mark as current version
       // Don't set order here - let it be undefined so it appears at top with latest updatedAt

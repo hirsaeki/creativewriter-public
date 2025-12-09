@@ -16,6 +16,7 @@ import { StoryService } from '../../services/story.service';
 import { StoryMetadata } from '../../models/story-metadata.interface';
 import { StoryMetadataIndexService } from '../../services/story-metadata-index.service';
 import { StoryLanguage } from '../../../ui/components/language-selection-dialog/language-selection-dialog.component';
+import { NarrativePerspective } from '../../models/story.interface';
 import { SyncStatusComponent } from '../../../ui/components/sync-status.component';
 import { LoginComponent } from '../../../ui/components/login.component';
 import { AuthService, User } from '../../../core/services/auth.service';
@@ -442,7 +443,44 @@ export class StoryListComponent implements OnInit, OnDestroy {
   }
 
   private async handleLanguageSelection(language: string): Promise<void> {
-    const newStory = await this.storyService.createStory(language as StoryLanguage);
+    // Show POV selection action sheet
+    const povSheet = await this.actionSheetCtrl.create({
+      header: 'Select Narrative Perspective',
+      subHeader: 'Choose the point of view for your story. This can be changed later in story settings.',
+      cssClass: 'pov-selection-action-sheet',
+      buttons: [
+        {
+          text: 'Third Person Limited (Recommended)',
+          data: { pov: 'third-person-limited' },
+          handler: () => this.createStoryWithSettings(language as StoryLanguage, 'third-person-limited')
+        },
+        {
+          text: 'First Person',
+          data: { pov: 'first-person' },
+          handler: () => this.createStoryWithSettings(language as StoryLanguage, 'first-person')
+        },
+        {
+          text: 'Third Person Omniscient',
+          data: { pov: 'third-person-omniscient' },
+          handler: () => this.createStoryWithSettings(language as StoryLanguage, 'third-person-omniscient')
+        },
+        {
+          text: 'Second Person',
+          data: { pov: 'second-person' },
+          handler: () => this.createStoryWithSettings(language as StoryLanguage, 'second-person')
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        }
+      ]
+    });
+
+    await povSheet.present();
+  }
+
+  private async createStoryWithSettings(language: StoryLanguage, pov: NarrativePerspective): Promise<void> {
+    const newStory = await this.storyService.createStory(language, pov);
     this.router.navigate(['/stories/editor', newStory.id]);
   }
 
