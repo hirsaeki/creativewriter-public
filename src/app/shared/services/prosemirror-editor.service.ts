@@ -142,8 +142,10 @@ export class ProseMirrorEditorService {
       }
     });
 
-    // Update codex plugin with actual editor view
-    this.pluginsService.createCodexHighlightingPlugin(config, this.editorView);
+    // Update the codex plugin's editor view reference (NOT create new plugin)
+    if (config.storyContext?.storyId) {
+      this.pluginsService.updateEditorView(config.storyContext.storyId, this.editorView);
+    }
 
     // Set placeholder if provided
     if (config.placeholder) {
@@ -347,6 +349,12 @@ export class ProseMirrorEditorService {
 
   destroy(): void {
     this.contextMenuService.hideContextMenu();
+
+    // Cleanup codex subscription to prevent memory leaks and stale callbacks
+    if (this.currentStoryContext?.storyId) {
+      this.pluginsService.cleanupCodexSubscription(this.currentStoryContext.storyId);
+    }
+
     if (this.editorView) {
       this.editorStateService.cleanupEditorView(this.editorView);
       this.editorView.destroy();
