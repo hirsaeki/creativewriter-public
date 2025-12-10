@@ -452,9 +452,10 @@ export class DatabaseService {
         }
       }
 
+      // Update progress only - DO NOT set isSync: false or lastSync here!
+      // Those should only be set in the 'paused' handler when sync is truly complete.
+      // Setting them here caused the green "synced" badge to appear prematurely.
       this.updateSyncStatus({
-        isSync: false,
-        lastSync: new Date(),
         error: undefined,
         syncProgress: docsProcessed > 0 ? {
           docsProcessed,
@@ -462,14 +463,6 @@ export class DatabaseService {
           currentDoc
         } : undefined
       });
-
-      // Clear progress after a short delay
-      setTimeout(() => {
-        const current = this.syncStatusSubject.value;
-        if (!current.isSync) {
-          this.updateSyncStatus({ syncProgress: undefined });
-        }
-      }, 2000);
     })
     .on('active', (info: unknown) => {
       // Extract pending count if available
@@ -491,9 +484,10 @@ export class DatabaseService {
     })
     .on('paused', () => {
       // Paused event means sync caught up and is waiting for new changes
-      // This is normal for live sync - not an error
+      // This is the ONLY place where lastSync should be set - indicates true sync completion
       this.updateSyncStatus({
         isSync: false,
+        lastSync: new Date(),
         syncProgress: undefined
       });
     })
@@ -589,39 +583,56 @@ export class DatabaseService {
     await this.stopSync();
     this.startSync();
 
-    // Wait for sync to complete by monitoring the sync status
-    // The 'paused' event indicates sync has caught up with all changes
+    // Wait for sync to complete with improved completion detection
     return new Promise((resolve) => {
       let totalDocsProcessed = 0;
       let syncCompleted = false;
-      const timeoutMs = 60000; // 60 second timeout
+      let lastActivityTime = Date.now();
+      const timeoutMs = 90000;      // 90s hard timeout
+      const idleThresholdMs = 3000; // 3s of no activity = likely complete
+
+      const complete = (docs: number) => {
+        if (syncCompleted) return;
+        syncCompleted = true;
+        clearInterval(idleChecker);
+        subscription.unsubscribe();
+
+        // Small delay to ensure IndexedDB writes complete before resolving
+        setTimeout(() => {
+          console.info(`[DatabaseService] Bootstrap sync completed: ${docs} docs processed`);
+          this.disableBootstrapSync();
+          resolve({ docsProcessed: docs });
+        }, 500);
+      };
 
       const subscription = this.syncStatus$.subscribe(status => {
-        // Track documents processed
+        // Track activity and documents processed
         if (status.syncProgress?.docsProcessed) {
           totalDocsProcessed = Math.max(totalDocsProcessed, status.syncProgress.docsProcessed);
+          lastActivityTime = Date.now();
         }
 
-        // Sync is complete when it's no longer syncing and we've had a sync event
-        if (!status.isSync && status.lastSync && !syncCompleted) {
-          syncCompleted = true;
-          console.info(`[DatabaseService] Bootstrap sync completed: ${totalDocsProcessed} docs processed`);
-
-          // Clean up subscription and disable bootstrap mode
-          subscription.unsubscribe();
-          this.disableBootstrapSync();
-          resolve({ docsProcessed: totalDocsProcessed });
+        // Complete when sync is paused AND we have lastSync set
+        // (now reliable since we only set lastSync on 'paused' event)
+        if (!status.isSync && status.lastSync && totalDocsProcessed > 0) {
+          console.info(`[DatabaseService] Bootstrap sync paused with ${totalDocsProcessed} docs`);
+          complete(totalDocsProcessed);
         }
       });
 
-      // Timeout fallback - don't wait forever
+      // Idle detection: if no activity for 3s after receiving docs, assume complete
+      const idleChecker = setInterval(() => {
+        if (totalDocsProcessed > 0 && Date.now() - lastActivityTime > idleThresholdMs && !syncCompleted) {
+          console.info('[DatabaseService] Bootstrap sync idle timeout');
+          complete(totalDocsProcessed);
+        }
+      }, 1000);
+
+      // Hard timeout fallback
       setTimeout(() => {
         if (!syncCompleted) {
-          console.warn('[DatabaseService] Bootstrap sync timed out, proceeding anyway');
-          syncCompleted = true;
-          subscription.unsubscribe();
-          this.disableBootstrapSync();
-          resolve({ docsProcessed: totalDocsProcessed });
+          console.warn('[DatabaseService] Bootstrap sync hard timeout');
+          complete(totalDocsProcessed);
         }
       }, timeoutMs);
     });

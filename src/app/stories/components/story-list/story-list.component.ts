@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, TemplateRef, ViewChild, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
-import { Subject, Subscription } from 'rxjs';
+import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -24,6 +24,18 @@ import { AppHeaderComponent, BurgerMenuItem, HeaderAction } from '../../../ui/co
 import { HeaderNavigationService } from '../../../shared/services/header-navigation.service';
 import { VersionService } from '../../../core/services/version.service';
 import { DatabaseService, SyncStatus } from '../../../core/services/database.service';
+
+/**
+ * Unified loading state for story list
+ * Replaces multiple boolean flags for clearer state management
+ */
+export enum LoadingState {
+  INITIAL = 'initial',     // App just started, no data yet
+  SYNCING = 'syncing',     // Syncing stories from cloud (first-time or bootstrap)
+  LOADING = 'loading',     // Loading from local database
+  READY = 'ready',         // Stories loaded and ready
+  EMPTY = 'empty'          // No stories exist
+}
 
 @Component({
   selector: 'app-story-list',
@@ -61,14 +73,26 @@ export class StoryListComponent implements OnInit, OnDestroy {
   burgerMenuItems: BurgerMenuItem[] = [];
   rightActions: HeaderAction[] = [];
   reorderingEnabled = false;
-  isLoadingStories = true;
+
+  // Unified loading state
+  loadingState: LoadingState = LoadingState.INITIAL;
+
+  // Backward-compatible getters for templates
+  get isLoadingStories(): boolean {
+    return this.loadingState === LoadingState.LOADING ||
+           this.loadingState === LoadingState.INITIAL ||
+           this.loadingState === LoadingState.SYNCING;
+  }
+
+  get isSyncingInitialData(): boolean {
+    return this.loadingState === LoadingState.SYNCING;
+  }
 
   // Sync status for loading indicator
   syncStatus: SyncStatus = {
     isOnline: navigator.onLine,
     isSync: false
   };
-  isSyncingInitialData = false;
 
   // Pagination support
   pageSize = 50;  // Load 50 stories at a time
@@ -108,10 +132,10 @@ export class StoryListComponent implements OnInit, OnDestroy {
       .subscribe(user => {
         this.currentUser = user;
         // Reload stories when user changes (different database)
-        this.isLoadingStories = true;
+        this.loadingState = LoadingState.LOADING;
         this.loadStories().then(() => {
           this.setupRightActions();
-          this.isLoadingStories = false;
+          // loadStories sets final state (READY or EMPTY)
           this.cdr.markForCheck();
         });
       });
@@ -132,9 +156,11 @@ export class StoryListComponent implements OnInit, OnDestroy {
       .subscribe(status => {
         this.syncStatus = status;
 
-        // Determine if we're in initial sync state (no stories + syncing/connecting)
-        this.isSyncingInitialData = this.stories.length === 0 &&
-                                     (status.isSync || status.isConnecting || false);
+        // If we're in INITIAL state and sync is active, switch to SYNCING
+        if (this.loadingState === LoadingState.INITIAL &&
+            (status.isSync || status.isConnecting)) {
+          this.loadingState = LoadingState.SYNCING;
+        }
 
         // Check if sync just completed (has lastSync and it's different from our last known sync)
         if (status.lastSync && (!this.lastSyncTime || status.lastSync > this.lastSyncTime)) {
@@ -191,18 +217,19 @@ export class StoryListComponent implements OnInit, OnDestroy {
     if (reset) {
       this.currentPage = 0;
       this.stories = [];
-      this.isLoadingStories = true;
+      // Only set LOADING if not already SYNCING (preserve sync state)
+      if (this.loadingState !== LoadingState.SYNCING) {
+        this.loadingState = LoadingState.LOADING;
+      }
     } else {
       this.isLoadingMore = true;
     }
 
     try {
-      // BUGFIX: Wait for initial sync to complete if database is fresh
-      // This prevents race condition where we try to load before metadata index has synced
-      if (reset && this.syncStatus.isSync) {
-        console.info('[StoryList] Waiting for initial sync to complete before loading metadata index');
-        await this.waitForInitialSync();
-      }
+      // Note: We no longer wait for initial sync here. Instead:
+      // - If sync is in progress and metadata index fails, we fall back to full story load
+      // - If that also fails, we trigger bootstrap sync (which properly waits)
+      // - When sync completes (paused event), syncStatus$ triggers a reload automatically
 
       // Load story metadata from index (lightweight)
       const index = await this.metadataIndexService.getMetadataIndex();
@@ -241,14 +268,18 @@ export class StoryListComponent implements OnInit, OnDestroy {
       const loadedCount = (this.currentPage + 1) * this.pageSize;
       this.hasMoreStories = loadedCount < this.totalStories && newStories.length === this.pageSize;
 
-      // Update initial sync status based on loaded stories
-      this.isSyncingInitialData = this.stories.length === 0 &&
-                                   (this.syncStatus.isSync || this.syncStatus.isConnecting || false);
-
-      // Check for missing stories after loading (only on reset/initial load)
-      if (reset && this.stories.length > 0) {
-        this.checkForMissingStories();
+      // Set final loading state based on whether we have stories
+      if (this.stories.length > 0) {
+        this.loadingState = LoadingState.READY;
+        // Check for missing stories after loading (only on reset/initial load)
+        if (reset) {
+          this.checkForMissingStories();
+        }
+      } else if (!this.syncStatus.isSync && !this.syncStatus.isConnecting) {
+        // Only show EMPTY if sync is complete and we have no stories
+        this.loadingState = LoadingState.EMPTY;
       }
+      // If syncing, keep current state (SYNCING) - it will update when sync completes
 
     } catch (error) {
       console.error('[StoryList] Failed to load metadata index, falling back to full stories:', error);
@@ -270,7 +301,7 @@ export class StoryListComponent implements OnInit, OnDestroy {
           const missingCheck = await this.databaseService.checkForMissingStories();
           if (missingCheck && missingCheck.remoteCount > 0) {
             console.info('[StoryList] Local DB empty but remote has stories - triggering bootstrap sync');
-            this.isSyncingInitialData = true;
+            this.loadingState = LoadingState.SYNCING;
             this.cdr.markForCheck();
 
             try {
@@ -310,12 +341,13 @@ export class StoryListComponent implements OnInit, OnDestroy {
                 // Not critical - index will be rebuilt naturally as stories are modified
               }
 
+              // Set state based on whether bootstrap succeeded
+              this.loadingState = this.stories.length > 0 ? LoadingState.READY : LoadingState.EMPTY;
               return; // Exit early, we've loaded stories via bootstrap
             } catch (bootstrapError) {
               console.error('[StoryList] Bootstrap sync failed:', bootstrapError);
               // Fall through to show empty state
-            } finally {
-              this.isSyncingInitialData = false;
+              this.loadingState = LoadingState.EMPTY;
             }
           }
         }
@@ -348,7 +380,11 @@ export class StoryListComponent implements OnInit, OnDestroy {
         throw fallbackError;
       }
     } finally {
-      this.isLoadingStories = false;
+      // Set final state if not already set (e.g., by bootstrap sync early return)
+      if (this.loadingState === LoadingState.LOADING ||
+          this.loadingState === LoadingState.INITIAL) {
+        this.loadingState = this.stories.length > 0 ? LoadingState.READY : LoadingState.EMPTY;
+      }
       this.isLoadingMore = false;
       this.cdr.markForCheck();
     }
@@ -361,47 +397,6 @@ export class StoryListComponent implements OnInit, OnDestroy {
 
     this.currentPage++;
     await this.loadStories(false);
-  }
-
-  /**
-   * Wait for initial sync to complete (used after browser data deletion)
-   * BUGFIX: Prevents race condition where we try to load metadata index
-   * before it has synced from remote
-   */
-  private async waitForInitialSync(timeoutMs = 60000): Promise<void> {
-    return new Promise((resolve) => {
-      const startTime = Date.now();
-      let syncSubscription: Subscription | null = null;
-
-      const checkAndResolve = () => {
-        if (syncSubscription) {
-          syncSubscription.unsubscribe();
-        }
-        resolve();
-      };
-
-      // Subscribe to sync status changes
-      syncSubscription = this.databaseService.syncStatus$.subscribe(status => {
-        // Check timeout
-        if (Date.now() - startTime >= timeoutMs) {
-          console.warn('[StoryList] Initial sync wait timed out, proceeding anyway');
-          checkAndResolve();
-          return;
-        }
-
-        // Wait for sync to complete (not syncing and has synced at least once)
-        if (!status.isSync && !status.isConnecting && status.lastSync) {
-          console.info('[StoryList] Initial sync completed, loading metadata index');
-          checkAndResolve();
-        }
-      });
-
-      // Hard timeout as backup
-      setTimeout(() => {
-        console.warn('[StoryList] Hard timeout reached for initial sync wait');
-        checkAndResolve();
-      }, timeoutMs);
-    });
   }
 
   async drop(event: CdkDragDrop<StoryMetadata[]>): Promise<void> {
@@ -595,29 +590,35 @@ export class StoryListComponent implements OnInit, OnDestroy {
    * Get loading message based on current state
    */
   getLoadingMessage(): string {
-    if (this.isSyncingInitialData) {
-      if (this.syncStatus.isConnecting) {
-        return 'Connecting to cloud storage...';
-      }
-      if (this.syncStatus.syncProgress) {
-        const progress = this.syncStatus.syncProgress;
-        if (progress.pendingDocs !== undefined && progress.pendingDocs > 0) {
-          return `Syncing ${progress.pendingDocs} ${progress.pendingDocs === 1 ? 'story' : 'stories'}...`;
+    switch (this.loadingState) {
+      case LoadingState.SYNCING:
+        if (this.syncStatus.isConnecting) {
+          return 'Connecting to cloud storage...';
         }
-        if (progress.docsProcessed > 0) {
-          return `Syncing stories (${progress.docsProcessed} loaded)...`;
+        if (this.syncStatus.syncProgress) {
+          const progress = this.syncStatus.syncProgress;
+          if (progress.docsProcessed > 0) {
+            return `Syncing... (${progress.docsProcessed} items)`;
+          }
+          if (progress.pendingDocs !== undefined && progress.pendingDocs > 0) {
+            return `Syncing ${progress.pendingDocs} ${progress.pendingDocs === 1 ? 'item' : 'items'}...`;
+          }
         }
-      }
-      return 'Syncing stories from cloud...';
+        return 'Syncing stories from cloud...';
+      case LoadingState.LOADING:
+        return 'Loading stories...';
+      case LoadingState.INITIAL:
+        return 'Preparing...';
+      default:
+        return 'Loading...';
     }
-    return 'Loading stories...';
   }
 
   /**
    * Get loading subtext for additional context
    */
   getLoadingSubtext(): string | null {
-    if (this.isSyncingInitialData) {
+    if (this.loadingState === LoadingState.SYNCING) {
       return 'First time loading may take a moment';
     }
     return null;
