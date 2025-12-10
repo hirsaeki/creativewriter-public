@@ -28,31 +28,18 @@ export class StoryMetadataIndexService {
   private readonly databaseService = inject(DatabaseService);
   private readonly storyStatsService = inject(StoryStatsService);
 
-  private db: PouchDB.Database | null = null;
   private metadataCache: StoryMetadataIndex | null = null;
-  private initPromise: Promise<void> | null = null;
-
-  constructor() {
-    this.initPromise = this.initialize();
-  }
 
   /**
-   * Initialize the service and load database
+   * Get the current database instance
+   * Always get fresh reference to handle user login/logout which creates new databases
    */
-  private async initialize(): Promise<void> {
-    this.db = await this.databaseService.getDatabase();
-  }
-
-  /**
-   * Ensure service is initialized before operations
-   */
-  private async ensureInitialized(): Promise<void> {
-    if (this.initPromise) {
-      await this.initPromise;
-    }
-    if (!this.db) {
+  private async getDb(): Promise<PouchDB.Database> {
+    const db = await this.databaseService.getDatabase();
+    if (!db) {
       throw new Error('Database not initialized');
     }
+    return db;
   }
 
   /**
@@ -62,7 +49,7 @@ export class StoryMetadataIndexService {
    * @throws Error if index cannot be loaded or created
    */
   async getMetadataIndex(): Promise<StoryMetadataIndex> {
-    await this.ensureInitialized();
+    const db = await this.getDb();
 
     // Return from cache if available
     if (this.metadataCache) {
@@ -71,7 +58,7 @@ export class StoryMetadataIndexService {
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const doc = await this.db!.get('story-metadata-index') as any;
+      const doc = await db.get('story-metadata-index') as any;
 
       // Validate that it's actually a metadata index
       if (!isStoryMetadataIndex(doc)) {
@@ -103,7 +90,7 @@ export class StoryMetadataIndexService {
    * @param story The story to update in the index
    */
   async updateStoryMetadata(story: Story): Promise<void> {
-    await this.ensureInitialized();
+    const db = await this.getDb();
 
     // Retry up to 3 times for conflict resolution
     const maxRetries = 3;
@@ -131,7 +118,7 @@ export class StoryMetadataIndexService {
         index.lastUpdated = new Date();
 
         // Save to database and update _rev in cached object
-        const result = await this.db!.put(index);
+        const result = await db.put(index);
         index._rev = result.rev;
         this.metadataCache = index;
         return; // Success - exit retry loop
@@ -164,7 +151,7 @@ export class StoryMetadataIndexService {
    * @param storyId The ID of the story to remove
    */
   async removeStoryMetadata(storyId: string): Promise<void> {
-    await this.ensureInitialized();
+    const db = await this.getDb();
 
     // Retry up to 3 times for conflict resolution
     const maxRetries = 3;
@@ -183,7 +170,7 @@ export class StoryMetadataIndexService {
         // Only update if something was actually removed
         if (index.stories.length < originalCount) {
           index.lastUpdated = new Date();
-          const result = await this.db!.put(index);
+          const result = await db.put(index);
           index._rev = result.rev;
           this.metadataCache = index;
         }
@@ -221,13 +208,13 @@ export class StoryMetadataIndexService {
    * @returns The newly rebuilt index
    */
   async rebuildIndex(force = false): Promise<StoryMetadataIndex> {
-    await this.ensureInitialized();
+    const db = await this.getDb();
 
     console.info('Rebuilding story metadata index from all stories...');
 
     try {
       // Load all stories from database
-      const result = await this.db!.allDocs({
+      const result = await db.allDocs({
         include_docs: true
       });
 
@@ -250,7 +237,7 @@ export class StoryMetadataIndexService {
 
         // Check if an index exists (might have synced already)
         try {
-          const existing = await this.db!.get('story-metadata-index');
+          const existing = await db.get('story-metadata-index');
           console.info('[MetadataIndex] Found existing index, returning it');
           const deserializedIndex = this.deserializeIndex(existing as StoryMetadataIndex);
           this.metadataCache = deserializedIndex;
@@ -282,14 +269,14 @@ export class StoryMetadataIndexService {
 
       // Check if index already exists (to preserve _rev)
       try {
-        const existing = await this.db!.get('story-metadata-index');
+        const existing = await db.get('story-metadata-index');
         index._rev = (existing as { _rev?: string })._rev;
       } catch {
         // Index doesn't exist yet, that's fine
       }
 
       // Save to database
-      await this.db!.put(index);
+      await db.put(index);
       this.metadataCache = index;
 
       console.info(`Metadata index rebuilt with ${index.stories.length} stories`);
