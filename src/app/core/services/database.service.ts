@@ -64,6 +64,10 @@ export class DatabaseService {
   private syncPaused = false;
   private activePauseCount = 0;
 
+  // Bootstrap mode: When true, sync ALL documents including stories
+  // Used when local database is empty and metadata index is missing
+  private bootstrapSyncMode = false;
+
   public syncStatus$: Observable<SyncStatus> = this.syncStatusSubject.asObservable();
 
   constructor() {
@@ -367,6 +371,14 @@ export class DatabaseService {
           return true;
         }
 
+        // BOOTSTRAP MODE: When enabled, sync ALL documents to populate empty database
+        // This is used when local database is empty and metadata index is missing
+        if (this.bootstrapSyncMode) {
+          // In bootstrap mode, sync everything except snapshots (already excluded above)
+          console.info(`[SyncFilter] ✓ Bootstrap mode: syncing ${docId}`);
+          return true;
+        }
+
         // If no active story is set (viewing story list), ONLY sync index + user-wide docs
         // DO NOT sync individual story documents - they're not needed for the list view
         if (!this.activeStoryId) {
@@ -558,6 +570,50 @@ export class DatabaseService {
       this.syncPaused = false;
       this.startSync();
     }
+  }
+
+  /**
+   * Enable bootstrap sync mode and trigger a full sync.
+   * Use this when local database is empty and metadata index is missing.
+   * This temporarily allows syncing ALL documents (including stories)
+   * to populate the empty database.
+   *
+   * @returns Promise that resolves when initial sync completes
+   */
+  async enableBootstrapSync(): Promise<{ docsProcessed: number }> {
+    if (!this.remoteDb) {
+      console.warn('[DatabaseService] Cannot enable bootstrap sync: remote database not connected');
+      return { docsProcessed: 0 };
+    }
+
+    console.info('[DatabaseService] Enabling bootstrap sync mode - will sync ALL documents');
+    this.bootstrapSyncMode = true;
+
+    // Restart sync with bootstrap mode enabled
+    await this.stopSync();
+    this.startSync();
+
+    // Do a forced pull to get all documents immediately
+    try {
+      const result = await this.forcePull();
+      console.info(`[DatabaseService] Bootstrap sync completed: ${result.docsProcessed} docs`);
+      return result;
+    } finally {
+      // Disable bootstrap mode after sync completes
+      console.info('[DatabaseService] Disabling bootstrap sync mode');
+      this.bootstrapSyncMode = false;
+
+      // Restart sync with normal selective filtering
+      await this.stopSync();
+      this.startSync();
+    }
+  }
+
+  /**
+   * Check if bootstrap sync mode is currently enabled
+   */
+  isBootstrapSyncEnabled(): boolean {
+    return this.bootstrapSyncMode;
   }
 
   async forcePush(): Promise<{ docsProcessed: number }> {

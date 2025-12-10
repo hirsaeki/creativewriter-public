@@ -263,6 +263,63 @@ export class StoryListComponent implements OnInit, OnDestroy {
           this.totalStories = await this.storyService.getTotalStoriesCount();
         }
 
+        // BOOTSTRAP SYNC: If local DB is empty but we have a remote connection,
+        // it likely means the selective sync filter is blocking story documents.
+        // Enable bootstrap mode to sync ALL documents and populate the database.
+        if (newStories.length === 0 && reset) {
+          const missingCheck = await this.databaseService.checkForMissingStories();
+          if (missingCheck && missingCheck.remoteCount > 0) {
+            console.info('[StoryList] Local DB empty but remote has stories - triggering bootstrap sync');
+            this.isSyncingInitialData = true;
+            this.cdr.markForCheck();
+
+            try {
+              const result = await this.databaseService.enableBootstrapSync();
+              console.info(`[StoryList] Bootstrap sync completed: ${result.docsProcessed} docs synced`);
+
+              // Reload stories after bootstrap sync
+              const bootstrappedStories = await this.storyService.getAllStories(
+                this.pageSize,
+                0
+              );
+              this.totalStories = await this.storyService.getTotalStoriesCount();
+
+              // Map Story to StoryMetadata for display
+              const bootstrappedMetadata: StoryMetadata[] = bootstrappedStories.map(story => ({
+                id: story.id,
+                title: story.title,
+                coverImageThumbnail: story.coverImage,
+                previewText: this.storyService.getStoryPreview(story),
+                chapterCount: story.chapters.length,
+                sceneCount: story.chapters.reduce((sum, ch) => sum + ch.scenes.length, 0),
+                wordCount: this.storyService.getWordCount(story),
+                createdAt: story.createdAt,
+                updatedAt: story.updatedAt,
+                order: story.order
+              }));
+
+              this.stories = bootstrappedMetadata;
+              this.hasMoreStories = bootstrappedStories.length === this.pageSize && this.totalStories > this.pageSize;
+
+              // Rebuild the metadata index from the newly synced stories
+              console.info('[StoryList] Rebuilding metadata index after bootstrap sync');
+              try {
+                await this.metadataIndexService.rebuildIndex(true); // force=true since we just synced
+              } catch (indexError) {
+                console.warn('[StoryList] Failed to rebuild metadata index:', indexError);
+                // Not critical - index will be rebuilt naturally as stories are modified
+              }
+
+              return; // Exit early, we've loaded stories via bootstrap
+            } catch (bootstrapError) {
+              console.error('[StoryList] Bootstrap sync failed:', bootstrapError);
+              // Fall through to show empty state
+            } finally {
+              this.isSyncingInitialData = false;
+            }
+          }
+        }
+
         // Map Story to StoryMetadata for display
         const metadata: StoryMetadata[] = newStories.map(story => ({
           id: story.id,
