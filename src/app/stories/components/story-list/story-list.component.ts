@@ -278,23 +278,21 @@ export class StoryListComponent implements OnInit, OnDestroy {
       } else if (this.syncStatus.isSync || this.syncStatus.isConnecting) {
         // Sync is in progress - show syncing state
         this.loadingState = LoadingState.SYNCING;
-      } else if (!this.syncStatus.lastSync && this.currentUser) {
-        // User is logged in but we haven't synced yet - likely just connected
-        // Show syncing state and wait for sync to complete
-        this.loadingState = LoadingState.SYNCING;
-        console.info('[StoryList] No stories and no sync history - waiting for initial sync');
       } else if (reset && this.currentUser) {
-        // Sync completed but no stories - check if remote has stories we're missing
-        // This can happen if selective sync filter blocked story documents
+        // No stories locally - check if remote has stories we should sync
+        // This handles both fresh install and selective sync filter scenarios
+        console.info('[StoryList] No stories found - checking remote for stories to sync');
+        this.loadingState = LoadingState.SYNCING;
+        this.cdr.markForCheck();
+
         const missingCheck = await this.databaseService.checkForMissingStories();
         if (missingCheck && missingCheck.remoteCount > 0) {
-          console.info('[StoryList] Sync complete but remote has stories - triggering bootstrap sync');
-          this.loadingState = LoadingState.SYNCING;
-          this.cdr.markForCheck();
+          console.info(`[StoryList] Remote has ${missingCheck.remoteCount} stories - triggering bootstrap sync`);
           await this.triggerBootstrapSync();
-          return; // Exit - bootstrap sync will reload
+          return; // Exit - bootstrap sync handled everything
         } else {
           // Truly empty - no stories locally or remotely
+          console.info('[StoryList] No stories found locally or remotely');
           this.loadingState = LoadingState.EMPTY;
         }
       } else {
