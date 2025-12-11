@@ -12,7 +12,7 @@ import { addIcons } from 'ionicons';
 import {
   arrowBack, send, personCircle, chatbubbles, copy, refresh,
   close, helpCircle, timeOutline, chevronForward,
-  createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline
+  createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline, copyOutline
 } from 'ionicons/icons';
 import { ModelSelectorComponent } from '../../../shared/components/model-selector/model-selector.component';
 
@@ -132,7 +132,7 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
     addIcons({
       arrowBack, send, personCircle, chatbubbles, copy, refresh,
       close, helpCircle, timeOutline, chevronForward,
-      createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline
+      createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline, copyOutline
     });
     this.initializeHeaderActions();
   }
@@ -230,14 +230,13 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   }
 
   async loadPremiumModule(): Promise<void> {
-    if (!this.premiumModuleService.isCharacterChatLoaded) {
-      const module = await this.premiumModuleService.loadCharacterChatModule();
-      if (module) {
-        // Create AI adapter that bridges to local AI services
-        const aiAdapter = this.createAIAdapter();
-        // Instantiate the CharacterChatService from the loaded module
-        this.chatService = new module.CharacterChatService(aiAdapter);
-      }
+    // Always try to load/get the module - it returns cached version if already loaded
+    const module = await this.premiumModuleService.loadCharacterChatModule();
+    if (module && !this.chatService) {
+      // Create AI adapter that bridges to local AI services
+      const aiAdapter = this.createAIAdapter();
+      // Instantiate the CharacterChatService from the loaded module
+      this.chatService = new module.CharacterChatService(aiAdapter);
     }
   }
 
