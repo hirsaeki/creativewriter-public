@@ -145,22 +145,26 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Check premium status
+    // Actively verify subscription status FIRST with direct state update
+    // This ensures premium users see the chat immediately
+    this.subscriptionService.checkSubscription().then(isPremium => {
+      console.log('[CharacterChat] checkSubscription result:', isPremium);
+      this.isPremium = isPremium;
+      if (isPremium) {
+        this.loadPremiumModule();
+      }
+    });
+
+    // Also subscribe for any future changes
     this.subscriptions.add(
       this.subscriptionService.isPremiumObservable.subscribe(isPremium => {
-        console.log('[CharacterChat] isPremium changed:', isPremium);
+        console.log('[CharacterChat] isPremium observable changed:', isPremium);
         this.isPremium = isPremium;
         if (isPremium) {
           this.loadPremiumModule();
         }
       })
     );
-
-    // Actively verify subscription status (don't just rely on cached observable)
-    // This ensures we have the latest status even if initialize() had timing issues
-    this.subscriptionService.checkSubscription().then(isPremium => {
-      console.log('[CharacterChat] checkSubscription result:', isPremium);
-    });
 
     // Load module status
     this.subscriptions.add(
