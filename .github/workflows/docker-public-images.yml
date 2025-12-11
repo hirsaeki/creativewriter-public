@@ -44,6 +44,10 @@ jobs:
             image_suffix: -couchdb
             context: .
             platforms: linux/amd64,linux/arm64
+          - dockerfile: Dockerfile.snapshot-service
+            image_suffix: -snapshot-service
+            context: .
+            platforms: linux/amd64,linux/arm64
 
     steps:
       - name: Checkout repository
@@ -180,6 +184,7 @@ jobs:
           echo "| Gemini Proxy | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-gemini-proxy:latest\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Nginx | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-nginx:latest\` |" >> $GITHUB_STEP_SUMMARY
           echo "| CouchDB | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-couchdb:latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Snapshot Service | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-snapshot-service:latest\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## 🔧 Features" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Multi-platform builds (AMD64, ARM64)" >> $GITHUB_STEP_SUMMARY
