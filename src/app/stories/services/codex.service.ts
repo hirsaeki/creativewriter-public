@@ -72,6 +72,39 @@ export class CodexService {
     }
   }
 
+  /**
+   * Reload a specific codex from the database.
+   * Use this after force-replicating the codex document to ensure we have the latest version.
+   * @param storyId The story ID whose codex should be reloaded
+   * @returns The codex if found, undefined otherwise
+   */
+  async reloadCodexFromDatabase(storyId: string): Promise<Codex | undefined> {
+    if (!this.isInitialized) {
+      await this.waitForInitialization();
+    }
+
+    const docId = `codex_${storyId}`;
+
+    try {
+      const doc = await this.db!.get(docId);
+      if (doc && (doc as { type?: string }).type === 'codex') {
+        const codex = this.deserializeCodex(doc);
+        this.codexMap.set(storyId, codex);
+        this.codexSubject.next(new Map(this.codexMap));
+        console.info(`[CodexService] Reloaded codex for story ${storyId} from database`);
+        return codex;
+      }
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'status' in error && (error as { status: number }).status === 404) {
+        // Codex doesn't exist yet - this is normal for new stories
+        console.info(`[CodexService] No codex found for story ${storyId} in database`);
+        return undefined;
+      }
+      console.error(`[CodexService] Error reloading codex for story ${storyId}:`, error);
+    }
+
+    return undefined;
+  }
 
   private async saveToDatabase(codex: Codex, maxRetries = 3): Promise<void> {
     try {

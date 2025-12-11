@@ -1,5 +1,5 @@
 **CRITICAL**
-- BEFORE DOING ANYTHING: Switch to main branch!!!!!!!!
+- BEFORE DOING ANYTHING: Switch to main branch and pull from git remote!!!!!!!!
 - ALWAYS: Commit and push code changes after completing ANY task - no exceptions!
 - NEVER: leave uncommitted or unpushed changes - always maintain a consistent and backed-up repository state
 - ALWAYS: Before declaring a task as complete, test if the app builds using `npm run build` AND run the tests!
@@ -11,6 +11,9 @@
 - NEVER MERGE TO release branch on your own!
 - WHEN CREATING NEW COMPONENTS: They shall follow a common design pattern to put each component into a seperate foldern, split them into template, typescript and css files!
 - After finising a task propose a next step to perform.
+- ALWAYS: After changing backend code (`backend/src/index.ts`), deploy to both dev AND production:
+  - `cd backend && npx wrangler deploy --env dev` (dev environment)
+  - `cd backend && npx wrangler deploy` (production environment)
 ---
 
 # Repository Guidelines
@@ -62,3 +65,6 @@
   - Sync process (.github/workflows/sync-public.yml): Filters out private files (.claude/, .vscode/, docs/), replaces docker-compose with public version, force-pushes to public repo main branch, creates GitHub Release with
   timestamp-based version (format: v1.4.YYYYMMDDHHMM).
   - Public repo (creativewriter-public): Release triggers .github/workflows/docker-public-images.yml which builds multi-platform Docker images and publishes to GHCR with tags: version, stable, latest.
+- Always use context7 when I need code generation, setup or configuration steps, or
+library/API documentation. This means you should automatically use the Context7 MCP
+tools to resolve library id and get library docs without me having to explicitly ask.

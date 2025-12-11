@@ -69,7 +69,7 @@ import { TokenCounterService, SupportedModel, TokenCountResult } from '../../sha
             <p>{{ tokenResult.tokens }} Tokens</p>
           </ion-label>
           <ion-note slot="end" color="medium">
-            ~{{ Math.round(tokenResult.tokens * 1.33) }} words
+            ~{{ Math.round(tokenResult.tokens * 0.75) }} words
           </ion-note>
         </ion-item>
 
@@ -415,9 +415,9 @@ export class TokenInfoPopoverComponent implements OnInit {
   Math = Math;
 
   comparisonModels: { id: SupportedModel; name: string }[] = [
-    { id: 'claude-3.5-sonnet', name: 'Claude 3.5' },
-    { id: 'claude-3.7-sonnet', name: 'Claude 3.7' },
-    { id: 'gemini-2.5-pro', name: 'Gemini 2.5' },
+    { id: 'claude-sonnet-4-5', name: 'Claude 4.5' },
+    { id: 'claude-sonnet-4', name: 'Claude 4' },
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { id: 'grok-3', name: 'Grok-3' }
   ];
 

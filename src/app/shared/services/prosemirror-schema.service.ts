@@ -174,6 +174,31 @@ export class ProseMirrorSchemaService {
             return attrs;
           }
         }]
+      },
+      // Invisible marker node to track the boundary between generated content and pre-existing text
+      // Used to preserve remainder text when regenerating beat content
+      // Must be a block node to sit between beat content paragraphs and pre-existing text
+      beatEndMarker: {
+        group: 'block',
+        atom: true,
+        selectable: false,
+        attrs: {
+          beatId: { default: '' }
+        },
+        toDOM: (node: ProseMirrorNode) => [
+          'div',
+          {
+            class: 'beat-end-marker',
+            'data-beat-id': node.attrs['beatId'],
+            style: 'height: 1px; margin: 0.5rem 2rem; background: linear-gradient(90deg, transparent 0%, rgba(128, 128, 128, 0.3) 20%, rgba(128, 128, 128, 0.3) 80%, transparent 100%);'
+          }
+        ],
+        parseDOM: [{
+          tag: 'div.beat-end-marker',
+          getAttrs: (dom: HTMLElement) => ({
+            beatId: dom.getAttribute('data-beat-id') || ''
+          })
+        }]
       }
     });
 

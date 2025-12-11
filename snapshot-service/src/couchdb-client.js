@@ -148,7 +148,22 @@ class DatabaseClient {
    * Get all documents
    */
   async allDocs(options = {}) {
-    return this.db.list(options);
+    try {
+      const result = await this.db.list(options);
+      // Ensure result has expected structure
+      if (!result || typeof result !== 'object') {
+        logger.warn(`Unexpected allDocs result type for ${this.dbName}: ${typeof result}`);
+        return { rows: [], total_rows: 0, offset: 0 };
+      }
+      if (!Array.isArray(result.rows)) {
+        logger.warn(`allDocs result missing rows array for ${this.dbName}:`, result);
+        return { rows: [], total_rows: 0, offset: 0 };
+      }
+      return result;
+    } catch (error) {
+      logger.error(`Error fetching allDocs for ${this.dbName}:`, error);
+      throw error;
+    }
   }
 }
 

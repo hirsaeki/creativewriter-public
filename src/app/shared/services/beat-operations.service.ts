@@ -142,6 +142,81 @@ export class BeatOperationsService {
   }
 
   /**
+   * Find the position of a beat end marker by beat ID
+   */
+  findBeatEndMarkerPosition(editorView: EditorView | null, beatId: string): number | null {
+    if (!editorView) return null;
+
+    const { state } = editorView;
+    let markerPos: number | null = null;
+
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === 'beatEndMarker' && node.attrs['beatId'] === beatId) {
+        markerPos = pos;
+        return false; // Stop iteration
+      }
+      return true;
+    });
+
+    return markerPos;
+  }
+
+  /**
+   * Insert a beat end marker at the specified position
+   * Returns the position where the marker was inserted
+   */
+  private insertBeatEndMarker(editorView: EditorView, beatId: string, position: number): void {
+    const markerNode = editorView.state.schema.nodes['beatEndMarker'].create({ beatId });
+    const tr = editorView.state.tr.insert(position, markerNode);
+    editorView.dispatch(tr);
+  }
+
+  /**
+   * Delete only the generated content between a beat and its end marker
+   * Falls back to deleteContentAfterBeat if no marker exists (backward compatibility)
+   */
+  deleteGeneratedContentOnly(editorView: EditorView | null, beatId: string, getHTMLContent: () => string): boolean {
+    if (!editorView) return false;
+
+    const beatPos = this.findBeatNodePosition(editorView, beatId);
+    if (beatPos === null) return false;
+
+    const { state } = editorView;
+    const beatNode = state.doc.nodeAt(beatPos);
+    if (!beatNode) return false;
+
+    const deleteStartPos = beatPos + beatNode.nodeSize;
+
+    // Try to find the marker for this beat
+    const markerPos = this.findBeatEndMarkerPosition(editorView, beatId);
+
+    // If no marker exists, fall back to old behavior (delete to next beat)
+    if (markerPos === null) {
+      return this.deleteContentAfterBeat(editorView, beatId, getHTMLContent);
+    }
+
+    // Delete only up to the marker (not including the marker itself)
+    if (markerPos <= deleteStartPos) {
+      return false;
+    }
+
+    const tr = state.tr.delete(deleteStartPos, markerPos);
+    editorView.dispatch(tr);
+
+    const content = getHTMLContent();
+    this.contentUpdate$.next(content);
+
+    // Refresh prompt manager after the deletion
+    setTimeout(() => {
+      this.promptManager.refresh().catch(error => {
+        console.error('Error refreshing prompt manager:', error);
+      });
+    }, 500);
+
+    return true;
+  }
+
+  /**
    * Get the text content between a beat and the next beat (or end of scene)
    */
   getTextAfterBeat(editorView: EditorView | null, beatId: string): string | null {
@@ -221,6 +296,27 @@ export class BeatOperationsService {
       return;
     }
 
+    // Save existing content to history BEFORE it gets overwritten
+    if (event.storyId) {
+      const existingContent = this.getTextAfterBeat(editorView, event.beatId);
+      if (existingContent && existingContent.trim().length > 0) {
+        // Save existing content as a previous version (don't block generation)
+        this.savePreviousContentToHistory(
+          event.beatId,
+          event.storyId,
+          existingContent,
+          event.beatType || 'story'
+        ).catch(error => {
+          console.error('[BeatOperations] Failed to save previous content to history:', error);
+        });
+      }
+    }
+
+    // Handle regenerate action - delete only generated content (up to marker) before regenerating
+    if (event.action === 'regenerate') {
+      this.deleteGeneratedContentOnly(editorView, event.beatId, getHTMLContent);
+    }
+
     // Handle rewrite action - delete old content before rewriting
     if (event.action === 'rewrite' && event.existingText) {
       this.deleteContentAfterBeat(editorView, event.beatId, getHTMLContent);
@@ -268,6 +364,16 @@ export class BeatOperationsService {
       }
     });
 
+    // For scene beats, extract text after beat for bridging context (before any deletion)
+    // This helps the AI generate content that connects to what follows
+    let textAfterBeatForBridging: string | undefined;
+    if (event.beatType === 'scene') {
+      const afterText = this.getTextAfterBeat(editorView, event.beatId);
+      if (afterText && afterText.trim().length > 0) {
+        textAfterBeatForBridging = afterText;
+      }
+    }
+
     // Generate AI content with streaming
     this.beatAIService.generateBeatContent(event.prompt || '', event.beatId, {
       wordCount: event.wordCount,
@@ -279,7 +385,8 @@ export class BeatOperationsService {
       beatType: event.beatType,
       customContext: event.customContext,
       action: event.action === 'rewrite' ? 'rewrite' : 'generate',
-      existingText: event.existingText
+      existingText: event.existingText,
+      textAfterBeat: textAfterBeatForBridging
     }).subscribe({
       next: (finalContent) => {
         // Final content received - ensure beat node is updated
@@ -375,8 +482,6 @@ export class BeatOperationsService {
         console.error('Error refreshing prompt manager:', error);
       });
     }, 500);
-
-    console.log(`[BeatOperations] Switched beat ${beatId} to version ${versionId}`);
   }
 
   /**
@@ -497,11 +602,26 @@ export class BeatOperationsService {
     const afterBeatPos = beatPos + beatNode.nodeSize;
 
     if (isFirstChunk) {
+      // Check if marker already exists (regenerate case)
+      const existingMarkerPos = this.findBeatEndMarkerPosition(editorView, beatId);
+
+      // If no marker exists, insert one first so generated content will push it down
+      if (existingMarkerPos === null) {
+        this.insertBeatEndMarker(editorView, beatId, afterBeatPos);
+      }
+
       // First chunk - create HTML with <p> wrapper and process linebreaks
       const htmlContent = '<p>' + newContent.replace(/\n/g, '</p><p>') + '</p>';
 
-      // Parse HTML and insert into document
-      this.insertHtmlContent(editorView, beatId, htmlContent, afterBeatPos);
+      // Parse HTML and insert into document (at afterBeatPos, before the marker)
+      // Need to re-calculate afterBeatPos since document may have changed after marker insertion
+      const updatedBeatPos = this.findBeatNodePosition(editorView, beatId);
+      if (updatedBeatPos === null) return;
+      const updatedBeatNode = editorView.state.doc.nodeAt(updatedBeatPos);
+      if (!updatedBeatNode) return;
+      const updatedAfterBeatPos = updatedBeatPos + updatedBeatNode.nodeSize;
+
+      this.insertHtmlContent(editorView, beatId, htmlContent, updatedAfterBeatPos);
     } else {
       // Subsequent chunks - process linebreaks and append to existing content
       const processedContent = newContent.replace(/\n/g, '</p><p>');
@@ -680,5 +800,45 @@ export class BeatOperationsService {
     } catch (error) {
       console.warn('Failed to remove empty paragraph:', error);
     }
+  }
+
+  /**
+   * Save existing beat content to history before it gets overwritten
+   * This ensures the previous version is preserved for later retrieval
+   */
+  private async savePreviousContentToHistory(
+    beatId: string,
+    storyId: string,
+    content: string,
+    beatType: 'story' | 'scene'
+  ): Promise<void> {
+    // Check if this content already exists in history to avoid duplicates
+    const existingHistory = await this.beatHistoryService.getHistory(beatId);
+    if (existingHistory) {
+      // Check if the most recent version has the same content
+      const sortedVersions = [...existingHistory.versions].sort(
+        (a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
+      );
+      if (sortedVersions.length > 0) {
+        const latestVersion = sortedVersions[0];
+        // Normalize content for comparison (trim whitespace)
+        if (latestVersion.content.trim() === content.trim()) {
+          return;
+        }
+      }
+    }
+
+    // Save the existing content as a previous version
+    await this.beatHistoryService.saveVersion(beatId, storyId, {
+      content,
+      prompt: '(previous content)',
+      model: 'manual',
+      beatType,
+      wordCount: content.split(/\s+/).length,
+      generatedAt: new Date(),
+      characterCount: content.length,
+      isCurrent: false,
+      action: 'generate'
+    });
   }
 }

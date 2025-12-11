@@ -6,12 +6,14 @@ import { Subject } from 'rxjs';
 import { AIRewriteModalComponent, AIRewriteResult } from '../../ui/components/ai-rewrite-modal.component';
 import { StoryContext } from './prosemirror-editor.interfaces';
 import { hasEmptyParagraphs } from './prosemirror-editor.utils';
+import { PremiumRewriteService } from './premium-rewrite.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ContextMenuService {
   private modalController = inject(ModalController);
+  private premiumRewriteService = inject(PremiumRewriteService);
   private contextMenuElement: HTMLElement | null = null;
 
   public contentUpdate$ = new Subject<string>();
@@ -80,8 +82,12 @@ export class ContextMenuService {
 
     // Add AI rewrite option if text is selected
     if (hasSelection && selectedText.trim()) {
-      const aiRewriteItem = this.createContextMenuItem('Rewrite with AI', () => {
-        this.openAIRewriteModal(view, selectedText, from, to, getHTMLContent, null);
+      const menuLabel = this.premiumRewriteService.isPremium ? 'Rewrite with AI' : 'Rewrite with AI ★';
+      const aiRewriteItem = this.createContextMenuItem(menuLabel, async () => {
+        const hasAccess = await this.premiumRewriteService.checkAndGateAccess();
+        if (hasAccess) {
+          this.openAIRewriteModal(view, selectedText, from, to, getHTMLContent, null);
+        }
         this.hideContextMenu();
       });
       menu.appendChild(aiRewriteItem);

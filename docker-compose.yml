@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   nginx:
-    image: ghcr.io/marcodroll/creativewriter2-nginx:latest
+    image: ghcr.io/marcodroll/creativewriter-public-nginx:latest
     restart: unless-stopped
     ports:
       - "${PORT:-3080}:80"  # Port can be overridden via .env, defaults to 3080
@@ -15,7 +15,7 @@ services:
       - creativewriter-network
 
   creativewriter:
-    image: ghcr.io/marcodroll/creativewriter2:latest
+    image: ghcr.io/marcodroll/creativewriter-public:latest
     restart: unless-stopped
     # No ports exposed directly - only through nginx
     environment:
@@ -28,10 +28,9 @@ services:
       - couchdb
 
   couchdb:
-    image: ghcr.io/marcodroll/creativewriter2-couchdb:latest
+    image: ghcr.io/marcodroll/creativewriter-public-couchdb:latest
     restart: unless-stopped
-    ports:
-      - "5984:5984"  # Admin access on local network
+    # No ports exposed directly - only through nginx
     environment:
       - COUCHDB_USER=${COUCHDB_USER:-admin}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD:-password}  # Change this in production!
@@ -43,7 +42,7 @@ services:
       - creativewriter-network
 
   replicate-proxy:
-    image: ghcr.io/marcodroll/creativewriter2-proxy:latest
+    image: ghcr.io/marcodroll/creativewriter-public-proxy:latest
     restart: unless-stopped
     environment:
       - PORT=3001
@@ -53,40 +52,12 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
 
   gemini-proxy:
-    image: ghcr.io/marcodroll/creativewriter2-gemini-proxy:latest
+    image: ghcr.io/marcodroll/creativewriter-public-gemini-proxy:latest
     restart: unless-stopped
     environment:
       - PORT=3002
     networks:
       - creativewriter-network
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-
-  snapshot-service:
-    image: ghcr.io/marcodroll/creativewriter2-snapshot-service:latest
-    restart: unless-stopped
-    environment:
-      - COUCHDB_HOST=couchdb
-      - COUCHDB_PORT=5984
-      - COUCHDB_USER=${COUCHDB_USER:-admin}
-      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD:-password}
-      - TZ=${TZ:-Europe/Berlin}
-      - LOG_LEVEL=${SNAPSHOT_LOG_LEVEL:-info}
-      - SNAPSHOT_ENABLED=${SNAPSHOT_ENABLED:-true}
-      - DATABASE_PATTERN=creative-writer-stories
-      # Optional: override default schedules
-      # - SCHEDULE_GRANULAR=*/15 * * * *
-      # - SCHEDULE_HOURLY=0 * * * *
-      # - SCHEDULE_DAILY=0 2 * * *
-      # - SCHEDULE_WEEKLY=0 3 * * 0
-      # - SCHEDULE_MONTHLY=0 4 1 * *
-      # - SCHEDULE_CLEANUP=0 5 * * *
-    volumes:
-      - ${DATA_PATH:-./data}/log/snapshot-service:/var/log/snapshot-service
-    networks:
-      - creativewriter-network
-    depends_on:
-      - couchdb
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 

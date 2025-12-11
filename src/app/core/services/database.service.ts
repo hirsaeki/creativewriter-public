@@ -60,6 +60,14 @@ export class DatabaseService {
   // Track the active story for selective sync
   private activeStoryId: string | null = null;
 
+  // Track if sync is temporarily paused (e.g., during AI streaming)
+  private syncPaused = false;
+  private activePauseCount = 0;
+
+  // Bootstrap mode: When true, sync ALL documents including stories
+  // Used when local database is empty and metadata index is missing
+  private bootstrapSyncMode = false;
+
   public syncStatus$: Observable<SyncStatus> = this.syncStatusSubject.asObservable();
 
   constructor() {
@@ -363,6 +371,14 @@ export class DatabaseService {
           return true;
         }
 
+        // BOOTSTRAP MODE: When enabled, sync ALL documents to populate empty database
+        // This is used when local database is empty and metadata index is missing
+        if (this.bootstrapSyncMode) {
+          // In bootstrap mode, sync everything except snapshots (already excluded above)
+          console.info(`[SyncFilter] ✓ Bootstrap mode: syncing ${docId}`);
+          return true;
+        }
+
         // If no active story is set (viewing story list), ONLY sync index + user-wide docs
         // DO NOT sync individual story documents - they're not needed for the list view
         if (!this.activeStoryId) {
@@ -436,9 +452,10 @@ export class DatabaseService {
         }
       }
 
+      // Update progress only - DO NOT set isSync: false or lastSync here!
+      // Those should only be set in the 'paused' handler when sync is truly complete.
+      // Setting them here caused the green "synced" badge to appear prematurely.
       this.updateSyncStatus({
-        isSync: false,
-        lastSync: new Date(),
         error: undefined,
         syncProgress: docsProcessed > 0 ? {
           docsProcessed,
@@ -446,14 +463,6 @@ export class DatabaseService {
           currentDoc
         } : undefined
       });
-
-      // Clear progress after a short delay
-      setTimeout(() => {
-        const current = this.syncStatusSubject.value;
-        if (!current.isSync) {
-          this.updateSyncStatus({ syncProgress: undefined });
-        }
-      }, 2000);
     })
     .on('active', (info: unknown) => {
       // Extract pending count if available
@@ -475,9 +484,10 @@ export class DatabaseService {
     })
     .on('paused', () => {
       // Paused event means sync caught up and is waiting for new changes
-      // This is normal for live sync - not an error
+      // This is the ONLY place where lastSync should be set - indicates true sync completion
       this.updateSyncStatus({
         isSync: false,
+        lastSync: new Date(),
         syncProgress: undefined
       });
     })
@@ -503,13 +513,9 @@ export class DatabaseService {
   async stopSync(): Promise<void> {
     if (this.syncHandler) {
       try {
-        // Remove all event listeners to prevent memory leaks
-        this.syncHandler.off('change');
-        this.syncHandler.off('active');
-        this.syncHandler.off('paused');
-        this.syncHandler.off('error');
-
-        // Cancel the sync
+        // Cancel the sync - this also cleans up event listeners internally
+        // Note: We don't call .off() because PouchDB's cancel() handles cleanup
+        // and .off() requires the original function references which we don't store
         this.syncHandler.cancel();
       } catch (error) {
         console.warn('Error canceling sync:', error);
@@ -517,6 +523,141 @@ export class DatabaseService {
       this.syncHandler = null;
     }
     this.updateSyncStatus({ isSync: false });
+  }
+
+  /**
+   * Temporarily pause database sync during performance-critical operations
+   * like AI text streaming. Uses a counter to support nested pause/resume calls.
+   * Safe to call multiple times - sync only resumes when all pausers have resumed.
+   */
+  pauseSync(): void {
+    this.activePauseCount++;
+
+    if (this.syncHandler && !this.syncPaused) {
+      console.info('[DatabaseService] Pausing sync for performance-critical operation');
+      try {
+        this.syncHandler.cancel();
+      } catch (error) {
+        console.warn('Error pausing sync:', error);
+      }
+      this.syncHandler = null;
+      this.syncPaused = true;
+    }
+  }
+
+  /**
+   * Resume database sync after a performance-critical operation completes.
+   * Only actually resumes when all nested pause calls have been matched with resume calls.
+   */
+  resumeSync(): void {
+    if (this.activePauseCount > 0) {
+      this.activePauseCount--;
+    }
+
+    // Only resume if all pausers have resumed and sync was actually paused
+    if (this.activePauseCount === 0 && this.syncPaused && this.remoteDb) {
+      console.info('[DatabaseService] Resuming sync after performance-critical operation');
+      this.syncPaused = false;
+      this.startSync();
+    }
+  }
+
+  /**
+   * Enable bootstrap sync mode and trigger a full sync.
+   * Use this when local database is empty and metadata index is missing.
+   * This temporarily allows syncing ALL documents (including stories)
+   * to populate the empty database.
+   *
+   * @returns Promise that resolves when initial sync completes
+   */
+  async enableBootstrapSync(): Promise<{ docsProcessed: number }> {
+    if (!this.remoteDb) {
+      console.warn('[DatabaseService] Cannot enable bootstrap sync: remote database not connected');
+      return { docsProcessed: 0 };
+    }
+
+    console.info('[DatabaseService] Enabling bootstrap sync mode - will sync ALL documents');
+    this.bootstrapSyncMode = true;
+
+    // Restart sync with bootstrap mode enabled
+    await this.stopSync();
+    this.startSync();
+
+    // Wait for sync to complete with improved completion detection
+    return new Promise((resolve) => {
+      let totalDocsProcessed = 0;
+      let syncCompleted = false;
+      let lastActivityTime = Date.now();
+      const timeoutMs = 90000;      // 90s hard timeout
+      const idleThresholdMs = 3000; // 3s of no activity = likely complete
+
+      const complete = (docs: number) => {
+        if (syncCompleted) return;
+        syncCompleted = true;
+        clearInterval(idleChecker);
+        subscription.unsubscribe();
+
+        // Small delay to ensure IndexedDB writes complete before resolving
+        setTimeout(() => {
+          console.info(`[DatabaseService] Bootstrap sync completed: ${docs} docs processed`);
+          this.disableBootstrapSync();
+          resolve({ docsProcessed: docs });
+        }, 500);
+      };
+
+      const subscription = this.syncStatus$.subscribe(status => {
+        // Track activity and documents processed
+        if (status.syncProgress?.docsProcessed) {
+          totalDocsProcessed = Math.max(totalDocsProcessed, status.syncProgress.docsProcessed);
+          lastActivityTime = Date.now();
+        }
+
+        // Complete when sync is paused AND we have lastSync set
+        // (now reliable since we only set lastSync on 'paused' event)
+        if (!status.isSync && status.lastSync && totalDocsProcessed > 0) {
+          console.info(`[DatabaseService] Bootstrap sync paused with ${totalDocsProcessed} docs`);
+          complete(totalDocsProcessed);
+        }
+      });
+
+      // Idle detection: if no activity for 3s after receiving docs, assume complete
+      const idleChecker = setInterval(() => {
+        if (totalDocsProcessed > 0 && Date.now() - lastActivityTime > idleThresholdMs && !syncCompleted) {
+          console.info('[DatabaseService] Bootstrap sync idle timeout');
+          complete(totalDocsProcessed);
+        }
+      }, 1000);
+
+      // Hard timeout fallback
+      setTimeout(() => {
+        if (!syncCompleted) {
+          console.warn('[DatabaseService] Bootstrap sync hard timeout');
+          complete(totalDocsProcessed);
+        }
+      }, timeoutMs);
+    });
+  }
+
+  /**
+   * Disable bootstrap sync mode and restart with selective sync
+   */
+  private disableBootstrapSync(): void {
+    console.info('[DatabaseService] Disabling bootstrap sync mode');
+    this.bootstrapSyncMode = false;
+
+    // Restart sync with normal selective filtering
+    this.stopSync().then(() => {
+      this.startSync();
+    }).catch(err => {
+      console.warn('[DatabaseService] Error restarting sync after bootstrap:', err);
+    });
+  }
+
+  /**
+   * Check if bootstrap sync mode is currently enabled
+   */
+  isBootstrapSyncEnabled(): boolean {
+    return this.bootstrapSyncMode;
   }
 
   async forcePush(): Promise<{ docsProcessed: number }> {
@@ -846,11 +987,20 @@ export class DatabaseService {
         return countStories(result.rows);
       };
 
-      // Count stories in both databases
-      const [localCount, remoteCount] = await Promise.all([
-        countStoriesInDb(localDb),
-        countStoriesInDb(this.remoteDb)
-      ]);
+      // Count local stories first
+      const localCount = await countStoriesInDb(localDb);
+
+      // Count remote stories with separate error handling
+      // Remote DB may be unavailable or return malformed responses
+      let remoteCount: number;
+      try {
+        remoteCount = await countStoriesInDb(this.remoteDb);
+      } catch {
+        // Remote database unavailable or returned invalid response
+        // This is expected when offline or server is unreachable
+        console.warn('[DatabaseService] Remote database unavailable for story count check');
+        return null;
+      }
 
       return {
         hasMissing: remoteCount > localCount,

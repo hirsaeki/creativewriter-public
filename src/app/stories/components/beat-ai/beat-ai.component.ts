@@ -27,6 +27,7 @@ import { OpenRouterIconComponent } from '../../../ui/icons/openrouter-icon.compo
 import { ClaudeIconComponent } from '../../../ui/icons/claude-icon.component';
 import { ReplicateIconComponent } from '../../../ui/icons/replicate-icon.component';
 import { OllamaIconComponent } from '../../../ui/icons/ollama-icon.component';
+import { PremiumRewriteService } from '../../../shared/services/premium-rewrite.service';
 
 interface SceneContext {
   chapterId: string;
@@ -65,6 +66,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   private modalService = inject(BeatAIModalService);
   private databaseService = inject(DatabaseService);
   private cdr = inject(ChangeDetectorRef);
+  private premiumRewriteService = inject(PremiumRewriteService);
 
   @Input() beatData!: BeatAI;
   @Input() storyId?: string;
@@ -89,8 +91,8 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   selectedBeatType: 'story' | 'scene' = 'story';
   private saveTimeout?: ReturnType<typeof setTimeout>;
   beatTypeOptions = [
-    { value: 'story', label: 'StoryBeat', description: 'With complete story context' },
-    { value: 'scene', label: 'SceneBeat', description: 'Ohne Szenen-Zusammenfassungen' }
+    { value: 'story', label: 'Story Beat', description: 'Continue the narrative forward' },
+    { value: 'scene', label: 'Scene Beat', description: 'Expand this moment with depth and detail' }
   ];
   wordCountOptions = [
     { value: 20, label: '~20 words' },
@@ -195,10 +197,10 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
             // Generation completed
             this.beatData.isGenerating = false;
             this.contentUpdate.emit(this.beatData);
+            // Only trigger change detection on completion - streaming text is handled
+            // directly by ProseMirror, not Angular templates
+            this.cdr.markForCheck();
           }
-          // Note: Streaming text is handled directly in the editor via ProseMirror service
-          // The component just tracks the generation state
-          this.cdr.markForCheck();
         }
       })
     );
@@ -375,7 +377,9 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   
   async regenerateContent(): Promise<void> {
-    if (!this.beatData.prompt) return;
+    if (!this.beatData.prompt) {
+      return;
+    }
 
     this.beatData.isGenerating = true;
     this.beatData.wordCount = this.getActualWordCount();
@@ -431,6 +435,12 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
    * Rewrite the generated content with a custom rewrite prompt
    */
   async rewriteContent(): Promise<void> {
+    // Premium gate check
+    const hasAccess = await this.premiumRewriteService.checkAndGateAccess();
+    if (!hasAccess) {
+      return;
+    }
+
     // First, get the text after this beat
     const existingText = this.proseMirrorService.getTextAfterBeat(this.beatData.id);
 
@@ -815,20 +825,30 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     
     // Map the model based on its label/name instead of trying to parse the ID
     let mappedModel: SupportedModel = 'custom';
-    
+
     if (selectedModelOption) {
       const modelLabel = selectedModelOption.label.toLowerCase();
-      
-      // Map based on the human-readable model name
-      if (modelLabel.includes('claude 3.7') || modelLabel.includes('claude-3.7') || 
+      const modelId = selectedModelOption.id.toLowerCase();
+
+      // Map based on the human-readable model name or model ID
+      if (modelLabel.includes('sonnet 4.5') || modelLabel.includes('sonnet-4-5') ||
+          modelId.includes('sonnet-4-5') || modelId.includes('sonnet-4.5')) {
+        mappedModel = 'claude-sonnet-4-5';
+      } else if (modelLabel.includes('sonnet 4') || modelLabel.includes('sonnet-4') ||
+          modelId.includes('sonnet-4') || (modelLabel.includes('claude 4') && !modelLabel.includes('4.5'))) {
+        mappedModel = 'claude-sonnet-4';
+      } else if (modelLabel.includes('claude 3.7') || modelLabel.includes('claude-3.7') ||
           modelLabel.includes('claude 3.5 sonnet v2') || modelLabel.includes('sonnet v2')) {
         mappedModel = 'claude-3.7-sonnet';
       } else if (modelLabel.includes('claude 3.5') || modelLabel.includes('claude-3.5')) {
         mappedModel = 'claude-3.5-sonnet';
-      } else if (modelLabel.includes('gemini 1.5') || modelLabel.includes('gemini-1.5')) {
-        mappedModel = 'gemini-1.5-pro';
+      } else if (modelLabel.includes('gemini 2.5 flash') || modelLabel.includes('gemini-2.5-flash') ||
+          modelId.includes('flash')) {
+        mappedModel = 'gemini-2.5-flash';
       } else if (modelLabel.includes('gemini 2.5') || modelLabel.includes('gemini-2.5')) {
         mappedModel = 'gemini-2.5-pro';
+      } else if (modelLabel.includes('gemini 1.5') || modelLabel.includes('gemini-1.5')) {
+        mappedModel = 'gemini-1.5-pro';
       } else if (modelLabel.includes('grok')) {
         mappedModel = 'grok-3';
       }
@@ -1028,7 +1048,8 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       this.story.settings.favoriteModelLists = {
         beatInput: [...this.story.settings.favoriteModels],
         sceneSummary: [],
-        rewrite: []
+        rewrite: [],
+        characterChat: []
       };
     }
 

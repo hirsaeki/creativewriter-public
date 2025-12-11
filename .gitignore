@@ -44,3 +44,8 @@ Thumbs.db
 # Private marketing materials
 /reddit-marketing
 proxy/node_modules/
+
+# Backend (Cloudflare Worker)
+/backend/node_modules
+/backend/.dev.vars
+/backend/.wrangler

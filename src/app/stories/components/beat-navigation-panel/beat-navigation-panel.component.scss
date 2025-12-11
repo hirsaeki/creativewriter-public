@@ -97,6 +97,8 @@
     flex: 1;
     display: flex;
     flex-direction: column;
+    min-height: 0; // Critical: allows flex item to shrink below content size
+    overflow: hidden; // Ensures content is clipped to panel bounds
     opacity: 0;
     transition: opacity 0.2s ease 0.1s;
 
@@ -130,6 +132,7 @@
 
   .panel-body {
     flex: 1;
+    min-height: 0; // Critical: allows flex item to shrink and enable scrolling
     overflow-y: auto;
     overflow-x: hidden;
     padding: 8px;
@@ -205,27 +208,9 @@
     .beat-prompt {
       color: var(--ion-text-color, #e0e0e0);
       font-size: 14px;
-      margin-bottom: 6px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-    }
-
-    .beat-status {
-      .status-chip {
-        height: 24px;
-        font-size: 11px;
-        margin: 0;
-
-        ion-icon {
-          font-size: 14px;
-          margin-right: 4px;
-        }
-
-        ion-label {
-          margin: 0;
-        }
-      }
     }
   }
 

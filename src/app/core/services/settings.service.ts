@@ -83,6 +83,14 @@ export class SettingsService {
             ...DEFAULT_SETTINGS.appearance,
             ...parsed.appearance
           },
+          premium: {
+            ...DEFAULT_SETTINGS.premium,
+            ...parsed.premium,
+            cachedStatus: {
+              ...DEFAULT_SETTINGS.premium.cachedStatus,
+              ...parsed.premium?.cachedStatus
+            }
+          },
           favoriteModelLists,
           favoriteModels: [...favoriteModelLists.beatInput],
           updatedAt: new Date(parsed.updatedAt || new Date())

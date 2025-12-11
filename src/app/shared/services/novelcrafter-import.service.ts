@@ -260,17 +260,19 @@ export class NovelCrafterImportService {
     let summaryBuffer: string[] = [];
     let parsingState: 'content' | 'story' | 'summary' = 'content';
     let sceneOrder = 0;
+    let titleExtracted = false;
+
+    // Detect heading levels used in the document
+    const headingLevels = this.detectHeadingLevels(lines);
+    console.log('Detected heading structure:', headingLevels);
 
     const saveCurrentScene = () => {
       if (currentScene && currentChapter) {
-        // Fix: summaryBuffer contains the actual scene summary, sceneBuffer contains the story content
-        // Preserve paragraph breaks by joining with newlines and converting double newlines to proper paragraph breaks
+        // summaryBuffer contains the actual scene summary, sceneBuffer contains the story content
+        // Preserve paragraph breaks by joining with newlines
         currentScene.summary = summaryBuffer.join('\n').trim();
         currentScene.content = sceneBuffer.join('\n').trim();
-        
-        // Convert single blank lines to double newlines for proper paragraph separation
-        currentScene.content = currentScene.content.replace(/\n\n/g, '\n\n');
-        
+
         // Only save scenes that have content or summary
         if (currentScene.content || currentScene.summary) {
           currentChapter.scenes.push(currentScene);
@@ -278,36 +280,112 @@ export class NovelCrafterImportService {
         } else {
           console.log(`⚠️ Skipping empty scene: "${currentScene.title}"`);
         }
-        
+
         sceneBuffer = [];
         summaryBuffer = [];
       }
     };
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      
-      console.log(`Line ${i}: "${line}" (state: ${parsingState})`);
+    // Helper to check if a line is a chapter heading
+    const isChapterHeading = (line: string): boolean => {
+      // Match various chapter heading formats:
+      // ### Chapter 1, ## Chapter 1, # Chapter 1
+      // ### 1, ## 1, # 1 (just numbers)
+      // ### Chapter One, ## Part 1, etc.
+      // Also match headings that are just titles without "Chapter" prefix
+      const chapterPatterns = [
+        /^#{1,4}\s+chapter\s+/i,           // # Chapter X, ## Chapter X, ### Chapter X
+        /^#{1,4}\s+part\s+/i,              // # Part X, ## Part X
+        /^#{1,4}\s+\d+[.:]\s*/,            // # 1: Title, ## 1. Title
+        /^#{1,4}\s+[IVXLCDM]+[.:]\s*/i,    // # I: Title (Roman numerals)
+      ];
 
-      // Extract story title from first line
-      if (i === 0 && line.startsWith('# ')) {
-        story.title = line.substring(2).trim();
-        console.log(`✓ Story title: "${story.title}"`);
+      // Check using detected heading level for chapters
+      if (headingLevels.chapter > 0) {
+        const expectedHashes = '#'.repeat(headingLevels.chapter);
+        const chapterRegex = new RegExp(`^${expectedHashes}\\s+(?!#).+`, 'i');
+        if (chapterRegex.test(line)) {
+          // Make sure it's not an act or scene heading
+          if (headingLevels.act > 0 && line.startsWith('#'.repeat(headingLevels.act) + ' ')) {
+            return false;
+          }
+          if (headingLevels.scene > 0 && line.startsWith('#'.repeat(headingLevels.scene) + ' ')) {
+            return false;
+          }
+          return true;
+        }
+      }
+
+      // Fallback to pattern matching
+      return chapterPatterns.some(pattern => pattern.test(line));
+    };
+
+    // Helper to check if a line is a scene heading
+    const isSceneHeading = (line: string): boolean => {
+      if (headingLevels.scene > 0) {
+        const expectedHashes = '#'.repeat(headingLevels.scene);
+        const sceneRegex = new RegExp(`^${expectedHashes}\\s+(?!#).+`, 'i');
+        return sceneRegex.test(line);
+      }
+      // Match scene patterns: #### Scene 1, #### 1, etc.
+      return /^#{4,}\s+(?:scene\s+)?\d+/i.test(line);
+    };
+
+    // Helper to check if a line is an act heading (to skip)
+    const isActHeading = (line: string): boolean => {
+      if (headingLevels.act > 0) {
+        const expectedHashes = '#'.repeat(headingLevels.act);
+        const actRegex = new RegExp(`^${expectedHashes}\\s+act\\s+`, 'i');
+        return actRegex.test(line);
+      }
+      return /^#{1,3}\s+act\s+/i.test(line);
+    };
+
+    // Helper to check for scene separators
+    const isSceneSeparator = (line: string): boolean => {
+      const trimmed = line.trim();
+      // Match various scene separators: * * *, ***, ---, ___
+      return /^\*\s*\*\s*\*$/.test(trimmed) ||
+             /^\*{3,}$/.test(trimmed) ||
+             /^-{3,}$/.test(trimmed) ||
+             /^_{3,}$/.test(trimmed);
+    };
+
+    // Extract heading text (remove # symbols)
+    const extractHeadingText = (line: string): string => {
+      return line.replace(/^#+\s*/, '').trim();
+    };
+
+    for (const line of lines) {
+      // Extract story title from first heading
+      if (!titleExtracted && line.startsWith('#') && !line.startsWith('##')) {
+        const title = extractHeadingText(line);
+        if (title) {
+          story.title = title;
+          titleExtracted = true;
+          console.log(`✓ Story title: "${story.title}"`);
+          continue;
+        }
+      }
+
+      // Skip author line
+      if (line.toLowerCase().startsWith('by ')) {
+        console.log(`⚠️ Skipping author line: "${line}"`);
         continue;
       }
 
-      // Skip other headers like "by Author" and "## Act 1"
-      if (line.startsWith('by ') || line.startsWith('## ')) {
-        console.log(`⚠️ Skipping header: "${line}"`);
+      // Skip act headings
+      if (isActHeading(line)) {
+        console.log(`⚠️ Skipping act heading: "${line}"`);
         continue;
       }
 
-      // Chapter detection
-      if (line.startsWith('### Chapter ')) {
+      // Chapter detection - more flexible matching
+      if (isChapterHeading(line)) {
         console.log(`✓ Chapter detected: "${line}"`);
         saveCurrentScene();
-        
-        const chapterTitle = line.substring(4).trim();
+
+        const chapterTitle = extractHeadingText(line);
         currentChapter = {
           id: this.generateId(),
           title: chapterTitle,
@@ -317,29 +395,45 @@ export class NovelCrafterImportService {
           createdAt: new Date(),
           updatedAt: new Date()
         };
-        if (currentChapter) {
-          story.chapters.push(currentChapter);
-        }
+        story.chapters.push(currentChapter);
         sceneOrder = 0;
         currentScene = null;
         parsingState = 'content';
         continue;
       }
 
-      // Story start marker - content starts after this
-      if (line === '---') {
-        console.log('✓ Story marker detected');
-        // Don't save current scene yet, just switch to story parsing
+      // Scene heading detection (if document uses scene headings)
+      if (headingLevels.scene > 0 && isSceneHeading(line)) {
+        console.log(`✓ Scene heading detected: "${line}"`);
+        saveCurrentScene();
+
+        sceneOrder++;
+        currentScene = {
+          id: this.generateId(),
+          title: extractHeadingText(line) || `Scene ${sceneOrder}`,
+          content: '',
+          order: sceneOrder,
+          sceneNumber: sceneOrder,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
         parsingState = 'story';
         continue;
       }
 
-      // Scene separator - summary starts after this
-      if (line === '* * *') {
+      // Story start marker - content starts after this
+      if (line.trim() === '---' && parsingState === 'content') {
+        console.log('✓ Story marker detected');
+        parsingState = 'story';
+        continue;
+      }
+
+      // Scene separator - creates a new scene
+      if (isSceneSeparator(line)) {
         console.log('✓ Scene separator detected - starting new scene');
         saveCurrentScene();
-        
-        // Create new scene for next summary/content pair
+
         sceneOrder++;
         currentScene = {
           id: this.generateId(),
@@ -350,54 +444,96 @@ export class NovelCrafterImportService {
           createdAt: new Date(),
           updatedAt: new Date()
         };
-        
+
+        // After separator, next content is either summary or story content
         parsingState = 'summary';
         continue;
       }
 
+      // If we have a chapter but no scene yet, create one
+      if (currentChapter && !currentScene && line.trim() !== '') {
+        sceneOrder++;
+        currentScene = {
+          id: this.generateId(),
+          title: `Scene ${sceneOrder}`,
+          content: '',
+          order: sceneOrder,
+          sceneNumber: sceneOrder,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        console.log(`✓ Created first scene in chapter automatically`);
+        parsingState = 'story'; // Assume content is story prose
+      }
+
       // Collect content based on current state
-      if (parsingState === 'story' && currentScene) {
-        // Preserve empty lines to maintain paragraph breaks
-        sceneBuffer.push(line);
-        if (line.trim() !== '') {
-          console.log(`  Adding to story: "${line.substring(0, 50)}..."`);
+      if (currentScene) {
+        if (parsingState === 'story') {
+          sceneBuffer.push(line);
+        } else if (parsingState === 'summary') {
+          // Check if we're transitioning from summary to story content
+          // Summaries in NovelCrafter are typically followed by --- then story content
+          if (line.trim() === '---') {
+            parsingState = 'story';
+            continue;
+          }
+          summaryBuffer.push(line);
+        } else if (parsingState === 'content') {
+          // Before any explicit markers, content goes to summary
+          summaryBuffer.push(line);
         }
-      } else if (parsingState === 'summary' && currentScene) {
-        // For summaries, preserve empty lines as well
-        summaryBuffer.push(line);
-        if (line.trim() !== '') {
-          console.log(`  Adding to summary: "${line}"`);
-        }
-      } else if (parsingState === 'content' && currentChapter) {
-        // Handle content before any --- marker (first scene in chapter)
-        if (!currentScene) {
-          sceneOrder++;
-          currentScene = {
-            id: this.generateId(),
-            title: `Scene ${sceneOrder}`,
-            content: '',
-            order: sceneOrder,
-            sceneNumber: sceneOrder,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          };
-          console.log(`✓ Created first scene in chapter automatically`);
-        }
-        
-        // This content goes into summary buffer since it's the scene description
-        summaryBuffer.push(line);
-        console.log(`  Adding to summary (first scene): "${line}"`);
       }
     }
 
     // Save final scene
     saveCurrentScene();
 
+    // If no chapters were found, create a single chapter with all content
+    if (story.chapters.length === 0 && lines.length > 0) {
+      console.log('⚠️ No chapters detected, creating single chapter from content');
+      currentChapter = {
+        id: this.generateId(),
+        title: 'Chapter 1',
+        order: 1,
+        chapterNumber: 1,
+        scenes: [],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      // Parse content as a single scene
+      const contentLines: string[] = [];
+      for (const line of lines) {
+        if (line.startsWith('#') && titleExtracted) continue;
+        if (line.toLowerCase().startsWith('by ')) continue;
+        contentLines.push(line);
+      }
+
+      if (contentLines.join('').trim()) {
+        const scene: Scene = {
+          id: this.generateId(),
+          title: 'Scene 1',
+          content: contentLines.join('\n').trim(),
+          order: 1,
+          sceneNumber: 1,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        currentChapter.scenes.push(scene);
+      }
+
+      if (currentChapter.scenes.length > 0) {
+        story.chapters.push(currentChapter);
+      }
+    }
+
     // Fix scene order within each chapter
     story.chapters.forEach(chapter => {
       chapter.scenes.forEach((scene, index) => {
         scene.order = index + 1;
-        scene.title = `Scene ${index + 1}`;
+        if (scene.title.startsWith('Scene ')) {
+          scene.title = `Scene ${index + 1}`;
+        }
       });
     });
 
@@ -412,6 +548,69 @@ export class NovelCrafterImportService {
     });
 
     return story;
+  }
+
+  /**
+   * Detect heading levels used in the document for title, acts, chapters, and scenes
+   */
+  private detectHeadingLevels(lines: string[]): { title: number; act: number; chapter: number; scene: number } {
+    const levels = { title: 0, act: 0, chapter: 0, scene: 0 };
+    const headingCounts: Record<number, number> = {};
+
+    // First pass: count headings at each level and identify patterns
+    for (const line of lines) {
+      const match = line.match(/^(#{1,6})\s+(.+)/);
+      if (match) {
+        const level = match[1].length;
+        const text = match[2].toLowerCase();
+
+        headingCounts[level] = (headingCounts[level] || 0) + 1;
+
+        // Identify specific heading types
+        if (/^act\s+/i.test(text)) {
+          levels.act = level;
+        } else if (/^chapter\s+|^part\s+/i.test(text) || /^\d+[.:]/i.test(text)) {
+          if (levels.chapter === 0 || level === levels.chapter) {
+            levels.chapter = level;
+          }
+        } else if (/^scene\s+/i.test(text)) {
+          levels.scene = level;
+        }
+      }
+    }
+
+    // If no explicit chapter markers, infer from heading hierarchy
+    if (levels.chapter === 0) {
+      const sortedLevels = Object.keys(headingCounts).map(Number).sort((a, b) => a - b);
+
+      if (sortedLevels.length >= 1) {
+        // First level is likely title, second is likely chapters
+        if (sortedLevels.length === 1) {
+          levels.title = sortedLevels[0];
+        } else if (sortedLevels.length === 2) {
+          levels.title = sortedLevels[0];
+          levels.chapter = sortedLevels[1];
+        } else if (sortedLevels.length >= 3) {
+          levels.title = sortedLevels[0];
+          // Second could be acts or chapters
+          if (levels.act > 0) {
+            levels.chapter = sortedLevels[2];
+          } else {
+            levels.chapter = sortedLevels[1];
+            if (sortedLevels.length > 2) {
+              levels.scene = sortedLevels[2];
+            }
+          }
+        }
+      }
+    }
+
+    // Default title to level 1 if not detected
+    if (levels.title === 0) {
+      levels.title = 1;
+    }
+
+    return levels;
   }
 
   private parseCodexEntry(content: string, filePath: string, category: string): CodexEntry | null {

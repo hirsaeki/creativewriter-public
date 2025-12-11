@@ -14,7 +14,8 @@ import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-hea
 import { addIcons } from 'ionicons';
 import {
   arrowBack, add, ellipsisVertical, create, trash, save, close,
-  search, person, bookmark, pricetag, star, swapHorizontal, helpCircle
+  search, person, bookmark, pricetag, star, swapHorizontal, helpCircle,
+  checkmarkDone, informationCircle
 } from 'ionicons/icons';
 import { CodexService } from '../../services/codex.service';
 import { Codex, CodexCategory, CodexEntry, STORY_ROLES, CustomField, StoryRole } from '../../models/codex.interface';
@@ -71,7 +72,8 @@ export class CodexComponent implements OnInit, OnDestroy {
   constructor() {
     addIcons({
       arrowBack, add, ellipsisVertical, create, trash, save, close,
-      search, person, bookmark, pricetag, star, swapHorizontal, helpCircle
+      search, person, bookmark, pricetag, star, swapHorizontal, helpCircle,
+      checkmarkDone, informationCircle
     });
     this.initializeHeaderActions();
   }

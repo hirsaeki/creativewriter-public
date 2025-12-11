@@ -1,6 +1,7 @@
-import { ErrorHandler, Injectable, inject } from '@angular/core';
+import { ErrorHandler, Injectable, inject, NgZone } from '@angular/core';
 import { AIRequestLoggerService } from './ai-request-logger.service';
 import { MobileDebugService } from './mobile-debug.service';
+import { AlertController } from '@ionic/angular/standalone';
 
 interface PromiseRejectionError {
   rejection?: {
@@ -54,8 +55,18 @@ type ErrorWithStack = Error & { stack?: string };
 export class GlobalErrorHandlerService implements ErrorHandler {
   private readonly aiLogger = inject(AIRequestLoggerService);
   private readonly mobileDebug = inject(MobileDebugService);
+  private readonly alertController = inject(AlertController);
+  private readonly ngZone = inject(NgZone);
+
+  // Track if we've already shown a chunk error alert to avoid duplicates
+  private chunkErrorAlertShown = false;
 
   handleError(error: unknown): void {
+    // Check for chunk loading errors first (version mismatch / stale cache)
+    if (this.isChunkLoadError(error) && !this.chunkErrorAlertShown) {
+      this.handleChunkLoadError(error);
+      return;
+    }
     const timestamp = new Date().toISOString();
     
     // Log comprehensive error information
@@ -207,5 +218,74 @@ export class GlobalErrorHandlerService implements ErrorHandler {
                                googleError?.promptFeedback?.safetyRatings);
 
     return messageContainsFilter || hasSafetyBlock || hasSafetyRatings;
+  }
+
+  /**
+   * Detects chunk loading errors that occur when the app has been updated
+   * but the browser still has old index.html referencing outdated chunk files.
+   */
+  private isChunkLoadError(error: unknown): boolean {
+    if (!error) return false;
+
+    // Get error message from various error types
+    let errorMessage = '';
+    if (error instanceof Error) {
+      errorMessage = error.message || '';
+    } else if ((error as PromiseRejectionError)?.rejection?.message) {
+      errorMessage = (error as PromiseRejectionError).rejection!.message!;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+
+    const errorName = error instanceof Error ? error.name : '';
+    const lowerMessage = errorMessage.toLowerCase();
+
+    // Check for various chunk loading error patterns
+    return (
+      errorName === 'ChunkLoadError' ||
+      lowerMessage.includes('loading chunk') ||
+      lowerMessage.includes('chunk failed') ||
+      lowerMessage.includes('failed to fetch dynamically imported module') ||
+      lowerMessage.includes('error loading dynamically imported module') ||
+      // 404 errors for JS files
+      (lowerMessage.includes('404') && lowerMessage.includes('.js')) ||
+      // Network errors during module load
+      (lowerMessage.includes('failed to load') && lowerMessage.includes('module'))
+    );
+  }
+
+  /**
+   * Handles chunk loading errors by showing an alert and prompting the user to reload.
+   */
+  private handleChunkLoadError(error: unknown): void {
+    this.chunkErrorAlertShown = true;
+
+    console.warn('🔄 Chunk load error detected - app has been updated', error);
+    this.mobileDebug.logCrash(new Error('Chunk load error - app update detected'));
+
+    // Run in NgZone to ensure Angular change detection works with Ionic
+    this.ngZone.run(async () => {
+      const alert = await this.alertController.create({
+        header: 'Update Available',
+        message: 'The app has been updated. Please reload to get the latest version.',
+        backdropDismiss: false,
+        buttons: [
+          {
+            text: 'Reload Now',
+            handler: () => {
+              // Clear caches and reload
+              if ('caches' in window) {
+                caches.keys().then(names => {
+                  names.forEach(name => caches.delete(name));
+                });
+              }
+              window.location.reload();
+            }
+          }
+        ]
+      });
+
+      await alert.present();
+    });
   }
 }

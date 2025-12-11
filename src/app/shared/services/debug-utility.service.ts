@@ -120,6 +120,35 @@ export class DebugUtilityService {
             z-index: 1000;
             pointer-events: none;
           }
+          .pm-debug-mode .ProseMirror > div.beat-end-marker {
+            display: block !important;
+            height: auto !important;
+            overflow: visible !important;
+            background: rgba(255, 0, 128, 0.2);
+            border: 2px dashed #ff0080 !important;
+            padding: 4px 8px;
+            margin: 4px 0 !important;
+            position: relative;
+          }
+          .pm-debug-mode .ProseMirror > div.beat-end-marker::before {
+            content: "beatEndMarker [" attr(data-beat-id) "]";
+            position: absolute;
+            top: -18px;
+            left: 0;
+            font-size: 10px;
+            color: #ff0080;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 2px 4px;
+            border-radius: 2px;
+            z-index: 1000;
+            pointer-events: none;
+          }
+          .pm-debug-mode .ProseMirror > div.beat-end-marker::after {
+            content: "⬆ generated content above | pre-existing text below ⬇";
+            font-size: 10px;
+            color: #ff0080;
+            font-style: italic;
+          }
           /* Inline elements */
           .pm-debug-mode .ProseMirror strong {
             border: 1px dotted rgba(255, 165, 0, 0.5) !important;

@@ -43,22 +43,15 @@
 
     <ion-card
       *ngFor="let version of versions; trackBy: trackByVersionId"
-      [class.current-version]="version.isCurrent"
       class="version-card">
 
       <ion-card-header>
         <ion-card-subtitle>
           <div class="version-header">
             <div class="version-info">
-              <ion-icon
-                *ngIf="version.isCurrent"
-                name="checkmark-circle"
-                color="success">
-              </ion-icon>
               <span class="version-label">{{ formatVersionLabel(version) }}</span>
-              <span class="version-badge" *ngIf="version.isCurrent">CURRENT</span>
-              <span class="action-badge" [class.rewrite-badge]="version.action === 'rewrite'" [class.generate-badge]="!version.action || version.action === 'generate'">
-                {{ version.action === 'rewrite' ? 'REWRITE' : 'GENERATE' }}
+              <span class="action-badge" [class.rewrite-badge]="version.action === 'rewrite'" [class.generate-badge]="!version.action || version.action === 'generate'" [class.manual-badge]="version.model === 'manual'">
+                {{ version.model === 'manual' ? 'PREVIOUS' : (version.action === 'rewrite' ? 'REWRITE' : 'GENERATE') }}
               </span>
             </div>
             <span class="version-timestamp">{{ formatTimestamp(version.generatedAt) }}</span>
@@ -122,9 +115,8 @@
           <ion-button
             size="small"
             fill="solid"
-            [disabled]="version.isCurrent"
             (click)="restoreVersion(version)">
-            {{ version.isCurrent ? 'Current' : 'Restore' }}
+            Restore
           </ion-button>
         </div>
       </ion-card-content>

@@ -110,7 +110,12 @@ function escapeRegex(str: string): string {
 }
 
 // Function to update plugin with new codex entries
-export function updateCodexHighlightingPlugin(view: EditorView, newCodexEntries: CodexEntry[]): void {
+export function updateCodexHighlightingPlugin(view: EditorView | null, newCodexEntries: CodexEntry[]): void {
+  // Guard: Check if view and view.state are valid (editor may be destroyed or not yet created)
+  if (!view || !view.state) {
+    return;
+  }
+
   const plugin = codexHighlightingKey.get(view.state);
   if (plugin) {
     const newDecorations = findCodexMatches(view.state.doc, newCodexEntries);

@@ -63,6 +63,7 @@ export class ModelFavoritesSettingsComponent implements OnChanges {
   @Input() description = 'Configure the models available as quick-access favorites.';
   @Input() emptyState = 'No favorites selected yet. Use the selector above to add models.';
   @Input() infoNote?: string;
+  @Input() showCard = true;
   @Output() favoriteIdsChange = new EventEmitter<string[]>();
 
   readonly maxFavorites = 6;
