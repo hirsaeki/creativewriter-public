@@ -15,48 +15,68 @@ env:
   BASE_IMAGE_NAME: marcodroll/creativewriter-public
 
 jobs:
-  build-images:
+  # Prepare version info for all jobs
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version_number: ${{ steps.version.outputs.version_number }}
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          VERSION_NUMBER=${VERSION#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version_number=$VERSION_NUMBER" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
+  # Build all images natively on their target platforms
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        dockerfile:
+          - file: Dockerfile
+            suffix: ""
+            needs_version: true
+          - file: Dockerfile.proxy
+            suffix: "-proxy"
+            needs_version: false
+          - file: Dockerfile.gemini-proxy
+            suffix: "-gemini-proxy"
+            needs_version: false
+          - file: Dockerfile.nginx
+            suffix: "-nginx"
+            needs_version: false
+          - file: Dockerfile.couchdb
+            suffix: "-couchdb"
+            needs_version: false
+          - file: Dockerfile.snapshot-service
+            suffix: "-snapshot-service"
+            needs_version: false
+        platform:
+          - name: linux/amd64
+            runner: ubuntu-latest
+            slug: amd64
+          - name: linux/arm64
+            runner: ubuntu-24.04-arm
+            slug: arm64
+    runs-on: ${{ matrix.platform.runner }}
     permissions:
       contents: read
       packages: write
-    
-    strategy:
-      matrix:
-        include:
-          - dockerfile: Dockerfile
-            image_suffix: ""
-            context: .
-            platforms: linux/amd64,linux/arm64
-          - dockerfile: Dockerfile.proxy
-            image_suffix: -proxy
-            context: .
-            platforms: linux/amd64,linux/arm64
-          - dockerfile: Dockerfile.gemini-proxy
-            image_suffix: -gemini-proxy
-            context: .
-            platforms: linux/amd64,linux/arm64
-          - dockerfile: Dockerfile.nginx
-            image_suffix: -nginx
-            context: .
-            platforms: linux/amd64,linux/arm64
-          - dockerfile: Dockerfile.couchdb
-            image_suffix: -couchdb
-            context: .
-            platforms: linux/amd64,linux/arm64
-          - dockerfile: Dockerfile.snapshot-service
-            image_suffix: -snapshot-service
-            context: .
-            platforms: linux/amd64,linux/arm64
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -68,31 +88,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine version
-        id: version
-        run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            VERSION="${{ github.event.release.tag_name }}"
-          else
-            VERSION="${{ github.event.inputs.version }}"
-          fi
-          
-          # Remove 'v' prefix if present
-          VERSION_NUMBER=${VERSION#v}
-          
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "version_number=$VERSION_NUMBER" >> $GITHUB_OUTPUT
-          echo "Using version: $VERSION"
-
       - name: Update version in package.json
-        if: matrix.dockerfile == 'Dockerfile'
+        if: matrix.dockerfile.needs_version
         run: |
-          VERSION_NUMBER="${{ steps.version.outputs.version_number }}"
+          VERSION_NUMBER="${{ needs.prepare.outputs.version_number }}"
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           COMMIT_HASH=$(git rev-parse HEAD)
           COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')
-          
-          # Update package.json version if it exists
+
           if [ -f "package.json" ]; then
             node -e "
               const pkg = require('./package.json');
@@ -100,8 +103,7 @@ jobs:
               require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
             "
           fi
-          
-          # Create version.json for the main app
+
           mkdir -p src/assets
           cat > src/assets/version.json << EOF
           {
@@ -113,53 +115,116 @@ jobs:
             "stable": true
           }
           EOF
-          
           echo "Updated version.json for stable release"
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./${{ matrix.dockerfile.file }}
+          platforms: ${{ matrix.platform.name }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.BASE_IMAGE_NAME }}${{ matrix.dockerfile.suffix }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.dockerfile.file }}-${{ matrix.platform.slug }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.dockerfile.file }}-${{ matrix.platform.slug }}
+          build-args: |
+            BUILD_CONFIGURATION=production
+            CACHE_BUST=${{ github.sha }}
+
+      - name: Export digest
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.dockerfile.suffix || 'main' }}-${{ matrix.platform.slug }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Merge platform-specific images into multi-arch manifests
+  merge:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - suffix: ""
+            artifact_name: "main"
+          - suffix: "-proxy"
+            artifact_name: "-proxy"
+          - suffix: "-gemini-proxy"
+            artifact_name: "-gemini-proxy"
+          - suffix: "-nginx"
+            artifact_name: "-nginx"
+          - suffix: "-couchdb"
+            artifact_name: "-couchdb"
+          - suffix: "-snapshot-service"
+            artifact_name: "-snapshot-service"
+
+    steps:
+      - name: Download AMD64 digest
+        uses: actions/download-artifact@v4
+        with:
+          name: digest-${{ matrix.artifact_name }}-amd64
+          path: ${{ runner.temp }}/digests
+
+      - name: Download ARM64 digest
+        uses: actions/download-artifact@v4
+        with:
+          name: digest-${{ matrix.artifact_name }}-arm64
+          path: ${{ runner.temp }}/digests
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.BASE_IMAGE_NAME }}${{ matrix.image_suffix }}
+          images: ${{ env.REGISTRY }}/${{ env.BASE_IMAGE_NAME }}${{ matrix.suffix }}
           tags: |
-            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ needs.prepare.outputs.version }}
             type=raw,value=stable
             type=raw,value=latest
           labels: |
-            org.opencontainers.image.title=creativewriter-public${{ matrix.image_suffix }}
-            org.opencontainers.image.description=CreativeWriter 2 - Self-Hosted Creative Writing Tool${{ matrix.image_suffix }}
-            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.title=creativewriter-public${{ matrix.suffix }}
+            org.opencontainers.image.description=CreativeWriter 2 - Self-Hosted Creative Writing Tool${{ matrix.suffix }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
             org.opencontainers.image.source=https://github.com/MarcoDroll/creativewriter-public
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ github.event.release.created_at }}
             org.opencontainers.image.url=https://github.com/MarcoDroll/creativewriter-public
             org.opencontainers.image.vendor=MarcoDroll
             stable=true
 
-      - name: Build and push Docker image
-        id: build
-        uses: docker/build-push-action@v5
-        with:
-          context: ${{ matrix.context }}
-          file: ./${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platforms }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.dockerfile }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.dockerfile }}
-          build-args: |
-            BUILD_CONFIGURATION=production
-            CACHE_BUST=${{ github.sha }}
-          # provenance and sbom removed due to permissions limitations
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.BASE_IMAGE_NAME }}${{ matrix.suffix }}@sha256:%s ' *)
 
-      # Note: Attestation removed due to permissions limitations in public repo
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.BASE_IMAGE_NAME }}${{ matrix.suffix }}:${{ needs.prepare.outputs.version }}
 
   create-release-summary:
-    needs: build-images
+    needs: [prepare, merge]
     runs-on: ubuntu-latest
     if: always()
-    
+
     steps:
       - name: Create release summary
         run: |
@@ -167,20 +232,15 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## 📦 Released Images" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            VERSION="${{ github.event.release.tag_name }}"
-          else
-            VERSION="${{ github.event.inputs.version }}"
-          fi
-          
+
+          VERSION="${{ needs.prepare.outputs.version }}"
           REGISTRY="${{ env.REGISTRY }}"
           REPO="${{ env.BASE_IMAGE_NAME }}"
-          
+
           echo "| Image | Tags | Pull Command |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|------|--------------|" >> $GITHUB_STEP_SUMMARY
           echo "| Main App | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO:latest\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Proxy | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-proxy:latest\` |" >> $GITHUB_STEP_SUMMARY  
+          echo "| Proxy | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-proxy:latest\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Gemini Proxy | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-gemini-proxy:latest\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Nginx | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-nginx:latest\` |" >> $GITHUB_STEP_SUMMARY
           echo "| CouchDB | \`$VERSION\`, \`stable\`, \`latest\` | \`docker pull $REGISTRY/$REPO-couchdb:latest\` |" >> $GITHUB_STEP_SUMMARY
@@ -188,8 +248,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## 🔧 Features" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Multi-platform builds (AMD64, ARM64)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Build provenance attestation" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Software Bill of Materials (SBOM)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Native ARM64 builds (no QEMU emulation)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Parallel build execution" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Proper semantic versioning" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Build cache optimization" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
