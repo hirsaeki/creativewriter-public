@@ -441,3 +441,42 @@ ion-radio-group ion-item {
     height: 48px;
   }
 }
+
+/* AI Favorites Tab */
+.favorites-tab {
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  .favorites-header {
+    text-align: center;
+    margin-bottom: 24px;
+
+    h2 {
+      margin: 0 0 8px 0;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #f8f9fa;
+      background: linear-gradient(135deg, #f8f9fa 0%, #8bb4f8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    p {
+      margin: 0;
+      color: #adb5bd;
+      font-size: 0.9rem;
+    }
+  }
+
+  .favorites-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+
+    @media (max-width: 992px) {
+      grid-template-columns: 1fr;
+    }
+  }
+}

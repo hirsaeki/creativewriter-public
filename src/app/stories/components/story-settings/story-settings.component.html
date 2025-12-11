@@ -209,47 +209,60 @@
             </ion-item>
           </ion-card-content>
         </ion-card>
+      </div>
 
-        <app-model-favorites-settings
-          [favoriteIds]="settings.favoriteModelLists?.beatInput || []"
-          [combinedModels]="combinedModels"
-          [loadingModels]="loadingModels"
-          [modelLoadError]="modelLoadError"
-          cardTitle="Beat Model Favorites"
-          heading="Beat Input Favorites"
-          subheading="Choose up to 6 models to surface as quick shortcuts for Beat AI."
-          description="Favorites are stored with this story and power the quick-select buttons in Beat AI."
-          emptyState="No favorites defined for this story yet. Use the selector above to add models."
-          infoNote="Connect at least one AI provider in the global API settings to populate the list."
-          (favoriteIdsChange)="onFavoriteModelsChange('beatInput', $event)">
-        </app-model-favorites-settings>
+      <!-- AI Favorites Tab -->
+      <div *ngSwitchCase="'favorites'" class="favorites-tab">
+        <div class="favorites-header">
+          <h2>AI Model Favorites</h2>
+          <p>Configure quick-access models for different AI features. Select up to 6 models for each feature.</p>
+        </div>
 
-        <app-model-favorites-settings
-          [favoriteIds]="settings.favoriteModelLists?.sceneSummary || []"
-          [combinedModels]="combinedModels"
-          [loadingModels]="loadingModels"
-          [modelLoadError]="modelLoadError"
-          cardTitle="Scene Summary Favorites"
-          heading="Summary Model Favorites"
-          subheading="Pick up to 6 models that should be one tap away when creating scene summaries."
-          description="These favorites appear in the scene summary panel inside the story editor."
-          emptyState="No favorites defined for scene summaries yet. Add models to speed up your workflow."
-          infoNote="Favorites are available for any provider you have enabled in the story."
-          (favoriteIdsChange)="onFavoriteModelsChange('sceneSummary', $event)">
-        </app-model-favorites-settings>
-        <app-model-favorites-settings
-          [favoriteIds]="settings.favoriteModelLists?.rewrite || []"
-          [combinedModels]="combinedModels"
-          [loadingModels]="loadingModels"
-          [modelLoadError]="modelLoadError"
-          cardTitle="Rewrite Favorites"
-          heading="Rewrite Model Favorites"
-          subheading="Choose up to 6 models to keep at hand for AI rewrites in this story."
-          description="Favorites show up as quick-select options in the rewrite dialog for this story."
-          emptyState="No rewrite favorites yet. Add models to speed up rewriting."
-          infoNote="Favorites are limited to the models available for this story."
-          (favoriteIdsChange)="onFavoriteModelsChange('rewrite', $event)">
-        </app-model-favorites-settings>
+        <div class="favorites-grid">
+          <app-model-favorites-settings
+            [favoriteIds]="settings.favoriteModelLists?.beatInput || []"
+            [combinedModels]="combinedModels"
+            [loadingModels]="loadingModels"
+            [modelLoadError]="modelLoadError"
+            cardTitle="Beat Input"
+            heading="Beat Generation Models"
+            subheading="Quick-select models in the Beat AI panel"
+            (favoriteIdsChange)="onFavoriteModelsChange('beatInput', $event)">
+          </app-model-favorites-settings>
+
+          <app-model-favorites-settings
+            [favoriteIds]="settings.favoriteModelLists?.sceneSummary || []"
+            [combinedModels]="combinedModels"
+            [loadingModels]="loadingModels"
+            [modelLoadError]="modelLoadError"
+            cardTitle="Scene Summary"
+            heading="Summary Generation Models"
+            subheading="Quick-select for scene summaries"
+            (favoriteIdsChange)="onFavoriteModelsChange('sceneSummary', $event)">
+          </app-model-favorites-settings>
+
+          <app-model-favorites-settings
+            [favoriteIds]="settings.favoriteModelLists?.rewrite || []"
+            [combinedModels]="combinedModels"
+            [loadingModels]="loadingModels"
+            [modelLoadError]="modelLoadError"
+            cardTitle="Rewrite"
+            heading="Rewrite Models"
+            subheading="Quick-select for AI rewrite"
+            (favoriteIdsChange)="onFavoriteModelsChange('rewrite', $event)">
+          </app-model-favorites-settings>
+
+          <app-model-favorites-settings
+            [favoriteIds]="settings.favoriteModelLists?.characterChat || []"
+            [combinedModels]="combinedModels"
+            [loadingModels]="loadingModels"
+            [modelLoadError]="modelLoadError"
+            cardTitle="Character Chat"
+            heading="Character Chat Models"
+            subheading="Quick-select for character conversations"
+            (favoriteIdsChange)="onFavoriteModelsChange('characterChat', $event)">
+          </app-model-favorites-settings>
+        </div>
       </div>
 
       <!-- DB Maintenance Tab -->
