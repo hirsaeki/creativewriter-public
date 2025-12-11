@@ -1,8 +1,8 @@
 import { Component, Input, Output, EventEmitter, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonIcon, IonButton, IonChip, IonLabel } from '@ionic/angular/standalone';
+import { IonIcon, IonButton } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { closeOutline, checkmarkCircle, ellipseOutline } from 'ionicons/icons';
+import { closeOutline } from 'ionicons/icons';
 import { Story } from '../../models/story.interface';
 
 interface BeatItem {
@@ -16,7 +16,7 @@ interface BeatItem {
 @Component({
   selector: 'app-beat-navigation-panel',
   standalone: true,
-  imports: [CommonModule, IonIcon, IonButton, IonChip, IonLabel],
+  imports: [CommonModule, IonIcon, IonButton],
   templateUrl: './beat-navigation-panel.component.html',
   styleUrls: ['./beat-navigation-panel.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -34,7 +34,7 @@ export class BeatNavigationPanelComponent implements OnInit {
   beats: BeatItem[] = [];
 
   constructor() {
-    addIcons({ closeOutline, checkmarkCircle, ellipseOutline });
+    addIcons({ closeOutline });
   }
 
   ngOnInit(): void {
@@ -71,25 +71,5 @@ export class BeatNavigationPanelComponent implements OnInit {
       return prompt;
     }
     return prompt.substring(0, maxLength) + '...';
-  }
-
-  getBeatStatusIcon(beat: BeatItem): string {
-    if (beat.isGenerating) {
-      return 'ellipse-outline';
-    }
-    if (beat.hasContent) {
-      return 'checkmark-circle';
-    }
-    return 'ellipse-outline';
-  }
-
-  getBeatStatusColor(beat: BeatItem): string {
-    if (beat.isGenerating) {
-      return 'warning';
-    }
-    if (beat.hasContent) {
-      return 'success';
-    }
-    return 'medium';
   }
 }

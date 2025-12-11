@@ -4,9 +4,11 @@ import { PromptManagerService } from './prompt-manager.service';
 import { BeatAIService } from './beat-ai.service';
 import { BeatHistoryService } from './beat-history.service';
 import { CodexService } from '../../stories/services/codex.service';
+import { ContextMenuService } from './context-menu.service';
 import { ModalController } from '@ionic/angular/standalone';
 import { ApplicationRef, EnvironmentInjector } from '@angular/core';
 import { EditorView } from 'prosemirror-view';
+import { Subject } from 'rxjs';
 
 describe('ProseMirrorEditorService', () => {
   let service: ProseMirrorEditorService;
@@ -14,6 +16,7 @@ describe('ProseMirrorEditorService', () => {
   let mockBeatAIService: jasmine.SpyObj<BeatAIService>;
   let mockBeatHistoryService: jasmine.SpyObj<BeatHistoryService>;
   let mockCodexService: jasmine.SpyObj<CodexService>;
+  let mockContextMenuService: jasmine.SpyObj<ContextMenuService>;
   let mockModalController: jasmine.SpyObj<ModalController>;
 
   beforeEach(() => {
@@ -22,11 +25,13 @@ describe('ProseMirrorEditorService', () => {
     mockBeatAIService = jasmine.createSpyObj('BeatAIService', ['generate', 'stopGeneration']);
     mockBeatHistoryService = jasmine.createSpyObj('BeatHistoryService', ['saveVersion', 'getHistory']);
     mockCodexService = jasmine.createSpyObj('CodexService', ['getCodex', 'codexUpdated$']);
+    mockContextMenuService = jasmine.createSpyObj('ContextMenuService', ['createContextMenuPlugin', 'hideContextMenu']);
     mockModalController = jasmine.createSpyObj('ModalController', ['create', 'dismiss']);
 
     // Setup default mock behaviors
     mockPromptManager.refresh.and.returnValue(Promise.resolve());
     mockCodexService.getCodex.and.returnValue(undefined);
+    (mockContextMenuService as unknown as { contentUpdate$: Subject<string> }).contentUpdate$ = new Subject<string>();
 
     TestBed.configureTestingModule({
       providers: [
@@ -35,6 +40,7 @@ describe('ProseMirrorEditorService', () => {
         { provide: BeatAIService, useValue: mockBeatAIService },
         { provide: BeatHistoryService, useValue: mockBeatHistoryService },
         { provide: CodexService, useValue: mockCodexService },
+        { provide: ContextMenuService, useValue: mockContextMenuService },
         { provide: ModalController, useValue: mockModalController },
         ApplicationRef,
         EnvironmentInjector
@@ -640,12 +646,13 @@ describe('ProseMirrorEditorService', () => {
        * This test verifies that scrollToBeat uses the correct querySelector
        * to find beat elements by data-beat-id attribute.
        *
-       * Note: This is a documentation test - it verifies the implementation
-       * uses the correct selector without requiring full DOM integration.
+       * Note: scrollToBeat is now delegated to BeatOperationsService.
+       * We verify the implementation by checking the delegate service.
        */
 
-      // Get the scrollToBeat method implementation as a string to verify selector
-      const scrollToBeatSource = service.scrollToBeat.toString();
+      // @ts-expect-error - accessing private property for testing
+      const beatOpsService = service.beatOpsService;
+      const scrollToBeatSource = beatOpsService.scrollToBeat.toString();
 
       // Verify the method searches for data-beat-id (not data-id)
       expect(scrollToBeatSource).toContain('data-beat-id');
@@ -716,8 +723,10 @@ describe('ProseMirrorEditorService', () => {
       expect(attrs2['data-beat-id']).toBe(beatId);
       expect(attrs2['data-id']).toBeUndefined(); // Should NOT revert to data-id
 
-      // Verify scrollToBeat also uses data-beat-id
-      const scrollToBeatSource = service.scrollToBeat.toString();
+      // Verify scrollToBeat also uses data-beat-id (via BeatOperationsService)
+      // @ts-expect-error - accessing private property for testing
+      const beatOpsService = service.beatOpsService;
+      const scrollToBeatSource = beatOpsService.scrollToBeat.toString();
       expect(scrollToBeatSource).toContain('data-beat-id');
     });
 

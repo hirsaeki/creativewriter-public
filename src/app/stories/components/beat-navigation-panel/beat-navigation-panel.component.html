@@ -51,16 +51,6 @@
           <div class="beat-number">{{ i + 1 }}</div>
           <div class="beat-info">
             <div class="beat-prompt">{{ getBeatPreview(beat.prompt) }}</div>
-            <div class="beat-status">
-              <ion-chip [color]="getBeatStatusColor(beat)" class="status-chip">
-                <ion-icon [name]="getBeatStatusIcon(beat)"></ion-icon>
-                <ion-label>
-                  <span *ngIf="beat.isGenerating">Generating...</span>
-                  <span *ngIf="!beat.isGenerating && beat.hasContent">Complete</span>
-                  <span *ngIf="!beat.isGenerating && !beat.hasContent">Pending</span>
-                </ion-label>
-              </ion-chip>
-            </div>
           </div>
         </div>
 

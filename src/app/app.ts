@@ -6,6 +6,7 @@ import { BeatAIModalService } from './shared/services/beat-ai-modal.service';
 import { BeatAIPreviewModalComponent } from './stories/components/beat-ai-preview-modal/beat-ai-preview-modal.component';
 import { MemoryWarningService } from './core/services/memory-warning.service';
 import { BeatHistoryService } from './shared/services/beat-history.service';
+import { SubscriptionService } from './core/services/subscription.service';
 
 // Preload PouchDB modules to avoid lazy loading delay during database initialization
 import PouchDB from 'pouchdb-browser';
@@ -35,6 +36,7 @@ export class App {
   protected modalService = inject(BeatAIModalService);
   private memoryWarning = inject(MemoryWarningService);
   private beatHistoryService = inject(BeatHistoryService);
+  private subscriptionService = inject(SubscriptionService);
 
   constructor() {
     // Initialize background service to apply global background
@@ -47,5 +49,9 @@ export class App {
     this.beatHistoryService.initialize().catch(error => {
       console.error('[App] Failed to initialize beat history service:', error);
     });
+
+    // Initialize subscription status from cache on app startup
+    // This restores premium status without requiring manual verification
+    this.subscriptionService.initialize();
   }
 }

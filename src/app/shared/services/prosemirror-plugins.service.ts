@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Plugin, PluginKey, EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
+import { Subscription } from 'rxjs';
 import { CodexService } from '../../stories/services/codex.service';
 import { CodexEntry } from '../../stories/models/codex.interface';
 import { createCodexHighlightingPlugin, updateCodexHighlightingPlugin } from './codex-highlighting-plugin';
@@ -11,6 +12,10 @@ import { EditorConfig, StoryContext } from './prosemirror-editor.interfaces';
 })
 export class ProseMirrorPluginsService {
   private codexService = inject(CodexService);
+
+  // Track subscriptions and editor view references per story to prevent memory leaks
+  private subscriptions = new Map<string, Subscription>();
+  private editorViews = new Map<string, EditorView | null>();
 
   /**
    * Create Beat AI plugin (basic plugin for beat node support)
@@ -31,24 +36,54 @@ export class ProseMirrorPluginsService {
   createCodexHighlightingPlugin(config: EditorConfig, editorView: EditorView | null): Plugin {
     // Get initial codex entries
     let codexEntries: CodexEntry[] = [];
+    const storyId = config.storyContext?.storyId;
 
-    if (config.storyContext?.storyId) {
-      this.codexService.codex$.subscribe(codexMap => {
-        const codex = codexMap.get(config.storyContext!.storyId!);
+    if (storyId) {
+      // Store initial editor view reference
+      this.editorViews.set(storyId, editorView);
+
+      // Clean up existing subscription if any (prevents duplicate subscriptions)
+      this.cleanupCodexSubscription(storyId);
+
+      // Create new subscription
+      const subscription = this.codexService.codex$.subscribe(codexMap => {
+        const codex = codexMap.get(storyId);
         if (codex) {
           codexEntries = this.extractAllCodexEntries(codex);
-          // Update the plugin when codex entries change
-          if (editorView) {
-            updateCodexHighlightingPlugin(editorView, codexEntries);
+          // Always use latest editor view reference from the Map
+          const currentView = this.editorViews.get(storyId);
+          if (currentView) {
+            updateCodexHighlightingPlugin(currentView, codexEntries);
           }
         }
       });
+
+      this.subscriptions.set(storyId, subscription);
     }
 
     return createCodexHighlightingPlugin({
       codexEntries,
-      storyId: config.storyContext?.storyId
+      storyId
     });
+  }
+
+  /**
+   * Update the editor view reference for a story
+   */
+  updateEditorView(storyId: string, editorView: EditorView | null): void {
+    this.editorViews.set(storyId, editorView);
+  }
+
+  /**
+   * Clean up codex subscription and editor view reference for a story
+   */
+  cleanupCodexSubscription(storyId: string): void {
+    const subscription = this.subscriptions.get(storyId);
+    if (subscription) {
+      subscription.unsubscribe();
+      this.subscriptions.delete(storyId);
+    }
+    this.editorViews.delete(storyId);
   }
 
   /**

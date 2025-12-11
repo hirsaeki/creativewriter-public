@@ -25,6 +25,7 @@ import { ReplicateIconComponent } from '../icons/replicate-icon.component';
 import { OllamaIconComponent } from '../icons/ollama-icon.component';
 import { Observable, of, from } from 'rxjs';
 import { switchMap, take } from 'rxjs/operators';
+import { PremiumRewriteService } from '../../shared/services/premium-rewrite.service';
 
 export interface AIRewriteResult {
   originalText: string;
@@ -462,6 +463,7 @@ export class AIRewriteModalComponent implements OnInit, OnDestroy {
   private aiLogger = inject(AIRequestLoggerService);
   private modelService = inject(ModelService);
   private aiProviderValidation = inject(AIProviderValidationService);
+  private premiumRewriteService = inject(PremiumRewriteService);
   private rewriteSubscription?: Subscription;
 
   customPrompt = '';
@@ -529,6 +531,13 @@ export class AIRewriteModalComponent implements OnInit, OnDestroy {
 
   async rewriteText() {
     if (!this.selectedText.trim() || this.isRewriting) return;
+
+    // Premium gate check
+    const hasAccess = await this.premiumRewriteService.checkAndGateAccess();
+    if (!hasAccess) {
+      this.dismiss();
+      return;
+    }
 
     this.isRewriting = true;
     this.rewrittenText = '';
@@ -802,7 +811,8 @@ export class AIRewriteModalComponent implements OnInit, OnDestroy {
       this.story.settings.favoriteModelLists = {
         beatInput: [...this.story.settings.favoriteModels],
         sceneSummary: [],
-        rewrite: []
+        rewrite: [],
+        characterChat: []
       };
     }
 

@@ -47,6 +47,12 @@ async function createSnapshotsForDatabase(dbName, tier) {
   // Get all documents
   const result = await db.allDocs({ include_docs: true });
 
+  // Validate result structure
+  if (!result || !result.rows) {
+    logger.warn(`Invalid response from allDocs for database ${dbName}: ${JSON.stringify(result)}`);
+    return 0;
+  }
+
   // Filter for story documents (not snapshots or other types)
   const stories = result.rows
     .map(row => row.doc)

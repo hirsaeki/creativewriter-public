@@ -1,5 +1,7 @@
 import { FavoriteModelLists } from '../../core/models/settings.interface';
 
+export type NarrativePerspective = 'first-person' | 'third-person-limited' | 'third-person-omniscient' | 'second-person';
+
 export interface Scene {
   id: string;
   title: string;
@@ -27,6 +29,7 @@ export interface StorySettings {
   beatGenerationTemplate: string; // Advanced template for beat generation
   useFullStoryContext: boolean; // true = full story, false = summaries only
   beatInstruction: 'continue' | 'stay'; // continue = "Continue the story", stay = "Stay in the moment"
+  narrativePerspective?: NarrativePerspective; // POV for AI-generated content
   language?: 'en' | 'de' | 'fr' | 'es' | 'custom'; // Story language setting
   favoriteModels: string[]; // Legacy quick access
   favoriteModelLists: FavoriteModelLists; // Structured favorites per story feature
@@ -112,10 +115,12 @@ Generate the beat now:</message>
 </messages>`,
   useFullStoryContext: false,
   beatInstruction: 'continue',
+  narrativePerspective: 'third-person-limited',
   favoriteModels: [],
   favoriteModelLists: {
     beatInput: [],
     sceneSummary: [],
-    rewrite: []
+    rewrite: [],
+    characterChat: []
   }
 };

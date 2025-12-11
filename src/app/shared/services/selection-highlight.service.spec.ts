@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { SelectionHighlightService } from './selection-highlight.service';
 import { EditorView } from 'prosemirror-view';
 import { EditorState } from 'prosemirror-state';
@@ -20,6 +20,8 @@ describe('SelectionHighlightService', () => {
   });
 
   afterEach(() => {
+    // Clear any pending flash timeouts before destroying the view
+    service.clearPendingFlash();
     if (editorView) {
       editorView.destroy();
     }
@@ -121,18 +123,19 @@ describe('SelectionHighlightService', () => {
       }).not.toThrow();
     });
 
-    it('should flash a selection', (done) => {
+    it('should flash a selection', fakeAsync(() => {
       // Select some text first
       service.selectFirstMatchOf(editorView, 'world');
 
       // Flash it
       service.flashSelection(editorView, 100);
 
-      // Verify the flash was applied (timeout to allow for animation)
-      setTimeout(() => {
-        done();
-      }, 150);
-    });
+      // Advance time past the flash duration (minimum is 300ms)
+      tick(350);
+
+      // Test passes if no errors were thrown
+      expect(true).toBe(true);
+    }));
   });
 
   describe('flashRange', () => {
@@ -156,22 +159,28 @@ describe('SelectionHighlightService', () => {
       }).not.toThrow();
     });
 
-    it('should flash a specific range', (done) => {
+    it('should flash a specific range', fakeAsync(() => {
       service.flashRange(editorView, 1, 6, 100);
 
-      // Verify the flash was applied
-      setTimeout(() => {
-        done();
-      }, 150);
-    });
+      // Advance time past the flash duration (minimum is 300ms)
+      tick(350);
 
-    it('should clear previous flash when new flash is applied', (done) => {
+      // Test passes if no errors were thrown
+      expect(true).toBe(true);
+    }));
+
+    it('should clear previous flash when new flash is applied', fakeAsync(() => {
       service.flashRange(editorView, 1, 6, 100);
 
-      setTimeout(() => {
-        service.flashRange(editorView, 7, 12, 100);
-        done();
-      }, 50);
-    });
+      tick(50);
+
+      service.flashRange(editorView, 7, 12, 100);
+
+      // Advance time to clear the second flash
+      tick(350);
+
+      // Test passes if no errors were thrown
+      expect(true).toBe(true);
+    }));
   });
 });

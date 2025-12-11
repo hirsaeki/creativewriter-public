@@ -2,7 +2,7 @@ import { Injectable, OnDestroy, inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Observable, ReplaySubject, Subject, Subscription, catchError, finalize, from, map, of, scan, switchMap, tap } from 'rxjs';
 import { BeatAI, BeatAIGenerationEvent } from '../../stories/models/beat-ai.interface';
-import { Story } from '../../stories/models/story.interface';
+import { Story, NarrativePerspective } from '../../stories/models/story.interface';
 import { OpenRouterApiService } from '../../core/services/openrouter-api.service';
 import { GoogleGeminiApiService } from '../../core/services/google-gemini-api.service';
 import { OllamaApiService } from '../../core/services/ollama-api.service';
@@ -15,6 +15,7 @@ import { PromptManagerService } from './prompt-manager.service';
 import { CodexRelevanceService, CodexEntry as CodexRelevanceEntry } from '../../core/services/codex-relevance.service';
 import { CodexEntry, CustomField } from '../../stories/models/codex.interface';
 import { BeatHistoryService } from './beat-history.service';
+import { DatabaseService } from '../../core/services/database.service';
 
 type ProviderType = 'ollama' | 'claude' | 'gemini' | 'openrouter';
 
@@ -53,6 +54,7 @@ export class BeatAIService implements OnDestroy {
   private readonly beatHistoryService = inject(BeatHistoryService);
   private readonly document = inject(DOCUMENT);
   private readonly aiProviderValidation = inject(AIProviderValidationService);
+  private readonly databaseService = inject(DatabaseService);
   
   private generationSubject = new Subject<BeatAIGenerationEvent>();
   public generation$ = this.generationSubject.asObservable();
@@ -316,6 +318,8 @@ export class BeatAIService implements OnDestroy {
 
     if (this.activeGenerations.size === 0) {
       this.isStreamingSubject.next(false);
+      // Resume database sync now that all generations are complete
+      this.databaseService.resumeSync();
     }
   }
 
@@ -399,6 +403,7 @@ export class BeatAIService implements OnDestroy {
     };
     action?: 'generate' | 'rewrite';
     existingText?: string;
+    textAfterBeat?: string; // Text that follows this beat position (for scene beat bridging)
   } = {}): Observable<string> {
     const settings = this.settingsService.getSettings();
 
@@ -417,6 +422,8 @@ export class BeatAIService implements OnDestroy {
     }
 
     this.isStreamingSubject.next(true);
+    // Pause database sync during streaming to prevent performance issues
+    this.databaseService.pauseSync();
     this.generationSubject.next({
       beatId,
       chunk: '',
@@ -949,6 +956,7 @@ export class BeatAIService implements OnDestroy {
     };
     action?: 'generate' | 'rewrite';
     existingText?: string;
+    textAfterBeat?: string; // Text that follows this beat position (for scene beat bridging)
   }): Observable<string> {
     if (!options.storyId) {
       return of(userPrompt);
@@ -1038,13 +1046,12 @@ export class BeatAIService implements OnDestroy {
               }
             }
         
-            // Find protagonist for point of view
-            // Default to "third person limited" as it's the most common narrative mode
-            // TODO: Add narrativePerspective field to StorySettings for user configuration
+            // Find protagonist for point of view from Codex
             const protagonist = this.findProtagonist(filteredCodexEntries);
-            const pointOfView = protagonist
-              ? `<pointOfView type="third person limited" character="${this.escapeXml(protagonist)}"/>`
-              : '<pointOfView type="third person"/>';
+            const pointOfView = this.generatePointOfViewXml(
+              story.settings?.narrativePerspective,
+              protagonist
+            );
         
         
         const codexText = filteredCodexEntries.length > 0 
@@ -1120,10 +1127,9 @@ export class BeatAIService implements OnDestroy {
               storySoFar = '';
             }
           } else {
-            // Default behavior: For SceneBeat, we get the story without scene summaries
-            storySoFar = options.beatType === 'scene' 
-              ? await this.promptManager.getStoryXmlFormatWithoutSummaries(options.sceneId)
-              : await this.promptManager.getStoryXmlFormat(options.sceneId);
+            // Both Story Beat and Scene Beat use full story context
+            // The difference is in the task instructions, not the context
+            storySoFar = await this.promptManager.getStoryXmlFormat(options.sceneId);
           }
         }
 
@@ -1178,6 +1184,17 @@ Please rewrite the above text according to the instructions. Only output the rew
           const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
           processedTemplate = processedTemplate.replace(regex, value || '');
         });
+
+        // For scene beats, replace the beat_generation_task with scene-specific instructions
+        console.log('[BeatAI] buildStructuredPromptFromTemplate - beatType:', options.beatType);
+        if (options.beatType === 'scene') {
+          console.log('[BeatAI] Using scene beat instructions, textAfterBeat:', options.textAfterBeat ? 'present' : 'none');
+          processedTemplate = this.replaceWithSceneBeatInstructions(
+            processedTemplate,
+            placeholders,
+            options.textAfterBeat
+          );
+        }
 
             return processedTemplate;
           })
@@ -1237,6 +1254,91 @@ Please rewrite the above text according to the instructions. Only output the rew
     return names[Math.floor(Math.random() * names.length)];
   }
 
+  /**
+   * Replace the beat_generation_task section with scene-beat-specific instructions.
+   * Scene beats focus on expanding moments with depth and detail, and can bridge
+   * to existing text that follows.
+   */
+  private replaceWithSceneBeatInstructions(
+    template: string,
+    placeholders: Record<string, string>,
+    textAfterBeat?: string
+  ): string {
+    // Build bridging instruction if there's text after the beat
+    let bridgingSection = '';
+    if (textAfterBeat && textAfterBeat.trim().length > 0) {
+      const escapedTextAfter = this.escapeXml(textAfterBeat.trim());
+      bridgingSection = `
+  <bridging_context>
+    <instruction>Your generation must seamlessly connect to the existing text that follows. End in a way that flows naturally into this text:</instruction>
+    <text_after_beat>${escapedTextAfter}</text_after_beat>
+  </bridging_context>`;
+    }
+
+    // Build the scene beat task block
+    const sceneBeatTask = `<beat_generation_task>
+  <objective>
+    Expand this moment with rich detail, deepening the reader's immersion in the scene.
+    Focus on the immediate experience rather than advancing the plot.
+  </objective>
+
+  <narrative_parameters>
+    ${placeholders['pointOfView']}
+    <word_count>${placeholders['wordCount']} words (±50 words acceptable)</word_count>
+    <tense>Match the established tense</tense>
+  </narrative_parameters>
+
+  <focus_areas>
+    <area>Internal character thoughts and emotional reactions</area>
+    <area>Sensory details - sight, sound, touch, smell, taste</area>
+    <area>Micro-actions and body language</area>
+    <area>Atmosphere and mood of the moment</area>
+    <area>Subtext in dialogue (if present)</area>
+  </focus_areas>
+
+  <beat_requirements>
+    ${placeholders['prompt']}
+  </beat_requirements>
+${bridgingSection}
+  <style_guidance>
+    - Match the exact tone and narrative voice of the current scene
+    - Maintain the established balance of dialogue, action, and introspection
+    - ${placeholders['writingStyle']}
+    - Deepen the reader's connection to the viewpoint character
+  </style_guidance>
+
+  <constraints>
+    - Stay within this moment - do NOT advance to new scenes or time jumps
+    - Do NOT resolve conflicts or make major plot progress
+    - Do NOT have characters act inconsistently with their established personalities
+    - Do NOT introduce major new story elements
+    - Match the exact tone and narrative voice
+    ${textAfterBeat ? '- End in a way that flows naturally into the text that follows' : ''}
+  </constraints>
+
+  <output_format>
+    Pure narrative prose. No meta-commentary, scene markers, chapter headings, or author notes.
+  </output_format>
+</beat_generation_task>`;
+
+    // Replace the beat_generation_task section in the template
+    // Match from <beat_generation_task> to </beat_generation_task>
+    const taskRegex = /<beat_generation_task>[\s\S]*?<\/beat_generation_task>/;
+    if (taskRegex.test(template)) {
+      console.log('[BeatAI] Found and replacing beat_generation_task with scene-specific instructions');
+      return template.replace(taskRegex, sceneBeatTask);
+    }
+    console.log('[BeatAI] WARNING: beat_generation_task not found in template');
+
+    // If no beat_generation_task found, append before "Generate the beat now:"
+    const generateNowRegex = /Generate the beat now:/;
+    if (generateNowRegex.test(template)) {
+      return template.replace(generateNowRegex, sceneBeatTask + '\n\nGenerate the beat now:');
+    }
+
+    // Fallback: just return original template
+    return template;
+  }
 
   createNewBeat(beatType: 'story' | 'scene' = 'story'): BeatAI {
     return {
@@ -1297,7 +1399,7 @@ Please rewrite the above text according to the instructions. Only output the rew
         chapterId: ctx.chapterId
       }));
 
-      const versionId = await this.beatHistoryService.saveVersion(
+      await this.beatHistoryService.saveVersion(
         beatId,
         options.storyId,
         {
@@ -1315,8 +1417,6 @@ Please rewrite the above text according to the instructions. Only output the rew
           existingText: options.existingText
         }
       );
-
-      console.log(`[BeatAIService] Saved version ${versionId} to history for beat ${beatId}`);
     } catch (error) {
       console.error(`[BeatAIService] Failed to save version history for beat ${beatId}:`, error);
       // Don't throw - history saving failure shouldn't break generation
@@ -1415,6 +1515,29 @@ Please rewrite the above text according to the instructions. Only output the rew
       }
     }
     return null;
+  }
+
+  private generatePointOfViewXml(
+    perspective: NarrativePerspective | undefined,
+    protagonistName: string | null
+  ): string {
+    const effectivePerspective = perspective || 'third-person-limited';
+
+    const povTypeMap: Record<NarrativePerspective, string> = {
+      'first-person': 'first person',
+      'third-person-limited': 'third person limited',
+      'third-person-omniscient': 'third person omniscient',
+      'second-person': 'second person'
+    };
+
+    const povType = povTypeMap[effectivePerspective];
+
+    // Include character for first/third-limited/second person when protagonist is known
+    if (protagonistName && ['first-person', 'third-person-limited', 'second-person'].includes(effectivePerspective)) {
+      return `<pointOfView type="${povType}" character="${this.escapeXml(protagonistName)}"/>`;
+    }
+
+    return `<pointOfView type="${povType}"/>`;
   }
 
   private convertCodexEntriesToRelevanceFormat(codexEntries: { category: string; entries: CodexEntry[]; icon?: string }[]): CodexRelevanceEntry[] {

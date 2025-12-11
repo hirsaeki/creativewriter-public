@@ -3,6 +3,7 @@ import { BehaviorSubject, Observable, combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Story, Scene } from '../models/story.interface';
 import { StoryService } from './story.service';
+import { CodexService } from './codex.service';
 import { PromptManagerService } from '../../shared/services/prompt-manager.service';
 import { StoryStatsService } from './story-stats.service';
 import { DatabaseService } from '../../core/services/database.service';
@@ -35,6 +36,7 @@ export interface StoryContext {
 })
 export class StoryEditorStateService {
   private storyService = inject(StoryService);
+  private codexService = inject(CodexService);
   private promptManager = inject(PromptManagerService);
   private storyStatsService = inject(StoryStatsService);
   private databaseService = inject(DatabaseService);
@@ -406,6 +408,9 @@ export class StoryEditorStateService {
 
       // Refresh prompt manager
       await this.promptManager.setCurrentStory(updatedStory.id);
+
+      // Reload codex from database to pick up any remote changes
+      await this.codexService.reloadCodexFromDatabase(updatedStory.id);
 
     } catch (error) {
       console.error('Error reloading story:', error);

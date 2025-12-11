@@ -111,6 +111,9 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        build-args: |
+          BUILD_CONFIGURATION=development
+          CACHE_BUST=${{ github.sha }}
 
     # Note: Build attestations are only available for public repositories
     # - name: Generate artifact attestation
@@ -120,3 +123,29 @@ jobs:
     #     subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
     #     subject-digest: ${{ steps.build.outputs.digest }}
     #     push-to-registry: true
+
+  # Deploy Cloudflare Worker backend to dev environment
+  deploy-backend-dev:
+    name: Deploy Backend (Dev)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies and deploy
+      working-directory: ./backend
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      run: |
+        echo "📦 Installing backend dependencies..."
+        npm install
+        echo "🚀 Deploying backend to dev environment..."
+        npx wrangler deploy --env dev
+        echo "✅ Backend deployed to dev environment"

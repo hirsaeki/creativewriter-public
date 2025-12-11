@@ -6,6 +6,32 @@ on:
   workflow_dispatch: # Allow manual trigger
 
 jobs:
+  # Deploy Cloudflare Worker backend to production environment
+  deploy-backend-production:
+    name: Deploy Backend (Production)
+    runs-on: ubuntu-latest
+    if: github.repository == 'MarcoDroll/creativewriter2'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies and deploy
+        working-directory: ./backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          echo "📦 Installing backend dependencies..."
+          npm install
+          echo "🚀 Deploying backend to production environment..."
+          npx wrangler deploy
+          echo "✅ Backend deployed to production environment"
+
   sync-public:
     runs-on: ubuntu-latest
     if: github.repository == 'MarcoDroll/creativewriter2' # Only run on private repo
@@ -63,6 +89,14 @@ jobs:
           rm -rf .claudescreenshots/ || true  # Remove Claude screenshots
           rm -rf docs/ || true  # Exclude private docs from public sync
           rm -f docker-compose.public.yml || true  # Remove the public compose file itself
+          rm -rf backend/ || true  # Remove Cloudflare Worker backend (premium features)
+
+          # Replace premium components with public stubs
+          CHAR_CHAT_DIR="src/app/stories/components/character-chat"
+          if [ -f "${CHAR_CHAT_DIR}/character-chat.component.public.ts" ]; then
+            mv "${CHAR_CHAT_DIR}/character-chat.component.public.ts" "${CHAR_CHAT_DIR}/character-chat.component.ts"
+            echo "✅ Replaced Character Chat with public stub"
+          fi
           
           # Move the public workflow back to .github
           if [ -d ".github-public" ]; then
@@ -135,60 +169,72 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
         run: |
           VERSION="${{ needs.sync-public.outputs.version }}"
-          COMMIT_HASH="${{ needs.sync-public.outputs.commit_hash }}"
           BUILD_DATE="${{ needs.sync-public.outputs.build_date }}"
 
-          # Check if RELEASE_NOTES.md exists and read it
+          # Check if RELEASE_NOTES.md exists and use it
           if [ -f "RELEASE_NOTES.md" ]; then
             echo "📝 Found RELEASE_NOTES.md, using prepared release notes"
-            CUSTOM_NOTES=$(cat RELEASE_NOTES.md)
+
+            # Append Docker images and Quick Start sections to the release notes
+            {
+              cat RELEASE_NOTES.md
+              echo ""
+              echo "## 📦 Docker Images"
+              echo ""
+              echo "All images are multi-platform (AMD64, ARM64):"
+              echo ""
+              echo "| Image | Tags |"
+              echo "|-------|------|"
+              echo "| Main Application | \`ghcr.io/marcodroll/creativewriter-public:v${VERSION}\`, \`:stable\`, \`:latest\` |"
+              echo "| Proxy Service | \`ghcr.io/marcodroll/creativewriter-public-proxy:v${VERSION}\` |"
+              echo "| Gemini Proxy | \`ghcr.io/marcodroll/creativewriter-public-gemini-proxy:v${VERSION}\` |"
+              echo "| Nginx Reverse Proxy | \`ghcr.io/marcodroll/creativewriter-public-nginx:v${VERSION}\` |"
+              echo "| CouchDB Database | \`ghcr.io/marcodroll/creativewriter-public-couchdb:v${VERSION}\` |"
+              echo ""
+              echo "### Using Stable Tags"
+              echo "\`\`\`bash"
+              echo "docker pull ghcr.io/marcodroll/creativewriter-public:stable"
+              echo "docker pull ghcr.io/marcodroll/creativewriter-public-nginx:stable"
+              echo "docker pull ghcr.io/marcodroll/creativewriter-public-proxy:stable"
+              echo "docker pull ghcr.io/marcodroll/creativewriter-public-gemini-proxy:stable"
+              echo "docker pull ghcr.io/marcodroll/creativewriter-public-couchdb:stable"
+              echo "\`\`\`"
+              echo ""
+              echo "## 🚀 Quick Start"
+              echo ""
+              echo "\`\`\`bash"
+              echo "# Create directory and persistent storage"
+              echo "mkdir creativewriter && cd creativewriter"
+              echo "mkdir -p data"
+              echo "chmod 755 data"
+              echo ""
+              echo "# Download docker-compose configuration"
+              echo "curl -O https://raw.githubusercontent.com/MarcoDroll/creativewriter-public/main/docker-compose.yml"
+              echo ""
+              echo "# Start with persistent storage"
+              echo "docker compose up -d"
+              echo ""
+              echo "# Access at http://localhost:3080"
+              echo "\`\`\`"
+              echo ""
+              echo "---"
+              echo "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+            } > /tmp/release_notes.md
           else
-            echo "⚠️ No RELEASE_NOTES.md found, using default notes"
-            CUSTOM_NOTES="No detailed release notes provided for this release."
+            echo "⚠️ No RELEASE_NOTES.md found, creating minimal release notes"
+            {
+              echo "## 🚀 Release v${VERSION}"
+              echo ""
+              echo "**Build Date**: ${BUILD_DATE}"
+              echo ""
+              echo "See [CHANGELOG.md](https://github.com/MarcoDroll/creativewriter-public/blob/main/CHANGELOG.md) for details."
+              echo ""
+              echo "---"
+              echo "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+            } > /tmp/release_notes.md
           fi
 
-          # Write release notes to a temporary file using echo to avoid heredoc YAML issues
-          {
-            echo "## 🚀 Release v${VERSION}"
-            echo ""
-            echo "### 📋 Release Details"
-            echo "* **Version**: v${VERSION}"
-            echo "* **Build Date**: ${BUILD_DATE}"
-            echo "* **Source Commit**: ${COMMIT_HASH}"
-            echo ""
-            echo "---"
-            echo ""
-            echo "${CUSTOM_NOTES}"
-            echo ""
-            echo "---"
-            echo ""
-            echo "### 📦 Docker Images"
-            echo "The following stable Docker images are available:"
-            echo ""
-            echo "| Image | Pull Command |"
-            echo "|-------|--------------|"
-            echo "| Main Application | \`docker pull ghcr.io/marcodroll/creativewriter-public:stable\` |"
-            echo "| Proxy Service | \`docker pull ghcr.io/marcodroll/creativewriter-public-proxy:stable\` |"
-            echo "| Gemini Proxy | \`docker pull ghcr.io/marcodroll/creativewriter-public-gemini-proxy:stable\` |"
-            echo "| Nginx Reverse Proxy | \`docker pull ghcr.io/marcodroll/creativewriter-public-nginx:stable\` |"
-            echo "| CouchDB Database | \`docker pull ghcr.io/marcodroll/creativewriter-public-couchdb:stable\` |"
-            echo ""
-            echo "### 🎯 Quick Start"
-            echo "\`\`\`bash"
-            echo "# Download docker-compose.yml"
-            echo "curl -O https://raw.githubusercontent.com/MarcoDroll/creativewriter-public/main/docker-compose.yml"
-            echo ""
-            echo "# Start the application"
-            echo "docker compose up -d"
-            echo ""
-            echo "# Access at http://localhost:3080"
-            echo "\`\`\`"
-            echo ""
-            echo "---"
-            echo "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
-          } > /tmp/release_notes.md
-
-          # Create the release in the public repository using the notes file
+          # Create the release in the public repository
           gh release create "v${VERSION}" \
             --repo MarcoDroll/creativewriter-public \
             --title "v${VERSION}" \
@@ -203,6 +249,7 @@ jobs:
           echo "# 🔄 Public Repository Sync Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## ✅ Sync Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend Deployment (Production)**: ✅ Deployed to Cloudflare Workers" >> $GITHUB_STEP_SUMMARY
           echo "- **Private → Public Sync**: ✅ Successful" >> $GITHUB_STEP_SUMMARY
           echo "- **Release Creation**: ✅ Successful" >> $GITHUB_STEP_SUMMARY
           echo "- **Docker Images**: 🔄 Building (triggered by release)" >> $GITHUB_STEP_SUMMARY

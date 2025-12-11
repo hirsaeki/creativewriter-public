@@ -3,23 +3,24 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
-  IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
+  IonContent, IonButton, IonIcon,
   IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
   IonTextarea, IonCheckbox, IonRadio, IonRadioGroup, IonChip, IonNote,
   IonText, IonGrid, IonRow, IonCol, IonProgressBar, IonList, IonThumbnail,
-  IonBadge, IonSelect, IonSelectOption
+  IonBadge, IonSelect, IonSelectOption, IonAccordion, IonAccordionGroup
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { 
+import {
   arrowBack, saveOutline, refreshOutline, checkmarkCircleOutline,
   warningOutline, informationCircleOutline, codeSlashOutline,
   settingsOutline, chatboxOutline, documentTextOutline, serverOutline,
   scanOutline, trashOutline, statsChartOutline,
   copyOutline, searchOutline, closeCircleOutline, checkboxOutline,
-  squareOutline, imageOutline
+  squareOutline, imageOutline, starOutline, createOutline, syncOutline,
+  chatbubblesOutline
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
-import { Story, StorySettings, DEFAULT_STORY_SETTINGS } from '../../models/story.interface';
+import { Story, StorySettings, DEFAULT_STORY_SETTINGS, NarrativePerspective } from '../../models/story.interface';
 import { ModelOption } from '../../../core/models/model.interface';
 import { ModelService } from '../../../core/services/model.service';
 import { getSystemMessage, getBeatGenerationTemplate } from '../../../shared/resources/system-messages';
@@ -29,25 +30,27 @@ import { SettingsContentComponent } from '../../../ui/components/settings-conten
 import { DbMaintenanceService, OrphanedImage, DatabaseStats, DuplicateImage, IntegrityIssue } from '../../../shared/services/db-maintenance.service';
 import { ImageUploadComponent, ImageUploadResult } from '../../../ui/components/image-upload.component';
 import { ModelFavoritesSettingsComponent } from '../../../ui/settings/model-favorites-settings/model-favorites-settings.component';
+import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
 
 @Component({
   selector: 'app-story-settings',
   standalone: true,
   imports: [
     CommonModule, FormsModule,
-    IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
+    IonContent, IonButton, IonIcon,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
     IonTextarea, IonCheckbox, IonRadio, IonRadioGroup, IonChip, IonNote,
     IonText, IonGrid, IonRow, IonCol, IonProgressBar, IonList, IonThumbnail,
-    IonBadge, IonSelect, IonSelectOption,
+    IonBadge, IonSelect, IonSelectOption, IonAccordion, IonAccordionGroup,
     SettingsTabsComponent, SettingsContentComponent, ImageUploadComponent,
-    ModelFavoritesSettingsComponent
+    ModelFavoritesSettingsComponent, AppHeaderComponent
   ],
   templateUrl: './story-settings.component.html',
   styleUrls: ['./story-settings.component.scss']
 })
 export class StorySettingsComponent implements OnInit {
   story: Story | null = null;
+  private storyId: string | null = null;
   settings: StorySettings = { ...DEFAULT_STORY_SETTINGS };
   hasUnsavedChanges = false;
   private originalSettings!: StorySettings;
@@ -57,6 +60,7 @@ export class StorySettingsComponent implements OnInit {
     { value: 'cover-image', icon: 'image-outline', label: 'Cover Image' },
     { value: 'ai-system', icon: 'chatbox-outline', label: 'AI System' },
     { value: 'beat-config', icon: 'settings-outline', label: 'Beat Config' },
+    { value: 'favorites', icon: 'star-outline', label: 'AI Favorites' },
     { value: 'db-maintenance', icon: 'server-outline', label: 'DB Maintenance' }
   ];
   
@@ -72,6 +76,13 @@ export class StorySettingsComponent implements OnInit {
     '{writingStyle}'
   ];
 
+  narrativePerspectiveOptions: { value: NarrativePerspective; label: string }[] = [
+    { value: 'first-person', label: 'First Person' },
+    { value: 'third-person-limited', label: 'Third Person Limited' },
+    { value: 'third-person-omniscient', label: 'Third Person Omniscient' },
+    { value: 'second-person', label: 'Second Person' }
+  ];
+
   // DB Maintenance properties
   orphanedImages: OrphanedImage[] = [];
   databaseStats: DatabaseStats | null = null;
@@ -85,6 +96,19 @@ export class StorySettingsComponent implements OnInit {
   loadingModels = false;
   modelLoadError: string | null = null;
 
+  get headerActions(): HeaderAction[] {
+    return [
+      {
+        icon: this.hasUnsavedChanges ? 'warning-outline' : 'checkmark-circle-outline',
+        chipContent: this.hasUnsavedChanges ? 'Not saved' : 'Saved',
+        chipColor: this.hasUnsavedChanges ? 'warning' : 'success',
+        action: () => { /* Status chip - no action needed */ },
+        showOnMobile: true,
+        showOnDesktop: true
+      }
+    ];
+  }
+
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly storyService = inject(StoryService);
@@ -92,28 +116,29 @@ export class StorySettingsComponent implements OnInit {
   private readonly modelService = inject(ModelService);
 
   constructor() {
-    addIcons({ 
+    addIcons({
       arrowBack, saveOutline, refreshOutline, checkmarkCircleOutline,
       warningOutline, informationCircleOutline, codeSlashOutline,
       settingsOutline, chatboxOutline, documentTextOutline, serverOutline,
       scanOutline, trashOutline, statsChartOutline,
       copyOutline, searchOutline, closeCircleOutline, checkboxOutline,
-      squareOutline, imageOutline
+      squareOutline, imageOutline, starOutline, createOutline, syncOutline,
+      chatbubblesOutline
     });
   }
 
   async ngOnInit(): Promise<void> {
-    const storyId = this.route.snapshot.paramMap.get('id');
-    if (storyId) {
-      this.story = await this.storyService.getStory(storyId);
+    this.storyId = this.route.snapshot.paramMap.get('id');
+    if (this.storyId) {
+      this.story = await this.storyService.getStory(this.storyId);
       if (this.story) {
         // Load existing settings or use defaults
-        this.settings = this.story.settings 
-          ? { ...this.story.settings } 
+        this.settings = this.story.settings
+          ? { ...this.story.settings }
           : { ...DEFAULT_STORY_SETTINGS };
 
         this.ensureFavoriteStructure();
-        
+
         this.originalSettings = { ...this.settings };
       } else {
         this.router.navigate(['/']);
@@ -203,7 +228,8 @@ export class StorySettingsComponent implements OnInit {
       this.settings.favoriteModelLists = {
         beatInput: [...this.settings.favoriteModels],
         sceneSummary: [],
-        rewrite: []
+        rewrite: [],
+        characterChat: []
       };
     }
 
@@ -223,6 +249,12 @@ export class StorySettingsComponent implements OnInit {
       this.settings.favoriteModelLists.rewrite = [];
     } else {
       this.settings.favoriteModelLists.rewrite = [...this.settings.favoriteModelLists.rewrite];
+    }
+
+    if (!Array.isArray(this.settings.favoriteModelLists.characterChat)) {
+      this.settings.favoriteModelLists.characterChat = [];
+    } else {
+      this.settings.favoriteModelLists.characterChat = [...this.settings.favoriteModelLists.characterChat];
     }
   }
 
@@ -254,8 +286,10 @@ export class StorySettingsComponent implements OnInit {
   }
 
   private navigateBack(): void {
-    if (this.story) {
-      this.router.navigate(['/stories/editor', this.story.id]);
+    // Use storyId from route as fallback to ensure correct navigation
+    const targetId = this.story?.id || this.storyId;
+    if (targetId) {
+      this.router.navigate(['/stories/editor', targetId]);
     } else {
       this.router.navigate(['/']);
     }

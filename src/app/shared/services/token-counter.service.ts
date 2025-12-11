@@ -1,17 +1,19 @@
-import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { Injectable } from '@angular/core';
 
 export interface TokenCountResult {
   tokens: number;
   model: string;
-  method: 'exact' | 'estimation';
+  method: 'improved_estimation' | 'estimation';
 }
 
-export type SupportedModel = 
+export type SupportedModel =
   | 'claude-3.5-sonnet'
   | 'claude-3.7-sonnet'
+  | 'claude-sonnet-4'
+  | 'claude-sonnet-4-5'
   | 'gemini-1.5-pro'
   | 'gemini-2.5-pro'
+  | 'gemini-2.5-flash'
   | 'grok-3'
   | 'custom';
 
@@ -23,13 +25,14 @@ export class TokenCounterService {
   private readonly CHARS_PER_TOKEN_ESTIMATES: Record<SupportedModel, number> = {
     'claude-3.5-sonnet': 3.5,
     'claude-3.7-sonnet': 3.5,
+    'claude-sonnet-4': 3.5,
+    'claude-sonnet-4-5': 3.5,
     'gemini-1.5-pro': 4.0,
     'gemini-2.5-pro': 4.0,
+    'gemini-2.5-flash': 4.0,
     'grok-3': 3.8,
     'custom': 4.0
   };
-
-  private http = inject(HttpClient);
 
   async countTokens(prompt: string, model: SupportedModel = 'claude-3.7-sonnet'): Promise<TokenCountResult> {
     const cleanedPrompt = this.preprocessText(prompt);
@@ -41,7 +44,7 @@ export class TokenCounterService {
         return {
           tokens,
           model,
-          method: 'exact'
+          method: 'improved_estimation'
         };
       } catch (error) {
         console.warn('Failed to use improved estimation, falling back to basic estimation:', error);
@@ -230,12 +233,15 @@ export class TokenCounterService {
     const tokenLimits: Record<SupportedModel, number> = {
       'claude-3.5-sonnet': 200000,
       'claude-3.7-sonnet': 200000,
+      'claude-sonnet-4': 200000,
+      'claude-sonnet-4-5': 200000,
       'gemini-1.5-pro': 2000000,
       'gemini-2.5-pro': 1000000,
+      'gemini-2.5-flash': 1048576,
       'grok-3': 131072,
       'custom': 4096
     };
-    
+
     return tokenLimits[model];
   }
 
@@ -271,12 +277,15 @@ export class TokenCounterService {
     const outputLimits: Record<SupportedModel, number> = {
       'claude-3.5-sonnet': 4096,
       'claude-3.7-sonnet': 128000, // With extended output API header
+      'claude-sonnet-4': 64000,
+      'claude-sonnet-4-5': 64000,
       'gemini-1.5-pro': 8192,
       'gemini-2.5-pro': 64000,
+      'gemini-2.5-flash': 65535,
       'grok-3': 8192,
       'custom': 4096
     };
-    
+
     return outputLimits[model];
   }
 
@@ -291,12 +300,15 @@ export class TokenCounterService {
     const modelInfo: Record<SupportedModel, { name: string; provider: string; releaseDate: string }> = {
       'claude-3.5-sonnet': { name: 'Claude 3.5 Sonnet', provider: 'Anthropic', releaseDate: '2024' },
       'claude-3.7-sonnet': { name: 'Claude 3.7 Sonnet', provider: 'Anthropic', releaseDate: 'February 2025' },
+      'claude-sonnet-4': { name: 'Claude Sonnet 4', provider: 'Anthropic', releaseDate: 'May 2025' },
+      'claude-sonnet-4-5': { name: 'Claude Sonnet 4.5', provider: 'Anthropic', releaseDate: 'September 2025' },
       'gemini-1.5-pro': { name: 'Gemini 1.5 Pro', provider: 'Google', releaseDate: '2024' },
       'gemini-2.5-pro': { name: 'Gemini 2.5 Pro', provider: 'Google', releaseDate: '2025' },
-      'grok-3': { name: 'Grok-3', provider: 'xAI', releaseDate: '2025' },
+      'gemini-2.5-flash': { name: 'Gemini 2.5 Flash', provider: 'Google', releaseDate: '2025' },
+      'grok-3': { name: 'Grok-3', provider: 'xAI', releaseDate: 'February 2025' },
       'custom': { name: 'Custom Model', provider: 'Unknown', releaseDate: 'Unknown' }
     };
-    
+
     return {
       ...modelInfo[model],
       contextWindow: this.getModelTokenLimit(model),

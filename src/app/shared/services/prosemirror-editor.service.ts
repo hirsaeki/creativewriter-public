@@ -142,8 +142,10 @@ export class ProseMirrorEditorService {
       }
     });
 
-    // Update codex plugin with actual editor view
-    this.pluginsService.createCodexHighlightingPlugin(config, this.editorView);
+    // Update the codex plugin's editor view reference (NOT create new plugin)
+    if (config.storyContext?.storyId) {
+      this.pluginsService.updateEditorView(config.storyContext.storyId, this.editorView);
+    }
 
     // Set placeholder if provided
     if (config.placeholder) {
@@ -272,6 +274,15 @@ export class ProseMirrorEditorService {
     return this.beatOpsService.deleteContentAfterBeat(this.editorView, beatId, () => this.getHTMLContent());
   }
 
+  /**
+   * Delete only the generated content between a beat and its end marker.
+   * Preserves any pre-existing text that was pushed down when the beat was inserted.
+   * Falls back to deleteContentAfterBeat if no marker exists (backward compatibility).
+   */
+  deleteGeneratedContentOnly(beatId: string): boolean {
+    return this.beatOpsService.deleteGeneratedContentOnly(this.editorView, beatId, () => this.getHTMLContent());
+  }
+
   async switchBeatVersion(beatId: string, versionId: string): Promise<void> {
     return this.beatOpsService.switchBeatVersion(this.editorView, beatId, versionId, () => this.getHTMLContent());
   }
@@ -338,6 +349,12 @@ export class ProseMirrorEditorService {
 
   destroy(): void {
     this.contextMenuService.hideContextMenu();
+
+    // Cleanup codex subscription to prevent memory leaks and stale callbacks
+    if (this.currentStoryContext?.storyId) {
+      this.pluginsService.cleanupCodexSubscription(this.currentStoryContext.storyId);
+    }
+
     if (this.editorView) {
       this.editorStateService.cleanupEditorView(this.editorView);
       this.editorView.destroy();
