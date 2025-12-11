@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   nginx:
     image: ghcr.io/marcodroll/creativewriter-public-nginx:latest
