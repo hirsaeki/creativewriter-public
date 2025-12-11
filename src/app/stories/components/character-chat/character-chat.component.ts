@@ -11,14 +11,10 @@ import {
 import { addIcons } from 'ionicons';
 import {
   arrowBack, send, personCircle, chatbubbles, copy, refresh,
-  close, helpCircle, timeOutline, logoGoogle, globeOutline, chevronForward,
+  close, helpCircle, timeOutline, chevronForward,
   createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline
 } from 'ionicons/icons';
-import { NgSelectModule } from '@ng-select/ng-select';
-import { OpenRouterIconComponent } from '../../../ui/icons/openrouter-icon.component';
-import { ClaudeIconComponent } from '../../../ui/icons/claude-icon.component';
-import { ReplicateIconComponent } from '../../../ui/icons/replicate-icon.component';
-import { OllamaIconComponent } from '../../../ui/icons/ollama-icon.component';
+import { ModelSelectorComponent } from '../../../shared/components/model-selector/model-selector.component';
 
 import { StoryService } from '../../services/story.service';
 import { CodexService } from '../../services/codex.service';
@@ -32,13 +28,11 @@ import {
   StoryContext,
   CharacterChatServiceInterface
 } from '../../../core/services/premium-module.service';
-import { ModelService } from '../../../core/services/model.service';
 import { OpenRouterApiService } from '../../../core/services/openrouter-api.service';
 import { GoogleGeminiApiService } from '../../../core/services/google-gemini-api.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { Story } from '../../models/story.interface';
 import { CodexEntry, Codex } from '../../models/codex.interface';
-import { ModelOption } from '../../../core/models/model.interface';
 import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
 
 interface ConversationMessage {
@@ -62,12 +56,12 @@ interface AIServiceAdapter {
   selector: 'app-character-chat',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterModule, NgSelectModule,
+    CommonModule, FormsModule, RouterModule,
     IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonFooter, IonTextarea, IonAvatar, IonChip, IonLabel, IonSpinner,
     IonModal, IonList, IonItem,
     AppHeaderComponent,
-    OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent
+    ModelSelectorComponent
   ],
   templateUrl: './character-chat.component.html',
   styleUrls: ['./character-chat.component.scss']
@@ -83,7 +77,6 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   private codexService = inject(CodexService);
   private subscriptionService = inject(SubscriptionService);
   private premiumModuleService = inject(PremiumModuleService);
-  private modelService = inject(ModelService);
   private openRouterService = inject(OpenRouterApiService);
   private geminiService = inject(GoogleGeminiApiService);
   private settingsService = inject(SettingsService);
@@ -110,7 +103,6 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   showKnowledgeModal = false;
 
   // Model selection
-  availableModels: ModelOption[] = [];
   selectedModel = '';
 
   // Suggested starters
@@ -133,7 +125,7 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   constructor() {
     addIcons({
       arrowBack, send, personCircle, chatbubbles, copy, refresh,
-      close, helpCircle, timeOutline, logoGoogle, globeOutline, chevronForward,
+      close, helpCircle, timeOutline, chevronForward,
       createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline
     });
     this.initializeHeaderActions();
@@ -154,16 +146,6 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
         this.isPremium = isPremium;
         if (isPremium) {
           this.loadPremiumModule();
-        }
-      })
-    );
-
-    // Load models
-    this.subscriptions.add(
-      this.modelService.getCombinedModels().subscribe(models => {
-        this.availableModels = models;
-        if (models.length > 0 && !this.selectedModel) {
-          this.selectedModel = models[0].id;
         }
       })
     );
@@ -504,13 +486,6 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
 
   formatTime(date: Date): string {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  getProviderIcon(provider: string): string {
-    switch (provider) {
-      case 'gemini': return 'logo-google';
-      default: return 'cloud-outline';
-    }
   }
 
   onEnterKey(event: KeyboardEvent): void {
