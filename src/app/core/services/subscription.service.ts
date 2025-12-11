@@ -89,8 +89,15 @@ export class SubscriptionService {
     const settings = this.settingsService.getSettings();
     const premium = settings.premium;
 
+    console.log('[SubscriptionService] checkSubscription called', {
+      email: premium?.email,
+      cachedActive: premium?.cachedStatus?.active,
+      lastVerified: premium?.cachedStatus?.lastVerified
+    });
+
     // No email configured
     if (!premium?.email) {
+      console.log('[SubscriptionService] No email configured');
       this.isPremium$.next(false);
       return false;
     }
@@ -100,12 +107,20 @@ export class SubscriptionService {
     const lastVerified = premium.cachedStatus?.lastVerified || 0;
     const cacheValid = lastVerified && (now - lastVerified) < this.CACHE_DURATION;
 
+    console.log('[SubscriptionService] Cache check', {
+      cacheValid,
+      cachedActive: premium.cachedStatus?.active,
+      timeSinceVerify: lastVerified ? now - lastVerified : 'never'
+    });
+
     if (cacheValid && premium.cachedStatus?.active) {
+      console.log('[SubscriptionService] Using valid cache, isPremium=true');
       this.isPremium$.next(true);
       return true;
     }
 
     // Verify with server
+    console.log('[SubscriptionService] Cache stale or inactive, verifying with server');
     return this.verifySubscription();
   }
 
@@ -116,6 +131,8 @@ export class SubscriptionService {
     const settings = this.settingsService.getSettings();
     const premium = settings.premium;
 
+    console.log('[SubscriptionService] verifySubscription called for:', premium?.email);
+
     if (!premium?.email) {
       this.isPremium$.next(false);
       return false;
@@ -125,6 +142,7 @@ export class SubscriptionService {
 
     try {
       const status = await this.fetchSubscriptionStatus(premium.email);
+      console.log('[SubscriptionService] API response:', status);
 
       // Update cache
       this.settingsService.updateSettings({
@@ -139,11 +157,12 @@ export class SubscriptionService {
         }
       });
 
+      console.log('[SubscriptionService] Setting isPremium to:', status.active);
       this.isPremium$.next(status.active);
       return status.active;
 
     } catch (error) {
-      console.warn('Subscription verification failed:', error);
+      console.warn('[SubscriptionService] Verification failed:', error);
 
       // Offline fallback: use grace period
       if (premium.cachedStatus?.active && premium.cachedStatus.expiresAt) {

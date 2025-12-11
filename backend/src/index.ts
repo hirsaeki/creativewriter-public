@@ -469,18 +469,45 @@ function handleHealth(headers: HeadersInit): Response {
 
 /**
  * Check if email has active subscription (helper for premium modules)
+ * This mirrors the verification logic from handleVerify to ensure consistency
  */
 async function isSubscriptionActive(
   email: string,
   env: Env
 ): Promise<boolean> {
-  const customerId = await env.SUBSCRIPTIONS.get(`email:${email}`);
-  if (!customerId) return false;
+  const stripe = getStripe(env);
 
+  // Look up customer ID by email (check cache first, then Stripe)
+  let customerId = await env.SUBSCRIPTIONS.get(`email:${email}`);
+
+  if (!customerId) {
+    // Customer not in cache - search Stripe directly
+    const existing = await stripe.customers.list({
+      email: email,
+      limit: 1,
+    });
+
+    if (existing.data.length > 0) {
+      customerId = existing.data[0].id;
+      // Cache the email -> customerId mapping
+      await env.SUBSCRIPTIONS.put(`email:${email}`, customerId);
+    } else {
+      // No customer exists in Stripe for this email
+      return false;
+    }
+  }
+
+  // Try to get cached subscription data
   const cached = await env.SUBSCRIPTIONS.get(`stripe:${customerId}`);
-  if (!cached) return false;
+  let subData: SubscriptionData;
 
-  const subData: SubscriptionData = JSON.parse(cached);
+  if (cached) {
+    subData = JSON.parse(cached);
+  } else {
+    // Fetch from Stripe and cache
+    subData = await syncStripeDataToKV(stripe, env.SUBSCRIPTIONS, customerId, env);
+  }
+
   return subData.status === 'active' || subData.status === 'trialing';
 }
 

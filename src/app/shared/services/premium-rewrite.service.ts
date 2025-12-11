@@ -56,7 +56,9 @@ export class PremiumRewriteService {
    * @returns true if user has access, false otherwise
    */
   async checkAndGateAccess(): Promise<boolean> {
-    if (this.isPremium) {
+    // Actively check subscription (don't rely only on cached isPremium getter)
+    const isPremium = await this.subscriptionService.checkSubscription();
+    if (isPremium) {
       return true;
     }
     await this.showUpsellDialog();
