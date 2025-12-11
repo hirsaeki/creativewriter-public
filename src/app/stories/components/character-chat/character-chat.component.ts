@@ -1,3 +1,11 @@
+/**
+ * Character Chat Component - Public Version
+ *
+ * This version checks subscription status and loads the premium module
+ * from the backend for premium subscribers.
+ *
+ * During public sync, this file replaces character-chat.component.ts
+ */
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef, TemplateRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -12,7 +20,8 @@ import { addIcons } from 'ionicons';
 import {
   arrowBack, send, personCircle, chatbubbles, copy, refresh,
   close, helpCircle, timeOutline, chevronForward,
-  createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline
+  createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline,
+  lockClosed, sparkles
 } from 'ionicons/icons';
 import { ModelSelectorComponent } from '../../../shared/components/model-selector/model-selector.component';
 
@@ -92,6 +101,7 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   currentMessage = '';
   isGenerating = false;
   isPremium = false;
+  isPremiumChecking = true; // Start with loading state
   isModuleLoading = false;
   moduleError: string | null = null;
 
@@ -131,7 +141,8 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
     addIcons({
       arrowBack, send, personCircle, chatbubbles, copy, refresh,
       close, helpCircle, timeOutline, chevronForward,
-      createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline
+      createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline,
+      lockClosed, sparkles
     });
     this.initializeHeaderActions();
   }
@@ -147,9 +158,11 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     // FIRST: Actively verify subscription status and WAIT for result
     // This ensures premium users see the chat immediately without race conditions
+    this.isPremiumChecking = true;
     const isPremium = await this.subscriptionService.checkSubscription();
     console.log('[CharacterChat] Initial premium check:', isPremium);
     this.isPremium = isPremium;
+    this.isPremiumChecking = false; // Done checking
     if (isPremium) {
       this.loadPremiumModule();
     }
