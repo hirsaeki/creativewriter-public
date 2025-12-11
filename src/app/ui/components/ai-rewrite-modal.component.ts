@@ -489,6 +489,7 @@ export class AIRewriteModalComponent implements OnInit, OnDestroy {
     'Write more emotionally',
     'Write more objectively',
     'Improve grammar',
+    'Improve expression',
     'Express more simply'
   ];
 
