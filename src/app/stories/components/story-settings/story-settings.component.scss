@@ -442,10 +442,10 @@ ion-radio-group ion-item {
   }
 }
 
-/* AI Favorites Tab */
+/* AI Favorites Tab - Accordion Layout */
 .favorites-tab {
   padding: 16px;
-  max-width: 1200px;
+  max-width: 800px;
   margin: 0 auto;
 
   .favorites-header {
@@ -470,13 +470,46 @@ ion-radio-group ion-item {
     }
   }
 
-  .favorites-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+  .favorites-accordion {
+    background: transparent;
 
-    @media (max-width: 992px) {
-      grid-template-columns: 1fr;
+    ion-accordion {
+      background: linear-gradient(135deg, rgba(20, 20, 20, 0.3) 0%, rgba(15, 15, 15, 0.3) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+
+      ion-item[slot="header"] {
+        --background: transparent;
+        --color: #f8f9fa;
+
+        ion-icon[slot="start"] {
+          color: #8bb4f8;
+          font-size: 1.2rem;
+        }
+
+        h3 {
+          font-weight: 600;
+          margin: 0 0 4px 0;
+        }
+
+        p {
+          font-size: 0.85rem;
+          color: #adb5bd;
+          margin: 0;
+        }
+
+        ion-badge {
+          --background: rgba(71, 118, 230, 0.3);
+          --color: #8bb4f8;
+        }
+      }
+
+      .accordion-content {
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.2);
+      }
     }
   }
 }

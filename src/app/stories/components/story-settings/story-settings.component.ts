@@ -7,7 +7,7 @@ import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
   IonTextarea, IonCheckbox, IonRadio, IonRadioGroup, IonChip, IonNote,
   IonText, IonGrid, IonRow, IonCol, IonProgressBar, IonList, IonThumbnail,
-  IonBadge, IonSelect, IonSelectOption
+  IonBadge, IonSelect, IonSelectOption, IonAccordion, IonAccordionGroup
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
@@ -16,7 +16,8 @@ import {
   settingsOutline, chatboxOutline, documentTextOutline, serverOutline,
   scanOutline, trashOutline, statsChartOutline,
   copyOutline, searchOutline, closeCircleOutline, checkboxOutline,
-  squareOutline, imageOutline, starOutline
+  squareOutline, imageOutline, starOutline, createOutline, syncOutline,
+  chatbubblesOutline
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { Story, StorySettings, DEFAULT_STORY_SETTINGS, NarrativePerspective } from '../../models/story.interface';
@@ -40,7 +41,7 @@ import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-hea
     IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
     IonTextarea, IonCheckbox, IonRadio, IonRadioGroup, IonChip, IonNote,
     IonText, IonGrid, IonRow, IonCol, IonProgressBar, IonList, IonThumbnail,
-    IonBadge, IonSelect, IonSelectOption,
+    IonBadge, IonSelect, IonSelectOption, IonAccordion, IonAccordionGroup,
     SettingsTabsComponent, SettingsContentComponent, ImageUploadComponent,
     ModelFavoritesSettingsComponent, AppHeaderComponent
   ],
@@ -121,7 +122,8 @@ export class StorySettingsComponent implements OnInit {
       settingsOutline, chatboxOutline, documentTextOutline, serverOutline,
       scanOutline, trashOutline, statsChartOutline,
       copyOutline, searchOutline, closeCircleOutline, checkboxOutline,
-      squareOutline, imageOutline, starOutline
+      squareOutline, imageOutline, starOutline, createOutline, syncOutline,
+      chatbubblesOutline
     });
   }
 
