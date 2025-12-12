@@ -1,6 +1,5 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonItem, IonLabel, IonList, IonCheckbox, IonSelect, IonSelectOption,
@@ -17,7 +16,7 @@ export interface PDFExportDialogOptions {
   selector: 'app-pdf-export-dialog',
   standalone: true,
   imports: [
-    CommonModule, FormsModule,
+    CommonModule,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
     IonItem, IonLabel, IonList, IonCheckbox, IonSelect, IonSelectOption
   ],

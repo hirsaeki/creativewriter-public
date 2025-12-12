@@ -1,11 +1,23 @@
-ion-header {
-  --background: rgba(30, 30, 30, 0.95);
-}
+// Modal sizing and positioning - ensures content renders properly
+:host {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 
-ion-content {
-  --background: rgba(20, 20, 20, 0.95);
-  height: auto;
-  contain: content;
+  ion-header {
+    flex-shrink: 0;
+    --background: rgba(30, 30, 30, 0.95);
+  }
+
+  ion-content {
+    flex: 1 1 auto;
+    --background: rgba(20, 20, 20, 0.95);
+    --overflow: auto;
+    overflow-y: auto;
+    min-height: 0;
+  }
 }
 
 ion-list {
