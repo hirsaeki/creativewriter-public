@@ -55,6 +55,31 @@ interface ErrorResponse {
   error: string;
 }
 
+// Auth token data stored in KV
+interface AuthToken {
+  customerId: string;
+  email: string;
+  createdAt: number;
+  subscriptionStatus: string;
+}
+
+// Verification code data (short-lived)
+interface VerificationCode {
+  customerId: string;
+  email: string;
+  expiresAt: number;
+}
+
+// Auth verify response (includes token)
+interface AuthVerifyResponse {
+  active: boolean;
+  status: string;
+  expiresAt?: number;
+  cancelAtPeriodEnd?: boolean;
+  plan?: PlanType;
+  authToken: string;
+}
+
 // Initialize Stripe with Worker-compatible HTTP client
 function getStripe(env: Env): Stripe {
   return new Stripe(env.STRIPE_API_KEY, {
@@ -69,7 +94,7 @@ function corsHeaders(_env: Env, origin: string): HeadersInit {
   return {
     'Access-Control-Allow-Origin': origin || '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
   };
 }
@@ -96,6 +121,57 @@ function getPlanFromPriceId(priceId: string | undefined, env: Env): PlanType | u
 // Get price ID from plan type
 function getPriceIdFromPlan(plan: PlanType, env: Env): string {
   return plan === 'yearly' ? env.STRIPE_PRICE_ID_YEARLY : env.STRIPE_PRICE_ID_MONTHLY;
+}
+
+/**
+ * Generate cryptographically secure random token using Web Crypto API
+ * Returns a 256-bit (32 byte) token as base64url string
+ */
+function generateSecureToken(): string {
+  const buffer = new Uint8Array(32);
+  crypto.getRandomValues(buffer);
+  return btoa(String.fromCharCode(...buffer))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+/**
+ * Generate short verification code for URL parameter
+ * Returns a 128-bit (16 byte) code as base64url string
+ */
+function generateVerificationCode(): string {
+  const buffer = new Uint8Array(16);
+  crypto.getRandomValues(buffer);
+  return btoa(String.fromCharCode(...buffer))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+/**
+ * Validate auth token and return customer data
+ */
+async function validateAuthToken(
+  token: string,
+  env: Env
+): Promise<{ valid: boolean; authData?: AuthToken; subData?: SubscriptionData }> {
+  const authDataStr = await env.SUBSCRIPTIONS.get(`auth:${token}`);
+  if (!authDataStr) {
+    return { valid: false };
+  }
+
+  const authData: AuthToken = JSON.parse(authDataStr);
+
+  const subDataStr = await env.SUBSCRIPTIONS.get(`stripe:${authData.customerId}`);
+  if (!subDataStr) {
+    return { valid: false };
+  }
+
+  const subData: SubscriptionData = JSON.parse(subDataStr);
+  const isActive = subData.status === 'active' || subData.status === 'trialing';
+
+  return { valid: isActive, authData, subData };
 }
 
 /**
@@ -418,7 +494,8 @@ async function handleVerify(
 }
 
 /**
- * Handle GET /api/portal - Get customer portal URL
+ * Handle GET /api/portal - Get customer portal URL with verification code
+ * The verification code proves user visited the portal (authenticated with Stripe)
  */
 async function handlePortal(
   request: Request,
@@ -427,6 +504,7 @@ async function handlePortal(
 ): Promise<Response> {
   const url = new URL(request.url);
   const email = url.searchParams.get('email')?.trim().toLowerCase();
+  const returnUrl = url.searchParams.get('returnUrl');
 
   if (!email) {
     return jsonResponse<ErrorResponse>(
@@ -436,21 +514,53 @@ async function handlePortal(
     );
   }
 
-  const customerId = await env.SUBSCRIPTIONS.get(`email:${email}`);
+  // First check if customer exists in Stripe (not just cache)
+  const stripe = getStripe(env);
+  let customerId = await env.SUBSCRIPTIONS.get(`email:${email}`);
 
   if (!customerId) {
-    return jsonResponse<ErrorResponse>(
-      { error: 'No subscription found for this email' },
-      404,
-      headers
-    );
+    // Customer not in cache - search Stripe directly
+    const existing = await stripe.customers.list({
+      email: email,
+      limit: 1,
+    });
+
+    if (existing.data.length > 0) {
+      customerId = existing.data[0].id;
+      // Cache the email -> customerId mapping
+      await env.SUBSCRIPTIONS.put(`email:${email}`, customerId);
+    } else {
+      return jsonResponse<ErrorResponse>(
+        { error: 'No subscription found for this email' },
+        404,
+        headers
+      );
+    }
   }
 
-  const stripe = getStripe(env);
+  // Generate verification code
+  const verificationCode = generateVerificationCode();
+
+  // Store verification code with 5-minute expiry
+  const verification: VerificationCode = {
+    customerId,
+    email,
+    expiresAt: Date.now() + 5 * 60 * 1000,
+  };
+  await env.SUBSCRIPTIONS.put(
+    `verification:${verificationCode}`,
+    JSON.stringify(verification),
+    { expirationTtl: 300 }
+  );
+
+  // Build return URL with verification code
+  const baseReturnUrl = returnUrl || env.SUCCESS_URL.replace('?subscription=success', '');
+  const separator = baseReturnUrl.includes('?') ? '&' : '?';
+  const portalReturnUrl = `${baseReturnUrl}${separator}verify=${verificationCode}`;
 
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
-    return_url: env.SUCCESS_URL.replace('?subscription=success', ''),
+    return_url: portalReturnUrl,
   });
 
   return jsonResponse<PortalResponse>({ url: session.url }, 200, headers);
@@ -462,6 +572,178 @@ async function handlePortal(
 function handleHealth(headers: HeadersInit): Response {
   return jsonResponse(
     { status: 'ok', timestamp: new Date().toISOString() },
+    200,
+    headers
+  );
+}
+
+/**
+ * Handle GET /api/auth/exchange - Exchange verification code for auth token
+ * This is called after user returns from Stripe Customer Portal
+ */
+async function handleAuthExchange(
+  request: Request,
+  env: Env,
+  headers: HeadersInit
+): Promise<Response> {
+  const url = new URL(request.url);
+  const code = url.searchParams.get('code');
+
+  if (!code) {
+    return jsonResponse<ErrorResponse>(
+      { error: 'Verification code required' },
+      400,
+      headers
+    );
+  }
+
+  // Look up verification code
+  const verificationData = await env.SUBSCRIPTIONS.get(`verification:${code}`);
+  if (!verificationData) {
+    return jsonResponse<ErrorResponse>(
+      { error: 'Invalid or expired verification code' },
+      401,
+      headers
+    );
+  }
+
+  const verification: VerificationCode = JSON.parse(verificationData);
+
+  // Check if code has expired
+  if (Date.now() > verification.expiresAt) {
+    await env.SUBSCRIPTIONS.delete(`verification:${code}`);
+    return jsonResponse<ErrorResponse>(
+      { error: 'Verification code expired' },
+      401,
+      headers
+    );
+  }
+
+  // Delete used verification code (one-time use)
+  await env.SUBSCRIPTIONS.delete(`verification:${code}`);
+
+  // Sync subscription data from Stripe
+  const stripe = getStripe(env);
+  const subData = await syncStripeDataToKV(
+    stripe,
+    env.SUBSCRIPTIONS,
+    verification.customerId,
+    env
+  );
+
+  // Generate auth token
+  const authToken = generateSecureToken();
+
+  const authData: AuthToken = {
+    customerId: verification.customerId,
+    email: verification.email,
+    createdAt: Date.now(),
+    subscriptionStatus: subData.status,
+  };
+
+  // Store auth token with 30-day TTL
+  await env.SUBSCRIPTIONS.put(
+    `auth:${authToken}`,
+    JSON.stringify(authData),
+    { expirationTtl: 86400 * 30 }
+  );
+
+  const isActive = subData.status === 'active' || subData.status === 'trialing';
+
+  return jsonResponse<AuthVerifyResponse>(
+    {
+      active: isActive,
+      status: subData.status,
+      expiresAt: subData.currentPeriodEnd * 1000,
+      cancelAtPeriodEnd: subData.cancelAtPeriodEnd,
+      plan: subData.plan,
+      authToken,
+    },
+    200,
+    headers
+  );
+}
+
+/**
+ * Handle POST /api/auth/refresh - Refresh auth token
+ * Called periodically to keep the token fresh and verify subscription is still active
+ */
+async function handleAuthRefresh(
+  request: Request,
+  env: Env,
+  headers: HeadersInit
+): Promise<Response> {
+  const authHeader = request.headers.get('Authorization');
+  const oldToken = authHeader?.replace('Bearer ', '');
+
+  if (!oldToken) {
+    return jsonResponse<ErrorResponse>(
+      { error: 'Authorization token required' },
+      401,
+      headers
+    );
+  }
+
+  // Validate existing token
+  const authDataStr = await env.SUBSCRIPTIONS.get(`auth:${oldToken}`);
+  if (!authDataStr) {
+    return jsonResponse<ErrorResponse>(
+      { error: 'Invalid token' },
+      401,
+      headers
+    );
+  }
+
+  const authData: AuthToken = JSON.parse(authDataStr);
+
+  // Sync subscription data from Stripe to verify it's still active
+  const stripe = getStripe(env);
+  const subData = await syncStripeDataToKV(
+    stripe,
+    env.SUBSCRIPTIONS,
+    authData.customerId,
+    env
+  );
+
+  const isActive = subData.status === 'active' || subData.status === 'trialing';
+  if (!isActive) {
+    // Subscription no longer active - delete the token
+    await env.SUBSCRIPTIONS.delete(`auth:${oldToken}`);
+    return jsonResponse<ErrorResponse>(
+      { error: 'Subscription no longer active' },
+      403,
+      headers
+    );
+  }
+
+  // Generate new token
+  const newToken = generateSecureToken();
+
+  const newAuthData: AuthToken = {
+    ...authData,
+    createdAt: Date.now(),
+    subscriptionStatus: subData.status,
+  };
+
+  // Store new token with 30-day TTL
+  await env.SUBSCRIPTIONS.put(
+    `auth:${newToken}`,
+    JSON.stringify(newAuthData),
+    { expirationTtl: 86400 * 30 }
+  );
+
+  // Delete old token
+  await env.SUBSCRIPTIONS.delete(`auth:${oldToken}`);
+
+  return jsonResponse<AuthVerifyResponse>(
+    {
+      active: true,
+      status: subData.status,
+      expiresAt: subData.currentPeriodEnd * 1000,
+      cancelAtPeriodEnd: subData.cancelAtPeriodEnd,
+      plan: subData.plan,
+      authToken: newToken,
+    },
     200,
     headers
   );
@@ -520,23 +802,24 @@ async function handlePremiumCharacterChat(
   env: Env,
   headers: HeadersInit
 ): Promise<Response> {
-  const url = new URL(request.url);
-  const email = url.searchParams.get('email')?.trim().toLowerCase();
+  // Require Authorization header with auth token
+  const authHeader = request.headers.get('Authorization');
+  const token = authHeader?.replace('Bearer ', '');
 
-  if (!email) {
+  if (!token) {
     return jsonResponse<ErrorResponse>(
-      { error: 'Email required' },
-      400,
+      { error: 'Authentication required. Please verify your subscription.' },
+      401,
       headers
     );
   }
 
-  // Verify subscription
-  const isActive = await isSubscriptionActive(email, env);
-  if (!isActive) {
+  // Validate auth token and check subscription is active
+  const { valid } = await validateAuthToken(token, env);
+  if (!valid) {
     return jsonResponse<ErrorResponse>(
-      { error: 'Premium subscription required' },
-      403,
+      { error: 'Invalid or expired authentication token. Please re-verify your subscription.' },
+      401,
       headers
     );
   }
@@ -776,23 +1059,24 @@ async function handlePremiumBeatRewrite(
   env: Env,
   headers: HeadersInit
 ): Promise<Response> {
-  const url = new URL(request.url);
-  const email = url.searchParams.get('email')?.trim().toLowerCase();
+  // Require Authorization header with auth token
+  const authHeader = request.headers.get('Authorization');
+  const token = authHeader?.replace('Bearer ', '');
 
-  if (!email) {
+  if (!token) {
     return jsonResponse<ErrorResponse>(
-      { error: 'Email required' },
-      400,
+      { error: 'Authentication required. Please verify your subscription.' },
+      401,
       headers
     );
   }
 
-  // Verify subscription
-  const isActive = await isSubscriptionActive(email, env);
-  if (!isActive) {
+  // Validate auth token and check subscription is active
+  const { valid } = await validateAuthToken(token, env);
+  if (!valid) {
     return jsonResponse<ErrorResponse>(
-      { error: 'Premium subscription required' },
-      403,
+      { error: 'Invalid or expired authentication token. Please re-verify your subscription.' },
+      401,
       headers
     );
   }
@@ -1014,6 +1298,26 @@ export default {
             );
           }
           return handlePortal(request, env, headers);
+
+        case '/api/auth/exchange':
+          if (request.method !== 'GET') {
+            return jsonResponse<ErrorResponse>(
+              { error: 'Method not allowed' },
+              405,
+              headers
+            );
+          }
+          return handleAuthExchange(request, env, headers);
+
+        case '/api/auth/refresh':
+          if (request.method !== 'POST') {
+            return jsonResponse<ErrorResponse>(
+              { error: 'Method not allowed' },
+              405,
+              headers
+            );
+          }
+          return handleAuthRefresh(request, env, headers);
 
         case '/api/prices':
           if (request.method !== 'GET') {

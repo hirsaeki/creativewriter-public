@@ -125,7 +125,7 @@ export class PremiumModuleService {
 
   /**
    * Load the Character Chat premium module
-   * Only works for verified premium subscribers
+   * Only works for verified premium subscribers with valid auth token
    */
   async loadCharacterChatModule(): Promise<CharacterChatModule | null> {
     // Check if already loaded
@@ -139,11 +139,11 @@ export class PremiumModuleService {
       return null;
     }
 
-    const settings = this.settingsService.getSettings();
-    const email = settings.premium?.email;
+    // Get auth token
+    const authToken = this.subscriptionService.getAuthToken();
 
-    if (!email) {
-      this.loadError$.next('No subscription email configured');
+    if (!authToken) {
+      this.loadError$.next('Please verify your subscription through the Stripe portal');
       return null;
     }
 
@@ -151,11 +151,18 @@ export class PremiumModuleService {
     this.loadError$.next(null);
 
     try {
-      const url = `${this.API_URL}/premium/character-chat?email=${encodeURIComponent(email)}`;
-      const response = await fetch(url);
+      const url = `${this.API_URL}/premium/character-chat`;
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
 
       if (!response.ok) {
-        if (response.status === 403) {
+        if (response.status === 401) {
+          this.loadError$.next('Session expired. Please re-verify your subscription.');
+          this.subscriptionService.clearSubscription();
+        } else if (response.status === 403) {
           this.loadError$.next('Premium subscription required');
         } else {
           this.loadError$.next(`Failed to load module: ${response.status}`);
@@ -189,7 +196,7 @@ export class PremiumModuleService {
 
   /**
    * Load the Beat Rewrite premium module
-   * Only works for verified premium subscribers
+   * Only works for verified premium subscribers with valid auth token
    */
   async loadBeatRewriteModule(): Promise<BeatRewriteModule | null> {
     // Check if already loaded
@@ -203,11 +210,11 @@ export class PremiumModuleService {
       return null;
     }
 
-    const settings = this.settingsService.getSettings();
-    const email = settings.premium?.email;
+    // Get auth token
+    const authToken = this.subscriptionService.getAuthToken();
 
-    if (!email) {
-      this.loadError$.next('No subscription email configured');
+    if (!authToken) {
+      this.loadError$.next('Please verify your subscription through the Stripe portal');
       return null;
     }
 
@@ -215,11 +222,18 @@ export class PremiumModuleService {
     this.loadError$.next(null);
 
     try {
-      const url = `${this.API_URL}/premium/beat-rewrite?email=${encodeURIComponent(email)}`;
-      const response = await fetch(url);
+      const url = `${this.API_URL}/premium/beat-rewrite`;
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
 
       if (!response.ok) {
-        if (response.status === 403) {
+        if (response.status === 401) {
+          this.loadError$.next('Session expired. Please re-verify your subscription.');
+          this.subscriptionService.clearSubscription();
+        } else if (response.status === 403) {
           this.loadError$.next('Premium subscription required');
         } else {
           this.loadError$.next(`Failed to load module: ${response.status}`);

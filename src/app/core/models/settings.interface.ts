@@ -27,6 +27,8 @@ export interface Settings {
 export interface PremiumSettings {
   email: string;                    // Email used for subscription verification
   apiUrl: string;                   // Subscription API URL (Cloudflare Worker)
+  authToken?: string;               // Auth token from portal verification
+  authTokenCreatedAt?: number;      // When auth token was created (for refresh)
   // Cached status (updated when verified)
   cachedStatus: {
     active: boolean;
