@@ -1,3 +1,11 @@
+/**
+ * Character Chat Component - Public Version
+ *
+ * This version checks subscription status and loads the premium module
+ * from the backend for premium subscribers.
+ *
+ * During public sync, this file replaces character-chat.component.ts
+ */
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef, TemplateRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -12,7 +20,8 @@ import { addIcons } from 'ionicons';
 import {
   arrowBack, send, personCircle, chatbubbles, copy, refresh,
   close, helpCircle, timeOutline, chevronForward,
-  createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline, copyOutline
+  createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline, copyOutline,
+  lockClosed, sparkles
 } from 'ionicons/icons';
 import { ModelSelectorComponent } from '../../../shared/components/model-selector/model-selector.component';
 
@@ -132,7 +141,8 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
     addIcons({
       arrowBack, send, personCircle, chatbubbles, copy, refresh,
       close, helpCircle, timeOutline, chevronForward,
-      createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline, copyOutline
+      createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline, copyOutline,
+      lockClosed, sparkles
     });
     this.initializeHeaderActions();
   }
