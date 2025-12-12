@@ -63,6 +63,10 @@ I've prepared Unraid-specific documentation including:
 
 Productivity / Tools
 
+## Support Thread
+
+**Unraid Forums:** https://forums.unraid.net/topic/195758-support-creativewriter-ai-enhanced-creative-writing-application/
+
 ## Additional Notes
 
 - MIT License

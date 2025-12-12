@@ -136,6 +136,7 @@ All persistent data is stored in `/mnt/user/appdata/creativewriter/`:
 
 ## Getting Help
 
+- **Unraid Forums**: https://forums.unraid.net/topic/195758-support-creativewriter-ai-enhanced-creative-writing-application/
 - **GitHub Issues**: https://github.com/MarcoDroll/creativewriter-public/issues
 - **Documentation**: https://github.com/MarcoDroll/creativewriter-public
 
