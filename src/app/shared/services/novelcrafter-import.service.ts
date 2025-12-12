@@ -258,7 +258,7 @@ export class NovelCrafterImportService {
     let currentScene: Scene | null = null;
     let sceneBuffer: string[] = [];
     let summaryBuffer: string[] = [];
-    let parsingState: 'content' | 'story' | 'summary' = 'content';
+    let parsingState: 'content' | 'story' = 'content';
     let sceneOrder = 0;
     let titleExtracted = false;
 
@@ -445,8 +445,9 @@ export class NovelCrafterImportService {
           updatedAt: new Date()
         };
 
-        // After separator, next content is either summary or story content
-        parsingState = 'summary';
+        // After separator, content is story prose by default
+        // NovelCrafter exports don't include summary sections after scene separators
+        parsingState = 'story';
         continue;
       }
 
@@ -470,17 +471,10 @@ export class NovelCrafterImportService {
       if (currentScene) {
         if (parsingState === 'story') {
           sceneBuffer.push(line);
-        } else if (parsingState === 'summary') {
-          // Check if we're transitioning from summary to story content
-          // Summaries in NovelCrafter are typically followed by --- then story content
-          if (line.trim() === '---') {
-            parsingState = 'story';
-            continue;
-          }
-          summaryBuffer.push(line);
         } else if (parsingState === 'content') {
-          // Before any explicit markers, content goes to summary
-          summaryBuffer.push(line);
+          // Before any explicit markers, treat content as story prose
+          // This handles the case where content appears immediately after chapter heading
+          sceneBuffer.push(line);
         }
       }
     }
