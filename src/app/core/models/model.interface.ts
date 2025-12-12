@@ -4,7 +4,7 @@ export interface ModelInfo {
   description?: string;
   pricing: ModelPricing;
   context_length: number;
-  provider: 'openrouter' | 'replicate' | 'gemini' | 'ollama' | 'claude';
+  provider: 'openrouter' | 'replicate' | 'gemini' | 'ollama' | 'claude' | 'openaiCompatible';
 }
 
 export interface ModelPricing {
@@ -104,5 +104,5 @@ export interface ModelOption {
   costInputEur: string; // Formatted cost per 1M tokens in EUR
   costOutputEur: string; // Formatted cost per 1M tokens in EUR
   contextLength: number;
-  provider: 'openrouter' | 'replicate' | 'gemini' | 'ollama' | 'claude';
+  provider: 'openrouter' | 'replicate' | 'gemini' | 'ollama' | 'claude' | 'openaiCompatible';
 }
