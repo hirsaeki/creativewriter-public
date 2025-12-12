@@ -4,7 +4,9 @@
 
 Hey! No worries at all - thanks for reaching out!
 
-Great news: I've just added Unraid support! Here's how to get it running:
+Great news: I've just added Unraid support! Just a heads up - this is still an early access version, so expect some rough edges, but it's stable enough for daily use.
+
+Here's how to get it running:
 
 ## Quick Install (Docker Compose Manager)
 

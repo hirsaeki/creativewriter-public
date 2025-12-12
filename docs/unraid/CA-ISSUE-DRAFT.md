@@ -17,6 +17,8 @@
 **Description:**
 AI-enhanced creative writing application for fiction authors. Features multiple AI provider support (OpenRouter, Google Gemini, Ollama for local LLMs), rich text editor with inline images, story structure management, dynamic character/world codex, and automatic backups.
 
+> **Note:** This is an early access version in active development. Stable but expect ongoing improvements.
+
 **GitHub Repository:** https://github.com/MarcoDroll/creativewriter-public
 
 **Docker Registry:** GitHub Container Registry (ghcr.io)

@@ -10,6 +10,8 @@
 
 ## CreativeWriter
 
+> **⚠️ Early Access:** This is an early version in active development. Expect bugs, missing features, and frequent changes. Use at your own risk and consider it experimental software.
+
 CreativeWriter is a powerful, self-hosted creative writing application that helps fiction authors craft compelling stories with AI assistance.
 
 ### Screenshots
