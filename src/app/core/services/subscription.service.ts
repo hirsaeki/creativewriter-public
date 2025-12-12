@@ -270,7 +270,7 @@ export class SubscriptionService {
    * Returns the Stripe Customer Portal URL
    */
   async initiatePortalVerification(email: string): Promise<string> {
-    const currentUrl = window.location.origin + '/settings';
+    const currentUrl = window.location.origin + '/settings?tab=premium';
     const url = `${this.API_URL}/portal?email=${encodeURIComponent(email)}&returnUrl=${encodeURIComponent(currentUrl)}`;
 
     const response = await fetch(url);
