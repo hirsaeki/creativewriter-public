@@ -55,7 +55,7 @@ For more control, create a dedicated template repository.
 
 3. **Register with Community Applications**
    - Create a support thread on the Unraid forums:
-     https://forums.unraid.net/forum/index.php?/forum/38-plug-in-support/
+     https://forums.unraid.net/forum/47-docker-containers/
    - Title: "[Support] CreativeWriter - AI Creative Writing App"
    - Include: description, screenshots, installation instructions
 
