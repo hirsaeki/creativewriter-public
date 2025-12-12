@@ -13,6 +13,7 @@ export interface Settings {
   googleGemini: GoogleGeminiSettings;
   ollama: OllamaSettings;
   claude: ClaudeSettings;
+  openAICompatible: OpenAICompatibleSettings;
   sceneTitleGeneration: SceneTitleGenerationSettings;
   sceneSummaryGeneration: SceneSummaryGenerationSettings;
   sceneGenerationFromOutline: SceneGenerationFromOutlineSettings;
@@ -91,6 +92,15 @@ export interface ClaudeSettings {
   enabled: boolean;
 }
 
+export interface OpenAICompatibleSettings {
+  baseUrl: string;
+  model: string;
+  temperature: number;
+  topP: number;
+  maxTokens: number;
+  enabled: boolean;
+}
+
 export interface SceneTitleGenerationSettings {
   maxWords: number;
   style: 'descriptive' | 'concise' | 'action' | 'emotional';
@@ -165,6 +175,14 @@ export const DEFAULT_SETTINGS: Settings = {
     temperature: 0.7,
     topP: 1.0,
     topK: 0,
+    enabled: false
+  },
+  openAICompatible: {
+    baseUrl: 'http://localhost:1234',
+    model: '',
+    temperature: 0.7,
+    topP: 1.0,
+    maxTokens: 2000,
     enabled: false
   },
   sceneTitleGeneration: {

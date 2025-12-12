@@ -11,6 +11,7 @@ import { Settings } from '../../core/models/settings.interface';
 import { ModelOption } from '../../core/models/model.interface';
 import { OllamaApiService } from '../../core/services/ollama-api.service';
 import { ClaudeApiService } from '../../core/services/claude-api.service';
+import { OpenAICompatibleApiService } from '../../core/services/openai-compatible-api.service';
 import { ModelService } from '../../core/services/model.service';
 import { OpenRouterIconComponent } from '../icons/openrouter-icon.component';
 import { ClaudeIconComponent } from '../icons/claude-icon.component';
@@ -49,7 +50,7 @@ import { OllamaIconComponent } from '../icons/ollama-icon.component';
                 size="small"
                 fill="outline"
                 (click)="loadCombinedModels()" 
-                [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl) && (!settings.claude.enabled || !settings.claude.apiKey) || loadingModels"
+                [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl) && (!settings.claude.enabled || !settings.claude.apiKey) && (!settings.openAICompatible.enabled || !settings.openAICompatible.baseUrl) || loadingModels"
                 title="Load Models">
                 {{ loadingModels ? 'Loading...' : 'Load Models' }}
               </ion-button>
@@ -60,7 +61,7 @@ import { OllamaIconComponent } from '../icons/ollama-icon.component';
                        bindValue="id"
                        [searchable]="true"
                        [clearable]="true"
-                       [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl) && (!settings.claude.enabled || !settings.claude.apiKey)"
+                       [disabled]="(!settings.openRouter.enabled || !settings.openRouter.apiKey) && (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) && (!settings.replicate.enabled || !settings.replicate.apiKey) && (!settings.ollama.enabled || !settings.ollama.baseUrl) && (!settings.claude.enabled || !settings.claude.apiKey) && (!settings.openAICompatible.enabled || !settings.openAICompatible.baseUrl)"
                        placeholder="Select or search model..."
                        (ngModelChange)="onGlobalModelChange()"
                        [loading]="loadingModels"
@@ -91,17 +92,24 @@ import { OllamaIconComponent } from '../icons/ollama-icon.component';
                       class="provider-icon replicate"
                       [title]="getProviderTooltip(item.provider)">
                     </app-replicate-icon>
-                    <app-ollama-icon 
+                    <app-ollama-icon
                       *ngIf="item.provider === 'ollama'"
-                      size="18" 
-                      color="#ff9800" 
+                      size="18"
+                      color="#ff9800"
                       class="provider-icon ollama"
                       [title]="getProviderTooltip(item.provider)">
                     </app-ollama-icon>
-                    <ion-icon 
-                      *ngIf="item.provider !== 'openrouter' && item.provider !== 'claude' && item.provider !== 'replicate' && item.provider !== 'ollama'"
-                      [name]="getProviderIcon(item.provider)" 
-                      class="provider-icon" 
+                    <ion-icon
+                      *ngIf="item.provider === 'openaiCompatible'"
+                      name="server-outline"
+                      class="provider-icon openai-compatible"
+                      style="color: #4caf50;"
+                      [title]="getProviderTooltip(item.provider)">
+                    </ion-icon>
+                    <ion-icon
+                      *ngIf="item.provider !== 'openrouter' && item.provider !== 'claude' && item.provider !== 'replicate' && item.provider !== 'ollama' && item.provider !== 'openaiCompatible'"
+                      [name]="getProviderIcon(item.provider)"
+                      class="provider-icon"
                       [class.gemini]="item.provider === 'gemini'"
                       [title]="getProviderTooltip(item.provider)"></ion-icon>
                     <span class="model-label">{{ item.label }}</span>
@@ -119,7 +127,7 @@ import { OllamaIconComponent } from '../icons/ollama-icon.component';
               <p *ngIf="!modelLoadError && combinedModels.length > 0" class="info-text">
                 {{ combinedModels.length }} models available. Prices in EUR per 1M tokens.
               </p>
-              <p *ngIf="!modelLoadError && combinedModels.length === 0 && (settings.openRouter.enabled || settings.googleGemini.enabled || settings.replicate.enabled || settings.ollama.enabled || settings.claude.enabled)" class="info-text">
+              <p *ngIf="!modelLoadError && combinedModels.length === 0 && (settings.openRouter.enabled || settings.googleGemini.enabled || settings.replicate.enabled || settings.ollama.enabled || settings.claude.enabled || settings.openAICompatible.enabled)" class="info-text">
                 Click 'Load Models' to display available models.
               </p>
             </div>
@@ -640,6 +648,115 @@ import { OllamaIconComponent } from '../icons/ollama-icon.component';
         </div>
       </ion-card-content>
     </ion-card>
+
+    <!-- OpenAI-Compatible Settings (LM Studio, LocalAI, etc.) -->
+    <ion-card>
+      <ion-card-header (click)="isOpenAICompatibleCollapsed = !isOpenAICompatibleCollapsed" style="cursor: pointer;">
+        <div class="card-header-content">
+          <ion-card-title>
+            <ion-icon name="server-outline" style="margin-right: 8px; color: #4caf50;"></ion-icon>
+            OpenAI-Compatible (Local)
+          </ion-card-title>
+          <span style="color: #8bb4f8; font-size: 1.5rem; margin-left: auto; padding: 0.5rem;">
+            {{ isOpenAICompatibleCollapsed ? '▼' : '▲' }}
+          </span>
+        </div>
+      </ion-card-header>
+      <ion-card-content [class.collapsed]="isOpenAICompatibleCollapsed">
+        <ion-item>
+          <ion-label>Enable OpenAI-Compatible</ion-label>
+          <ion-toggle
+            [(ngModel)]="settings.openAICompatible.enabled"
+            (ngModelChange)="onProviderToggle('openAICompatible')"
+            slot="end">
+          </ion-toggle>
+        </ion-item>
+
+        <ion-item [class.disabled]="!settings.openAICompatible.enabled">
+          <ion-input
+            type="url"
+            [(ngModel)]="settings.openAICompatible.baseUrl"
+            (ngModelChange)="onOpenAICompatibleUrlChange()"
+            placeholder="http://localhost:1234"
+            [disabled]="!settings.openAICompatible.enabled"
+            label="Base URL"
+            labelPlacement="stacked"
+            helperText="URL where your OpenAI-compatible server is running (LM Studio default: localhost:1234)">
+          </ion-input>
+        </ion-item>
+
+        <div class="connection-test" [class.disabled]="!settings.openAICompatible.enabled">
+          <ion-button
+            size="small"
+            fill="outline"
+            (click)="testOpenAICompatibleConnection()"
+            [disabled]="!settings.openAICompatible.enabled || !settings.openAICompatible.baseUrl || testingOpenAICompatibleConnection"
+            title="Test Connection">
+            <ion-icon name="checkmark-circle" slot="start" *ngIf="openAICompatibleConnectionStatus === 'success'"></ion-icon>
+            <ion-icon name="warning" slot="start" *ngIf="openAICompatibleConnectionStatus === 'error'"></ion-icon>
+            {{ testingOpenAICompatibleConnection ? 'Testing...' : 'Test Connection' }}
+          </ion-button>
+          <span *ngIf="openAICompatibleConnectionStatus === 'success'" class="connection-status success">✓ Connected</span>
+          <span *ngIf="openAICompatibleConnectionStatus === 'error'" class="connection-status error">✗ Connection Failed</span>
+        </div>
+
+        <div class="model-info" [class.disabled]="!settings.openAICompatible.enabled">
+          <p class="info-text">Use the global model selection above to choose from your local models. <br>
+            Works with LM Studio, LocalAI, vLLM, text-generation-webui, and other OpenAI-compatible servers.</p>
+          <p class="info-text warning-text" style="color: #ffb74d; margin-top: 8px;">
+            <ion-icon name="warning-outline" style="vertical-align: middle; margin-right: 4px;"></ion-icon>
+            <strong>CORS Required:</strong> Enable CORS in your local server settings.<br>
+            <span style="font-size: 0.85em; opacity: 0.9;">
+              • <strong>LM Studio:</strong> Local Server → Enable "Cross-Origin-Resource-Sharing (CORS)"<br>
+              • <strong>Ollama:</strong> Set OLLAMA_ORIGINS environment variable<br>
+              • <strong>Other servers:</strong> Consult your server's CORS documentation
+            </span>
+          </p>
+        </div>
+
+        <div class="settings-row" [class.disabled]="!settings.openAICompatible.enabled">
+          <ion-item>
+            <ion-input
+              type="number"
+              [(ngModel)]="settings.openAICompatible.temperature"
+              (ngModelChange)="settingsChange.emit()"
+              min="0"
+              max="2"
+              step="0.1"
+              [disabled]="!settings.openAICompatible.enabled"
+              label="Temperature"
+              labelPlacement="stacked">
+            </ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input
+              type="number"
+              [(ngModel)]="settings.openAICompatible.topP"
+              (ngModelChange)="settingsChange.emit()"
+              min="0"
+              max="1"
+              step="0.1"
+              [disabled]="!settings.openAICompatible.enabled"
+              label="Top P"
+              labelPlacement="stacked">
+            </ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input
+              type="number"
+              [(ngModel)]="settings.openAICompatible.maxTokens"
+              (ngModelChange)="settingsChange.emit()"
+              min="100"
+              max="10000"
+              step="100"
+              [disabled]="!settings.openAICompatible.enabled"
+              label="Max Tokens"
+              labelPlacement="stacked">
+            </ion-input>
+          </ion-item>
+        </div>
+      </ion-card-content>
+    </ion-card>
   `,
   styles: [`
     :host {
@@ -890,6 +1007,7 @@ import { OllamaIconComponent } from '../icons/ollama-icon.component';
 export class ApiSettingsComponent implements OnDestroy {
   private ollamaApiService = inject(OllamaApiService);
   private claudeApiService = inject(ClaudeApiService);
+  private openAICompatibleApiService = inject(OpenAICompatibleApiService);
   private modelService = inject(ModelService);
   private subscriptions = new Subscription();
 
@@ -898,14 +1016,16 @@ export class ApiSettingsComponent implements OnDestroy {
   @Input() replicateModels: ModelOption[] = [];
   @Input() loadingModels = false;
   @Input() modelLoadError: string | null = null;
-  
+
   @Output() settingsChange = new EventEmitter<void>();
   @Output() modelsLoaded = new EventEmitter<ModelOption[]>();
-  
+
   testingOllamaConnection = false;
   ollamaConnectionStatus: 'success' | 'error' | null = null;
   testingClaudeConnection = false;
   claudeConnectionStatus: 'success' | 'error' | null = null;
+  testingOpenAICompatibleConnection = false;
+  openAICompatibleConnectionStatus: 'success' | 'error' | null = null;
 
   // Collapsible card states
   isModelSelectionCollapsed = false;
@@ -914,6 +1034,7 @@ export class ApiSettingsComponent implements OnDestroy {
   isOllamaCollapsed = true;
   isGeminiCollapsed = true;
   isClaudeCollapsed = true;
+  isOpenAICompatibleCollapsed = true;
 
   formatContextLength(length: number): string {
     if (length >= 1000000) {
@@ -959,6 +1080,8 @@ export class ApiSettingsComponent implements OnDestroy {
         this.settings.ollama.model = modelId;
       } else if (provider === 'replicate') {
         this.settings.replicate.model = modelId;
+      } else if (provider === 'openaiCompatible') {
+        this.settings.openAICompatible.model = modelId;
       }
     }
 
@@ -990,7 +1113,7 @@ export class ApiSettingsComponent implements OnDestroy {
     }
   }
   
-  onProviderToggle(provider: 'openRouter' | 'replicate' | 'googleGemini' | 'ollama' | 'claude'): void {
+  onProviderToggle(provider: 'openRouter' | 'replicate' | 'googleGemini' | 'ollama' | 'claude' | 'openAICompatible'): void {
     this.settingsChange.emit();
 
     // Load models when provider is enabled and has credentials
@@ -1006,6 +1129,9 @@ export class ApiSettingsComponent implements OnDestroy {
     } else if (provider === 'claude' && this.settings.claude.enabled && this.settings.claude.apiKey) {
       this.subscriptions.add(this.modelService.loadClaudeModels().subscribe());
       this.claudeConnectionStatus = null; // Reset connection status
+    } else if (provider === 'openAICompatible' && this.settings.openAICompatible.enabled && this.settings.openAICompatible.baseUrl) {
+      this.subscriptions.add(this.modelService.loadOpenAICompatibleModels().subscribe());
+      this.openAICompatibleConnectionStatus = null; // Reset connection status
     }
   }
   
@@ -1059,6 +1185,41 @@ export class ApiSettingsComponent implements OnDestroy {
     );
   }
 
+  onOpenAICompatibleUrlChange(): void {
+    this.settingsChange.emit();
+    this.openAICompatibleConnectionStatus = null; // Reset connection status when URL changes
+
+    // Auto-load models when URL is entered and provider is enabled
+    if (this.settings.openAICompatible.enabled && this.settings.openAICompatible.baseUrl) {
+      this.subscriptions.add(this.modelService.loadOpenAICompatibleModels().subscribe());
+    }
+  }
+
+  testOpenAICompatibleConnection(): void {
+    if (!this.settings.openAICompatible.baseUrl) return;
+
+    this.testingOpenAICompatibleConnection = true;
+    this.openAICompatibleConnectionStatus = null;
+
+    this.subscriptions.add(
+      this.openAICompatibleApiService.testConnection().subscribe({
+        next: () => {
+          this.testingOpenAICompatibleConnection = false;
+          this.openAICompatibleConnectionStatus = 'success';
+          // Auto-load models on successful connection
+          if (this.settings.openAICompatible.enabled) {
+            this.subscriptions.add(this.modelService.loadOpenAICompatibleModels().subscribe());
+          }
+        },
+        error: (error) => {
+          this.testingOpenAICompatibleConnection = false;
+          this.openAICompatibleConnectionStatus = 'error';
+          console.error('OpenAI-Compatible connection test failed:', error);
+        }
+      })
+    );
+  }
+
   getProviderIcon(provider: string): string {
     switch (provider) {
       case 'gemini':
@@ -1071,6 +1232,8 @@ export class ApiSettingsComponent implements OnDestroy {
         return 'ollama-custom'; // Official Ollama logo
       case 'replicate':
         return 'replicate-custom'; // Official Replicate logo
+      case 'openaiCompatible':
+        return 'server-outline'; // Generic server icon for OpenAI-compatible
       default:
         return 'globe-outline';
     }
@@ -1088,6 +1251,8 @@ export class ApiSettingsComponent implements OnDestroy {
         return 'Ollama - Run large language models locally on your machine';
       case 'replicate':
         return 'Replicate - Cloud platform for running machine learning models';
+      case 'openaiCompatible':
+        return 'OpenAI-Compatible - Local server with OpenAI API (LM Studio, LocalAI, etc.)';
       default:
         return 'AI Provider';
     }
