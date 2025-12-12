@@ -9,6 +9,11 @@ export interface SubscriptionStatus {
   plan?: 'monthly' | 'yearly';
   expiresAt?: number;
   cancelAtPeriodEnd?: boolean;
+  authToken?: string;
+}
+
+export interface PortalResponse {
+  url: string;
 }
 
 @Injectable({
@@ -18,6 +23,7 @@ export class SubscriptionService {
   private readonly API_URL = environment.premiumApiUrl;
   private readonly CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
   private readonly GRACE_PERIOD = 3 * 24 * 60 * 60 * 1000; // 3 days offline grace
+  private readonly TOKEN_REFRESH_THRESHOLD = 7 * 24 * 60 * 60 * 1000; // 7 days
 
   private settingsService = inject(SettingsService);
 
@@ -37,6 +43,22 @@ export class SubscriptionService {
   /** Whether verification is in progress */
   get isVerifying(): Observable<boolean> {
     return this.isVerifying$.asObservable();
+  }
+
+  /**
+   * Get the current auth token for premium API requests
+   */
+  getAuthToken(): string | undefined {
+    const settings = this.settingsService.getSettings();
+    return settings.premium?.authToken;
+  }
+
+  /**
+   * Check if user has a valid auth token (required for premium features)
+   */
+  hasValidAuthToken(): boolean {
+    const settings = this.settingsService.getSettings();
+    return Boolean(settings.premium?.authToken && settings.premium?.cachedStatus?.active);
   }
 
   /**
@@ -210,6 +232,8 @@ export class SubscriptionService {
       premium: {
         ...settings.premium,
         email: '',
+        authToken: undefined,
+        authTokenCreatedAt: undefined,
         cachedStatus: {
           active: false
         }
@@ -220,26 +244,150 @@ export class SubscriptionService {
   }
 
   /**
-   * Update subscription email and verify
+   * Update subscription email (stores email but doesn't verify - use portal flow)
    */
-  async setEmail(email: string): Promise<boolean> {
+  async setEmail(email: string): Promise<void> {
     const settings = this.settingsService.getSettings();
 
     this.settingsService.updateSettings({
       premium: {
         ...settings.premium,
         email: email.trim().toLowerCase(),
+        // Clear auth token when email changes
+        authToken: undefined,
+        authTokenCreatedAt: undefined,
         cachedStatus: {
           active: false
         }
       }
     });
 
-    if (email) {
-      return this.verifySubscription();
+    this.isPremium$.next(false);
+  }
+
+  /**
+   * Initiate portal verification flow
+   * Returns the Stripe Customer Portal URL
+   */
+  async initiatePortalVerification(email: string): Promise<string> {
+    const currentUrl = window.location.origin + '/settings';
+    const url = `${this.API_URL}/portal?email=${encodeURIComponent(email)}&returnUrl=${encodeURIComponent(currentUrl)}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create portal session');
     }
 
-    this.isPremium$.next(false);
-    return false;
+    const data: PortalResponse = await response.json();
+    return data.url;
+  }
+
+  /**
+   * Exchange verification code for auth token
+   * Called after user returns from Stripe Customer Portal
+   */
+  async exchangeVerificationCode(code: string): Promise<boolean> {
+    const url = `${this.API_URL}/auth/exchange?code=${encodeURIComponent(code)}`;
+
+    this.isVerifying$.next(true);
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Verification failed');
+      }
+
+      const data: SubscriptionStatus = await response.json();
+
+      const settings = this.settingsService.getSettings();
+      this.settingsService.updateSettings({
+        premium: {
+          ...settings.premium,
+          email: settings.premium?.email || '',
+          authToken: data.authToken,
+          authTokenCreatedAt: Date.now(),
+          cachedStatus: {
+            active: data.active,
+            plan: data.plan,
+            expiresAt: data.expiresAt,
+            lastVerified: Date.now()
+          }
+        }
+      });
+
+      this.isPremium$.next(data.active);
+      return data.active;
+
+    } catch (error) {
+      console.error('[SubscriptionService] Token exchange failed:', error);
+      throw error;
+    } finally {
+      this.isVerifying$.next(false);
+    }
+  }
+
+  /**
+   * Refresh auth token if it's getting old
+   * Should be called periodically (e.g., on app init, every few days)
+   */
+  async refreshTokenIfNeeded(): Promise<void> {
+    const settings = this.settingsService.getSettings();
+    const token = settings.premium?.authToken;
+    const createdAt = settings.premium?.authTokenCreatedAt || 0;
+
+    // No token to refresh
+    if (!token) {
+      console.log('[SubscriptionService] No token to refresh');
+      return;
+    }
+
+    // Token is still fresh
+    if (Date.now() - createdAt < this.TOKEN_REFRESH_THRESHOLD) {
+      console.log('[SubscriptionService] Token still fresh, skipping refresh');
+      return;
+    }
+
+    console.log('[SubscriptionService] Token is old, refreshing...');
+
+    try {
+      const response = await fetch(`${this.API_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        // Token invalid or subscription expired - clear it
+        console.warn('[SubscriptionService] Token refresh failed, clearing subscription');
+        this.clearSubscription();
+        return;
+      }
+
+      const data: SubscriptionStatus = await response.json();
+
+      this.settingsService.updateSettings({
+        premium: {
+          ...settings.premium,
+          authToken: data.authToken,
+          authTokenCreatedAt: Date.now(),
+          cachedStatus: {
+            active: data.active,
+            plan: data.plan,
+            expiresAt: data.expiresAt,
+            lastVerified: Date.now()
+          }
+        }
+      });
+
+      this.isPremium$.next(data.active);
+      console.log('[SubscriptionService] Token refreshed successfully');
+
+    } catch (error) {
+      console.warn('[SubscriptionService] Token refresh error:', error);
+      // Don't clear subscription on network error - keep using existing token
+    }
   }
 }
