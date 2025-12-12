@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   IonButton, IonIcon, IonSpinner,
-  IonContent, IonChip, IonLabel, IonMenu, IonSplitPane, MenuController, LoadingController, ModalController
+  IonContent, IonChip, IonLabel, IonMenu, IonSplitPane, MenuController, LoadingController, ModalController, AlertController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
@@ -41,6 +41,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { StoryStatsService } from '../../services/story-stats.service';
 import { VersionService } from '../../../core/services/version.service';
 import { PDFExportService, PDFExportProgress } from '../../../shared/services/pdf-export.service';
+import { PDFExportDialogComponent, PDFExportDialogOptions } from '../../../ui/components/pdf-export-dialog/pdf-export-dialog.component';
 import { DatabaseService } from '../../../core/services/database.service';
 import { SnapshotTimelineComponent } from '../snapshot-timeline/snapshot-timeline.component';
 import { SceneNavigationService } from '../../services/scene-navigation.service';
@@ -78,6 +79,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   private imageVideoService = inject(ImageVideoService);
   private videoService = inject(VideoService);
   private loadingController = inject(LoadingController);
+  private alertController = inject(AlertController);
   private databaseService = inject(DatabaseService);
   private modalController = inject(ModalController);
   private sceneNav = inject(SceneNavigationService);
@@ -2039,6 +2041,24 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     try {
       console.log('PDF export button clicked');
 
+      // Show export options dialog first
+      const modal = await this.modalController.create({
+        component: PDFExportDialogComponent,
+        cssClass: 'pdf-export-dialog-modal'
+      });
+
+      await modal.present();
+      const { data, role } = await modal.onWillDismiss();
+
+      // User cancelled
+      if (role === 'cancel' || !data) {
+        console.log('PDF export cancelled by user');
+        return;
+      }
+
+      const exportOptions: PDFExportDialogOptions = data;
+      console.log('PDF export options:', exportOptions);
+
       // Save any unsaved changes first
       if (this.hasUnsavedChanges) {
         console.log('Saving unsaved changes before PDF export');
@@ -2092,11 +2112,11 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       );
 
       try {
-        // Export the story to PDF with background
+        // Export the story to PDF with user-selected options
         await this.pdfExportService.exportStoryToPDF(this.story, {
-          includeBackground: true,
-          format: 'a4',
-          orientation: 'portrait'
+          includeBackground: exportOptions.includeBackground,
+          format: exportOptions.format,
+          orientation: exportOptions.orientation
         });
 
         console.log('PDF export completed successfully');
@@ -2112,8 +2132,14 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('PDF export failed:', error);
 
-      // Show user-friendly error message
-      alert(`PDF export failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
+      // Show user-friendly error message using Ionic AlertController
+      const errorAlert = await this.alertController.create({
+        header: 'PDF Export Failed',
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
+        buttons: ['OK'],
+        cssClass: 'pdf-export-error-alert'
+      });
+      await errorAlert.present();
     } finally {
       // Always dismiss loading modal
       if (loading) {
