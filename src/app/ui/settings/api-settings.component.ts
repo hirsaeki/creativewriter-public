@@ -352,6 +352,13 @@ import { OllamaIconComponent } from '../icons/ollama-icon.component';
         <div class="model-info" [class.disabled]="!settings.ollama.enabled">
           <p class="info-text">Use the global model selection above to choose from your local models. <br>
             Install models with: <code>ollama pull llama3.2</code></p>
+          <p class="info-text warning-text" style="color: #ffb74d; margin-top: 8px;">
+            <ion-icon name="shield-outline" style="vertical-align: middle; margin-right: 4px;"></ion-icon>
+            <strong>Chrome Local Network Access:</strong> Chrome may block requests to localhost.<br>
+            <span style="font-size: 0.85em; opacity: 0.9;">
+              When prompted, click "Allow" to enable local network access.
+            </span>
+          </p>
         </div>
 
         <div class="settings-row" [class.disabled]="!settings.ollama.enabled">
@@ -710,6 +717,14 @@ import { OllamaIconComponent } from '../icons/ollama-icon.component';
               • <strong>LM Studio:</strong> Local Server → Enable "Cross-Origin-Resource-Sharing (CORS)"<br>
               • <strong>Ollama:</strong> Set OLLAMA_ORIGINS environment variable<br>
               • <strong>Other servers:</strong> Consult your server's CORS documentation
+            </span>
+          </p>
+          <p class="info-text warning-text" style="color: #ffb74d; margin-top: 8px;">
+            <ion-icon name="shield-outline" style="vertical-align: middle; margin-right: 4px;"></ion-icon>
+            <strong>Chrome Local Network Access:</strong> Chrome may block requests to localhost.<br>
+            <span style="font-size: 0.85em; opacity: 0.9;">
+              When prompted, click "Allow" to enable local network access.<br>
+              If blocked without prompt: Go to <strong>chrome://settings/content/localNetworkAccess</strong>
             </span>
           </p>
         </div>
