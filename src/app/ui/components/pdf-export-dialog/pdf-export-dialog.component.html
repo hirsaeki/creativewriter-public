@@ -12,7 +12,11 @@
   </p>
   <ion-list>
     <ion-item>
-      <ion-checkbox slot="start" [(ngModel)]="includeBackground"></ion-checkbox>
+      <ion-checkbox
+        slot="start"
+        [checked]="includeBackground"
+        (ionChange)="includeBackground = $event.detail.checked">
+      </ion-checkbox>
       <ion-label>
         <h2>Include Background Image</h2>
         <p>Add the app's background image to the PDF</p>
@@ -23,7 +27,11 @@
       <ion-label>
         <h2>Page Format</h2>
       </ion-label>
-      <ion-select [(ngModel)]="format" interface="popover" slot="end">
+      <ion-select
+        [value]="format"
+        (ionChange)="format = $event.detail.value"
+        interface="popover"
+        slot="end">
         <ion-select-option value="a4">A4</ion-select-option>
         <ion-select-option value="letter">Letter</ion-select-option>
       </ion-select>
@@ -33,7 +41,11 @@
       <ion-label>
         <h2>Orientation</h2>
       </ion-label>
-      <ion-select [(ngModel)]="orientation" interface="popover" slot="end">
+      <ion-select
+        [value]="orientation"
+        (ionChange)="orientation = $event.detail.value"
+        interface="popover"
+        slot="end">
         <ion-select-option value="portrait">Portrait</ion-select-option>
         <ion-select-option value="landscape">Landscape</ion-select-option>
       </ion-select>

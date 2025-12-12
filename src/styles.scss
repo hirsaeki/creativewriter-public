@@ -46,9 +46,13 @@
 .pdf-export-dialog-modal {
   --width: 90%;
   --max-width: 400px;
-  --height: auto;
+  --height: 400px;
   --border-radius: 12px;
   --background: rgba(20, 20, 20, 0.95);
+
+  @media (max-width: 768px) {
+    --height: 450px;
+  }
 }
 
 /* Force Ionic Dark Mode Variables */

@@ -1,33 +1,20 @@
 # Release Notes
 
-> **New AI Provider: OpenAI-Compatible local servers (LM Studio, LocalAI, vLLM)**
+> **Bug fix release addressing PDF export dialog rendering issue**
 
 ## 📋 Release Information
 - **Commits**: 2 commits since last release
-- **Key Areas**: AI Providers, Settings UI
+- **Key Areas**: PDF Export, UI Components
 
-## 🎯 New Features
+## 🔧 Bug Fixes
 
-### OpenAI-Compatible Provider Support
-- 🖥️ **Local AI Server Integration** - Connect to LM Studio, LocalAI, vLLM, text-generation-webui, and other OpenAI-compatible local servers
-- ⚙️ **Simple Configuration** - Just enter your server's base URL (default: `http://localhost:1234` for LM Studio)
-- 🔌 **Connection Test** - Built-in connection testing to verify your local server is accessible
-- 📋 **Automatic Model Discovery** - Fetches available models from your local server via `/v1/models` endpoint
-- 🌊 **Full Streaming Support** - Real-time streaming responses for beat generation and scene writing
-- 🔧 **Customizable Parameters** - Configure temperature, top-p, and max tokens per your preference
-- 🔓 **No API Key Required** - Designed for local servers that don't require authentication
-
-### Settings UI Improvements
-- 📝 **CORS Documentation** - Clear in-app instructions for enabling CORS in popular local servers:
-  - LM Studio: Enable in Local Server settings
-  - Ollama: Set OLLAMA_ORIGINS environment variable
-  - Other servers: Links to documentation
+### PDF Export Dialog
+- 🐛 **Fixed PDF export dialog not rendering content** - The PDF export options dialog was appearing empty with only the title and cancel button visible. This was caused by incorrect modal height settings and Ionic 8 compatibility issues with form bindings.
 
 ## 🏗️ Technical Improvements
-- **New Service**: `openai-compatible-api.service.ts` with full OpenAI API compatibility
-- **Type Safety**: Updated provider types across model interfaces and request logging
-- **Provider Routing**: Integrated into beat-ai and scene-generation services
-- **Model Service**: Added model loading and context length estimation for common model families (Llama, Mistral, Qwen, Gemma, Phi)
+- **Ionic 8 Compatibility**: Updated form bindings to use Ionic 8's recommended `[value]`/`[checked]` + `(ionChange)` pattern instead of `ngModel` for better standalone component compatibility
+- **Modal Layout**: Added proper flexbox layout to ensure modal content renders correctly
+- **Test Cleanup**: Removed unused `FormsModule` import from test file
 
 ---
 *Release prepared with [Claude Code](https://claude.com/claude-code)*

@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { ModalController } from '@ionic/angular/standalone';
 
 import { PDFExportDialogComponent, PDFExportDialogOptions } from './pdf-export-dialog.component';
@@ -14,7 +13,7 @@ describe('PDFExportDialogComponent', () => {
     modalController = jasmine.createSpyObj<ModalController>('ModalController', ['dismiss']);
 
     await TestBed.configureTestingModule({
-      imports: [PDFExportDialogComponent, FormsModule],
+      imports: [PDFExportDialogComponent],
       providers: [
         { provide: ModalController, useValue: modalController }
       ],
