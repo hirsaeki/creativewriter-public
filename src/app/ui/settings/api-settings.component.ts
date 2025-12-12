@@ -703,6 +703,15 @@ import { OllamaIconComponent } from '../icons/ollama-icon.component';
         <div class="model-info" [class.disabled]="!settings.openAICompatible.enabled">
           <p class="info-text">Use the global model selection above to choose from your local models. <br>
             Works with LM Studio, LocalAI, vLLM, text-generation-webui, and other OpenAI-compatible servers.</p>
+          <p class="info-text warning-text" style="color: #ffb74d; margin-top: 8px;">
+            <ion-icon name="warning-outline" style="vertical-align: middle; margin-right: 4px;"></ion-icon>
+            <strong>CORS Required:</strong> Enable CORS in your local server settings.<br>
+            <span style="font-size: 0.85em; opacity: 0.9;">
+              • <strong>LM Studio:</strong> Local Server → Enable "Cross-Origin-Resource-Sharing (CORS)"<br>
+              • <strong>Ollama:</strong> Set OLLAMA_ORIGINS environment variable<br>
+              • <strong>Other servers:</strong> Consult your server's CORS documentation
+            </span>
+          </p>
         </div>
 
         <div class="settings-row" [class.disabled]="!settings.openAICompatible.enabled">
