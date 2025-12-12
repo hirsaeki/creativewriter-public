@@ -287,7 +287,8 @@ export class OpenRouterApiService {
         }
         
         const decoder = new TextDecoder();
-        
+        let buffer = '';
+
         const readStream = (): Promise<void> => {
           return reader.read().then(({ done, value }) => {
             if (aborted || done) {
@@ -300,17 +301,18 @@ export class OpenRouterApiService {
               }
               return;
             }
-            
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-            
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
             for (const line of lines) {
-              if (line.trim().startsWith('data: ')) {
-                const data = line.substring(6).trim();
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
                 if (data === '[DONE]') {
                   continue;
                 }
-                
+
                 try {
                   const parsed = JSON.parse(data);
                   if (parsed.choices?.[0]?.delta?.content) {
@@ -323,7 +325,7 @@ export class OpenRouterApiService {
                 }
               }
             }
-            
+
             return readStream();
           });
         }
