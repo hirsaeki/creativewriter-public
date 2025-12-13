@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Settings } from '../models/settings.interface';
 
-export type AIProvider = 'openrouter' | 'gemini' | 'claude' | 'ollama' | 'replicate';
+export type AIProvider = 'openrouter' | 'gemini' | 'claude' | 'ollama' | 'replicate' | 'openaiCompatible';
 
 /**
  * Centralized service for validating AI provider availability and configuration.
@@ -41,6 +41,10 @@ export class AIProviderValidationService {
       case 'replicate':
         return settings.replicate.enabled && !!settings.replicate.apiKey;
 
+      case 'openaicompatible':
+        // OpenAI-Compatible uses baseUrl instead of apiKey for validation
+        return settings.openAICompatible.enabled && !!settings.openAICompatible.baseUrl;
+
       default:
         return false;
     }
@@ -53,7 +57,7 @@ export class AIProviderValidationService {
    * @returns Array of available provider names
    */
   getAvailableProviders(settings: Settings): AIProvider[] {
-    const providers: AIProvider[] = ['openrouter', 'gemini', 'claude', 'ollama', 'replicate'];
+    const providers: AIProvider[] = ['openrouter', 'gemini', 'claude', 'ollama', 'replicate', 'openaiCompatible'];
     return providers.filter(provider => this.isProviderAvailable(provider, settings));
   }
 
@@ -100,7 +104,7 @@ export class AIProviderValidationService {
    * @returns Array of provider names that are not configured
    */
   getUnconfiguredProviders(settings: Settings): AIProvider[] {
-    const providers: AIProvider[] = ['openrouter', 'gemini', 'claude', 'ollama', 'replicate'];
+    const providers: AIProvider[] = ['openrouter', 'gemini', 'claude', 'ollama', 'replicate', 'openaiCompatible'];
     return providers.filter(provider => !this.isProviderAvailable(provider, settings));
   }
 }

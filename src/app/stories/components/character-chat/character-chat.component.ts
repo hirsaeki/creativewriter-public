@@ -11,14 +11,10 @@ import {
 import { addIcons } from 'ionicons';
 import {
   arrowBack, send, personCircle, chatbubbles, copy, refresh,
-  close, helpCircle, timeOutline, logoGoogle, globeOutline, chevronForward,
-  createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline
+  close, helpCircle, timeOutline, chevronForward,
+  createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline, copyOutline
 } from 'ionicons/icons';
-import { NgSelectModule } from '@ng-select/ng-select';
-import { OpenRouterIconComponent } from '../../../ui/icons/openrouter-icon.component';
-import { ClaudeIconComponent } from '../../../ui/icons/claude-icon.component';
-import { ReplicateIconComponent } from '../../../ui/icons/replicate-icon.component';
-import { OllamaIconComponent } from '../../../ui/icons/ollama-icon.component';
+import { ModelSelectorComponent } from '../../../shared/components/model-selector/model-selector.component';
 
 import { StoryService } from '../../services/story.service';
 import { CodexService } from '../../services/codex.service';
@@ -32,13 +28,11 @@ import {
   StoryContext,
   CharacterChatServiceInterface
 } from '../../../core/services/premium-module.service';
-import { ModelService } from '../../../core/services/model.service';
 import { OpenRouterApiService } from '../../../core/services/openrouter-api.service';
 import { GoogleGeminiApiService } from '../../../core/services/google-gemini-api.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { Story } from '../../models/story.interface';
 import { CodexEntry, Codex } from '../../models/codex.interface';
-import { ModelOption } from '../../../core/models/model.interface';
 import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-header.component';
 
 interface ConversationMessage {
@@ -62,12 +56,12 @@ interface AIServiceAdapter {
   selector: 'app-character-chat',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterModule, NgSelectModule,
+    CommonModule, FormsModule, RouterModule,
     IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonFooter, IonTextarea, IonAvatar, IonChip, IonLabel, IonSpinner,
     IonModal, IonList, IonItem,
     AppHeaderComponent,
-    OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent
+    ModelSelectorComponent
   ],
   templateUrl: './character-chat.component.html',
   styleUrls: ['./character-chat.component.scss']
@@ -83,7 +77,6 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   private codexService = inject(CodexService);
   private subscriptionService = inject(SubscriptionService);
   private premiumModuleService = inject(PremiumModuleService);
-  private modelService = inject(ModelService);
   private openRouterService = inject(OpenRouterApiService);
   private geminiService = inject(GoogleGeminiApiService);
   private settingsService = inject(SettingsService);
@@ -99,6 +92,7 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   currentMessage = '';
   isGenerating = false;
   isPremium = false;
+  isPremiumChecking = true; // Start with loading state
   isModuleLoading = false;
   moduleError: string | null = null;
 
@@ -110,8 +104,12 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   showKnowledgeModal = false;
 
   // Model selection
-  availableModels: ModelOption[] = [];
   selectedModel = '';
+
+  // Quick picks from story settings
+  get quickPickIds(): string[] {
+    return this.story?.settings?.favoriteModelLists?.characterChat || [];
+  }
 
   // Suggested starters
   suggestedStarters: string[] = [];
@@ -133,8 +131,8 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   constructor() {
     addIcons({
       arrowBack, send, personCircle, chatbubbles, copy, refresh,
-      close, helpCircle, timeOutline, logoGoogle, globeOutline, chevronForward,
-      createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline
+      close, helpCircle, timeOutline, chevronForward,
+      createOutline, refreshOutline, checkmarkOutline, closeOutline, personOutline, copyOutline
     });
     this.initializeHeaderActions();
   }
@@ -147,23 +145,27 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
     ];
   }
 
-  ngOnInit(): void {
-    // Check premium status
-    this.subscriptions.add(
-      this.subscriptionService.isPremiumObservable.subscribe(isPremium => {
-        this.isPremium = isPremium;
-        if (isPremium) {
-          this.loadPremiumModule();
-        }
-      })
-    );
+  async ngOnInit(): Promise<void> {
+    // FIRST: Actively verify subscription status and WAIT for result
+    // This ensures premium users see the chat immediately without race conditions
+    this.isPremiumChecking = true;
+    const isPremium = await this.subscriptionService.checkSubscription();
+    console.log('[CharacterChat] Initial premium check:', isPremium);
+    this.isPremium = isPremium;
+    this.isPremiumChecking = false; // Done checking
+    if (isPremium) {
+      this.loadPremiumModule();
+    }
 
-    // Load models
+    // THEN subscribe for any future changes (after initial value is set)
     this.subscriptions.add(
-      this.modelService.getCombinedModels().subscribe(models => {
-        this.availableModels = models;
-        if (models.length > 0 && !this.selectedModel) {
-          this.selectedModel = models[0].id;
+      this.subscriptionService.isPremiumObservable.subscribe(newPremiumStatus => {
+        console.log('[CharacterChat] isPremium observable changed:', newPremiumStatus);
+        if (this.isPremium !== newPremiumStatus) {
+          this.isPremium = newPremiumStatus;
+          if (newPremiumStatus) {
+            this.loadPremiumModule();
+          }
         }
       })
     );
@@ -228,14 +230,13 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
   }
 
   async loadPremiumModule(): Promise<void> {
-    if (!this.premiumModuleService.isCharacterChatLoaded) {
-      const module = await this.premiumModuleService.loadCharacterChatModule();
-      if (module) {
-        // Create AI adapter that bridges to local AI services
-        const aiAdapter = this.createAIAdapter();
-        // Instantiate the CharacterChatService from the loaded module
-        this.chatService = new module.CharacterChatService(aiAdapter);
-      }
+    // Always try to load/get the module - it returns cached version if already loaded
+    const module = await this.premiumModuleService.loadCharacterChatModule();
+    if (module && !this.chatService) {
+      // Create AI adapter that bridges to local AI services
+      const aiAdapter = this.createAIAdapter();
+      // Instantiate the CharacterChatService from the loaded module
+      this.chatService = new module.CharacterChatService(aiAdapter);
     }
   }
 
@@ -504,13 +505,6 @@ export class CharacterChatComponent implements OnInit, OnDestroy {
 
   formatTime(date: Date): string {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  getProviderIcon(provider: string): string {
-    switch (provider) {
-      case 'gemini': return 'logo-google';
-      default: return 'cloud-outline';
-    }
   }
 
   onEnterKey(event: KeyboardEvent): void {

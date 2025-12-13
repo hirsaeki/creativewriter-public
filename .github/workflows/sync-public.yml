@@ -87,9 +87,19 @@ jobs:
           rm -rf .claude/ || true  # Remove Claude development files
           rm -rf .vscode/ || true  # Remove VS Code settings
           rm -rf .claudescreenshots/ || true  # Remove Claude screenshots
-          rm -rf docs/ || true  # Exclude private docs from public sync
           rm -f docker-compose.public.yml || true  # Remove the public compose file itself
           rm -rf backend/ || true  # Remove Cloudflare Worker backend (premium features)
+
+          # Selectively remove private docs, keeping public ones (screenshots, unraid)
+          rm -rf docs/premium-feature-plan/ || true  # Remove premium docs
+          rm -f docs/reddit-post.md || true  # Remove private drafts
+          rm -f docs/sample-beat-prompt.txt || true  # Remove sample files
+          # Remove internal drafts from unraid folder
+          rm -f docs/unraid/CA-ISSUE-DRAFT.md || true
+          rm -f docs/unraid/CA-SUBMISSION.md || true
+          rm -f docs/unraid/FORUM-POST-DRAFT.md || true
+          rm -f docs/unraid/USER-REPLY-DRAFT.md || true
+          # Keep: docs/screenshots/, docs/unraid/ (README, docker-compose, xml, png), docs/beat-version-history/
 
           # Replace premium components with public stubs
           CHAR_CHAT_DIR="src/app/stories/components/character-chat"
@@ -142,21 +152,9 @@ jobs:
     if: needs.sync-public.result == 'success'
     
     steps:
-      - name: Trigger image builds in public repository
-        env:
-          GITHUB_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
-        run: |
-          VERSION="${{ needs.sync-public.outputs.version }}"
-          
-          # Trigger the workflow in the public repository if it exists
-          echo "Attempting to trigger Docker image builds in public repository..."
-          
-          # Check if the workflow exists and trigger it
-          gh workflow run docker-build.yml \
-            --repo MarcoDroll/creativewriter-public \
-            --field version="v${VERSION}" \
-            2>/dev/null || echo "Note: Could not trigger workflow (may not exist yet)"
-      
+      # Note: Docker builds are triggered automatically when the release is created below
+      # (via "on: release" in docker-build.yml). No need to trigger manually.
+
       - name: Checkout for release notes
         uses: actions/checkout@v4
         with:

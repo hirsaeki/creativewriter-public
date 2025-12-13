@@ -10,57 +10,26 @@
 
   <ng-template #modelToolbar>
     <div class="model-selection-container">
-      <ng-select [(ngModel)]="selectedModel"
-                 [items]="availableModels"
-                 bindLabel="label"
-                 bindValue="id"
-                 [clearable]="false"
-                 [searchable]="true"
-                 placeholder="Select model..."
-                 class="model-select"
-                 appendTo="body">
-        <ng-template ng-option-tmp let-item="item">
-          <div class="model-option-inline">
-            <app-openrouter-icon
-              *ngIf="item.provider === 'openrouter'"
-              size="16"
-              color="#6467f2"
-              class="provider-icon-inline openrouter">
-            </app-openrouter-icon>
-            <app-claude-icon
-              *ngIf="item.provider === 'claude'"
-              size="16"
-              color="#C15F3C"
-              class="provider-icon-inline claude">
-            </app-claude-icon>
-            <app-replicate-icon
-              *ngIf="item.provider === 'replicate'"
-              size="16"
-              color="#9c27b0"
-              class="provider-icon-inline replicate">
-            </app-replicate-icon>
-            <app-ollama-icon
-              *ngIf="item.provider === 'ollama'"
-              size="16"
-              color="#ff9800"
-              class="provider-icon-inline ollama">
-            </app-ollama-icon>
-            <ion-icon
-              *ngIf="item.provider !== 'openrouter' && item.provider !== 'claude' && item.provider !== 'replicate' && item.provider !== 'ollama'"
-              [name]="getProviderIcon(item.provider)"
-              class="provider-icon-inline"
-              [class.gemini]="item.provider === 'gemini'">
-            </ion-icon>
-            <span class="model-label">{{ item.label }}</span>
-          </div>
-        </ng-template>
-      </ng-select>
+      <app-model-selector
+        [(model)]="selectedModel"
+        [clearable]="false"
+        [searchable]="true"
+        [quickPickIds]="quickPickIds"
+        placeholder="Select model..."
+        appendTo="body">
+      </app-model-selector>
     </div>
   </ng-template>
 
   <ion-content class="chat-content">
+    <!-- Loading Premium Status -->
+    <div *ngIf="isPremiumChecking" class="loading-state">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>Checking subscription...</p>
+    </div>
+
     <!-- Premium Required Message -->
-    <div *ngIf="!isPremium" class="premium-required">
+    <div *ngIf="!isPremiumChecking && !isPremium" class="premium-required">
       <ion-icon name="lock-closed" class="lock-icon"></ion-icon>
       <h2>Premium Feature</h2>
       <p>Character Chat is a premium feature. Subscribe to unlock conversations with your characters.</p>
@@ -70,20 +39,20 @@
     </div>
 
     <!-- Module Loading -->
-    <div *ngIf="isPremium && isModuleLoading" class="loading-state">
+    <div *ngIf="!isPremiumChecking && isPremium && isModuleLoading" class="loading-state">
       <ion-spinner name="crescent"></ion-spinner>
       <p>Loading Character Chat...</p>
     </div>
 
     <!-- Module Error -->
-    <div *ngIf="isPremium && moduleError && !isModuleLoading" class="error-state">
+    <div *ngIf="!isPremiumChecking && isPremium && moduleError && !isModuleLoading" class="error-state">
       <ion-icon name="alert-circle" class="error-icon"></ion-icon>
       <p>{{ moduleError }}</p>
       <ion-button (click)="loadPremiumModule()">Try Again</ion-button>
     </div>
 
     <!-- Character Selection (when no character selected) -->
-    <div *ngIf="isPremium && !selectedCharacter && !isModuleLoading && !moduleError" class="character-selection">
+    <div *ngIf="!isPremiumChecking && isPremium && !selectedCharacter && !isModuleLoading && !moduleError" class="character-selection">
       <h2>Select a Character</h2>
       <p>Choose a character from your codex to start chatting.</p>
 
@@ -111,7 +80,7 @@
     </div>
 
     <!-- Chat Interface -->
-    <div *ngIf="isPremium && selectedCharacter && !isModuleLoading" class="chat-interface">
+    <div *ngIf="!isPremiumChecking && isPremium && selectedCharacter && !isModuleLoading" class="chat-interface">
       <!-- Character Header -->
       <div class="character-header">
         <ion-chip (click)="selectedCharacter = null" class="back-chip">
@@ -248,7 +217,7 @@
   </ion-content>
 
   <!-- Input Footer (only when character selected) -->
-  <ion-footer *ngIf="isPremium && selectedCharacter && !isModuleLoading" class="chat-footer">
+  <ion-footer *ngIf="!isPremiumChecking && isPremium && selectedCharacter && !isModuleLoading" class="chat-footer">
     <div class="input-container">
       <ion-textarea
         #messageInput

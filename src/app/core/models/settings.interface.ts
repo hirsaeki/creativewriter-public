@@ -4,6 +4,7 @@ export interface FavoriteModelLists {
   beatInput: string[];
   sceneSummary: string[];
   rewrite: string[];
+  characterChat: string[];
 }
 
 export interface Settings {
@@ -12,6 +13,7 @@ export interface Settings {
   googleGemini: GoogleGeminiSettings;
   ollama: OllamaSettings;
   claude: ClaudeSettings;
+  openAICompatible: OpenAICompatibleSettings;
   sceneTitleGeneration: SceneTitleGenerationSettings;
   sceneSummaryGeneration: SceneSummaryGenerationSettings;
   sceneGenerationFromOutline: SceneGenerationFromOutlineSettings;
@@ -26,6 +28,8 @@ export interface Settings {
 export interface PremiumSettings {
   email: string;                    // Email used for subscription verification
   apiUrl: string;                   // Subscription API URL (Cloudflare Worker)
+  authToken?: string;               // Auth token from portal verification
+  authTokenCreatedAt?: number;      // When auth token was created (for refresh)
   // Cached status (updated when verified)
   cachedStatus: {
     active: boolean;
@@ -85,6 +89,15 @@ export interface ClaudeSettings {
   temperature: number;
   topP: number;
   topK: number;
+  enabled: boolean;
+}
+
+export interface OpenAICompatibleSettings {
+  baseUrl: string;
+  model: string;
+  temperature: number;
+  topP: number;
+  maxTokens: number;
   enabled: boolean;
 }
 
@@ -164,6 +177,14 @@ export const DEFAULT_SETTINGS: Settings = {
     topK: 0,
     enabled: false
   },
+  openAICompatible: {
+    baseUrl: 'http://localhost:1234',
+    model: '',
+    temperature: 0.7,
+    topP: 1.0,
+    maxTokens: 2000,
+    enabled: false
+  },
   sceneTitleGeneration: {
     maxWords: 5,
     style: 'concise',
@@ -209,7 +230,8 @@ export const DEFAULT_SETTINGS: Settings = {
   favoriteModelLists: {
     beatInput: [],
     sceneSummary: [],
-    rewrite: []
+    rewrite: [],
+    characterChat: []
   },
   updatedAt: new Date()
 };

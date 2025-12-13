@@ -120,6 +120,7 @@ Generate the beat now:</message>
   favoriteModelLists: {
     beatInput: [],
     sceneSummary: [],
-    rewrite: []
+    rewrite: [],
+    characterChat: []
   }
 };

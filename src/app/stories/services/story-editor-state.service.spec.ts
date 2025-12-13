@@ -169,6 +169,165 @@ describe('StoryEditorStateService', () => {
       expect(storyServiceSpy.updateScene).not.toHaveBeenCalled();
       expect(storyServiceSpy.updateStory).not.toHaveBeenCalled();
     });
+
+    it('should force save even if no changes when force option is true', async () => {
+      await service.loadStory('story-1');
+
+      await service.saveStory({ force: true });
+
+      expect(storyServiceSpy.updateScene).toHaveBeenCalled();
+    });
+  });
+
+  describe('saveStory concurrent save handling', () => {
+    it('should wait for ongoing save before returning when concurrent save detected', async () => {
+      await service.loadStory('story-1');
+      service.updateSceneContent('<p>First update</p>');
+
+      // Create a slow save that takes time to complete
+      let resolveSlowSave!: () => void;
+      const slowSavePromise = new Promise<void>(resolve => {
+        resolveSlowSave = resolve;
+      });
+      storyServiceSpy.updateScene.and.returnValue(slowSavePromise);
+
+      // Start first save (will be slow)
+      const firstSave = service.saveStory();
+
+      // Start second save while first is in progress
+      const secondSave = service.saveStory();
+
+      // At this point, second save should be waiting
+      expect(service.hasPendingSave()).toBe(true);
+
+      // Complete the slow save
+      resolveSlowSave();
+      await firstSave;
+      await secondSave;
+
+      // Both saves should complete without error
+      expect(service.getCurrentState().hasUnsavedChanges).toBe(false);
+    });
+
+    it('should retry save when concurrent save fails and changes remain', async () => {
+      await service.loadStory('story-1');
+      service.updateSceneContent('<p>Content to save</p>');
+
+      let callCount = 0;
+      storyServiceSpy.updateScene.and.callFake(() => {
+        callCount++;
+        if (callCount === 1) {
+          // First call fails
+          return Promise.reject(new Error('Database error'));
+        }
+        // Subsequent calls succeed
+        return Promise.resolve();
+      });
+
+      // Start first save (will fail)
+      const firstSave = service.saveStory().catch(() => {
+        // Expected to fail
+      });
+
+      // Start second save while first is in progress
+      const secondSave = service.saveStory();
+
+      await firstSave;
+
+      // After first save fails, hasUnsavedChanges should be true
+      // and second save should eventually retry
+      await secondSave;
+
+      // updateScene should have been called more than once (retry happened)
+      expect(storyServiceSpy.updateScene.calls.count()).toBeGreaterThan(1);
+    });
+
+    it('should not retry when concurrent save succeeds', async () => {
+      await service.loadStory('story-1');
+      service.updateSceneContent('<p>Content to save</p>');
+
+      // Slow but successful save
+      let resolveSlowSave!: () => void;
+      const slowSavePromise = new Promise<void>(resolve => {
+        resolveSlowSave = resolve;
+      });
+      storyServiceSpy.updateScene.and.returnValue(slowSavePromise);
+
+      // Start first save
+      const firstSave = service.saveStory();
+
+      // Start second save while first is in progress
+      const secondSave = service.saveStory();
+
+      // Complete the slow save
+      resolveSlowSave();
+      await firstSave;
+      await secondSave;
+
+      // updateScene should only be called once (no retry needed)
+      expect(storyServiceSpy.updateScene.calls.count()).toBe(1);
+      expect(service.getCurrentState().hasUnsavedChanges).toBe(false);
+    });
+
+    it('should handle rapid consecutive saves correctly', async () => {
+      await service.loadStory('story-1');
+
+      // Create multiple content updates and saves rapidly
+      const saves: Promise<void>[] = [];
+
+      for (let i = 0; i < 5; i++) {
+        service.updateSceneContent(`<p>Content version ${i}</p>`);
+        saves.push(service.saveStory());
+      }
+
+      // All saves should complete without error
+      await Promise.all(saves);
+
+      // Final state should show no unsaved changes
+      expect(service.getCurrentState().hasUnsavedChanges).toBe(false);
+      // At least one save should have been executed
+      expect(storyServiceSpy.updateScene).toHaveBeenCalled();
+    });
+
+    it('should have valid currentSavePromise before isSaving is set to true', async () => {
+      await service.loadStory('story-1');
+      service.updateSceneContent('<p>Content</p>');
+
+      // Track state transitions
+      const stateTransitions: { isSaving: boolean; hasPromise: boolean }[] = [];
+
+      // Override updateScene to capture state at save time
+      storyServiceSpy.updateScene.and.callFake(() => {
+        stateTransitions.push({
+          isSaving: service.getCurrentState().isSaving,
+          hasPromise: service.hasPendingSave() || service.getCurrentState().isSaving
+        });
+        return Promise.resolve();
+      });
+
+      await service.saveStory();
+
+      // When updateScene was called, isSaving should have been true
+      expect(stateTransitions.length).toBeGreaterThan(0);
+      expect(stateTransitions[0].isSaving).toBe(true);
+    });
+
+    it('should mark hasUnsavedChanges true when save fails', async () => {
+      await service.loadStory('story-1');
+      service.updateSceneContent('<p>Content</p>');
+
+      storyServiceSpy.updateScene.and.returnValue(Promise.reject(new Error('Save failed')));
+
+      try {
+        await service.saveStory();
+      } catch {
+        // Expected to throw
+      }
+
+      // hasUnsavedChanges should be true after failure
+      expect(service.getCurrentState().hasUnsavedChanges).toBe(true);
+      expect(service.getCurrentState().isSaving).toBe(false);
+    });
   });
 
   describe('recordUserActivity', () => {

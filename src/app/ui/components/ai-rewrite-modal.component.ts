@@ -812,7 +812,8 @@ export class AIRewriteModalComponent implements OnInit, OnDestroy {
       this.story.settings.favoriteModelLists = {
         beatInput: [...this.story.settings.favoriteModels],
         sceneSummary: [],
-        rewrite: []
+        rewrite: [],
+        characterChat: []
       };
     }
 

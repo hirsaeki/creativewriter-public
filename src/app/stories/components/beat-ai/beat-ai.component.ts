@@ -854,12 +854,25 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     }
 
+    // For custom models, pass the actual model name and provider
+    let customModelName: string | undefined;
+    let customModelProvider: string | undefined;
+
+    if (mappedModel === 'custom' && selectedModelOption) {
+      customModelName = selectedModelOption.label;
+      // Extract provider from the model ID (format: provider:model-id)
+      const providerMatch = selectedModelOption.id.match(/^([^:]+):/);
+      customModelProvider = providerMatch ? this.formatProviderName(providerMatch[1]) : undefined;
+    }
+
     const popover = await this.popoverController.create({
       component: TokenInfoPopoverComponent,
       componentProps: {
         prompt: fullPrompt || this.currentPrompt,
         model: mappedModel,
-        showComparison: true
+        showComparison: true,
+        customModelName,
+        customModelProvider
       },
       cssClass: 'token-info-popover',
       translucent: true,
@@ -869,6 +882,18 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     });
 
     await popover.present();
+  }
+
+  private formatProviderName(provider: string): string {
+    const providerNames: Record<string, string> = {
+      'openrouter': 'OpenRouter',
+      'ollama': 'Ollama (Local)',
+      'claude': 'Anthropic',
+      'gemini': 'Google',
+      'replicate': 'Replicate',
+      'openaicompatible': 'OpenAI-Compatible'
+    };
+    return providerNames[provider.toLowerCase()] || provider;
   }
 
   stopGeneration(): void {
@@ -1048,7 +1073,8 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       this.story.settings.favoriteModelLists = {
         beatInput: [...this.story.settings.favoriteModels],
         sceneSummary: [],
-        rewrite: []
+        rewrite: [],
+        characterChat: []
       };
     }
 

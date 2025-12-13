@@ -1,10 +1,10 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, tap, takeUntil, Subject } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { Observable, tap, takeUntil, Subject, catchError, throwError, map } from 'rxjs';
 import { SettingsService } from './settings.service';
 import { AIRequestLoggerService } from './ai-request-logger.service';
 
-export interface OpenRouterRequest {
+export interface OpenAICompatibleRequest {
   model: string;
   messages: {
     role: 'system' | 'user' | 'assistant';
@@ -16,7 +16,7 @@ export interface OpenRouterRequest {
   stream?: boolean;
 }
 
-export interface OpenRouterResponse {
+export interface OpenAICompatibleResponse {
   id: string;
   object: string;
   created: number;
@@ -29,22 +29,31 @@ export interface OpenRouterResponse {
     };
     finish_reason: string;
   }[];
-  usage: {
+  usage?: {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
   };
 }
 
+export interface OpenAICompatibleModelsResponse {
+  object: string;
+  data: {
+    id: string;
+    object: string;
+    created?: number;
+    owned_by?: string;
+  }[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
-export class OpenRouterApiService {
+export class OpenAICompatibleApiService {
   private http = inject(HttpClient);
   private settingsService = inject(SettingsService);
   private aiLogger = inject(AIRequestLoggerService);
 
-  private readonly API_URL = 'https://openrouter.ai/api/v1/chat/completions';
   private abortSubjects = new Map<string, Subject<void>>();
   private requestMetadata = new Map<string, { logId: string; startTime: number }>();
 
@@ -57,20 +66,20 @@ export class OpenRouterApiService {
     requestId?: string;
     messages?: {role: 'system' | 'user' | 'assistant', content: string}[];
     stream?: boolean;
-  } = {}): Observable<OpenRouterResponse> {
+  } = {}): Observable<OpenAICompatibleResponse> {
     const settings = this.settingsService.getSettings();
     const startTime = Date.now();
-    
-    if (!settings.openRouter.enabled || !settings.openRouter.apiKey) {
-      throw new Error('OpenRouter API ist nicht aktiviert oder API-Key fehlt');
+
+    if (!settings.openAICompatible.enabled || !settings.openAICompatible.baseUrl) {
+      return throwError(() => new Error('OpenAI-Compatible API is not enabled or base URL is missing'));
     }
 
-    const model = options.model || settings.openRouter.model;
+    const model = options.model || settings.openAICompatible.model;
     if (!model) {
-      throw new Error('No AI model selected');
+      return throwError(() => new Error('No AI model selected'));
     }
 
-    const maxTokens = options.maxTokens || 500;
+    const maxTokens = options.maxTokens || settings.openAICompatible.maxTokens;
     const wordCount = options.wordCount || Math.floor(maxTokens / 1.3);
 
     // Build prompt for logging - use messages if prompt is empty
@@ -81,41 +90,47 @@ export class OpenRouterApiService {
         .join('\n\n');
     }
 
+    const url = `${settings.openAICompatible.baseUrl}/v1/chat/completions`;
+
     // Log the request
     const logId = this.aiLogger.logRequest({
-      endpoint: this.API_URL,
+      endpoint: url,
       model: model,
       wordCount: wordCount,
       maxTokens: maxTokens,
-      prompt: promptForLogging
+      prompt: promptForLogging,
+      apiProvider: 'openaiCompatible',
+      streamingMode: options.stream || false,
+      requestDetails: {
+        temperature: options.temperature !== undefined ? options.temperature : settings.openAICompatible.temperature,
+        topP: options.topP !== undefined ? options.topP : settings.openAICompatible.topP,
+        baseUrl: settings.openAICompatible.baseUrl
+      }
     });
 
-    const headers = new HttpHeaders({
-      'Authorization': `Bearer ${settings.openRouter.apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'Creative Writer'
-    });
-
-    const request: OpenRouterRequest = {
+    const request: OpenAICompatibleRequest = {
       model: model,
       messages: options.messages && options.messages.length > 0
         ? options.messages
         : [{ role: 'user', content: prompt }],
       max_tokens: maxTokens,
-      temperature: options.temperature !== undefined ? options.temperature : settings.openRouter.temperature,
-      top_p: options.topP !== undefined ? options.topP : settings.openRouter.topP
+      temperature: options.temperature !== undefined ? options.temperature : settings.openAICompatible.temperature,
+      top_p: options.topP !== undefined ? options.topP : settings.openAICompatible.topP
     };
 
     // Create abort subject for this request
     const requestId = options.requestId || this.generateRequestId();
     const abortSubject = new Subject<void>();
     this.abortSubjects.set(requestId, abortSubject);
-    
+
     // Store request metadata for abort handling
     this.requestMetadata.set(requestId, { logId, startTime });
 
-    return this.http.post<OpenRouterResponse>(this.API_URL, request, { headers }).pipe(
+    return this.http.post<OpenAICompatibleResponse>(url, request, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }).pipe(
       takeUntil(abortSubject),
       tap({
         next: (response) => {
@@ -127,7 +142,7 @@ export class OpenRouterApiService {
         error: (error) => {
           const duration = Date.now() - startTime;
           let errorMessage = 'Unknown error';
-          
+
           // Extract detailed error information
           if (error.status) {
             errorMessage = `HTTP ${error.status}: `;
@@ -145,7 +160,7 @@ export class OpenRouterApiService {
               errorMessage += 'Server Error - ';
             }
           }
-          
+
           // Add error details
           if (error.error?.error?.message) {
             errorMessage += error.error.error.message;
@@ -154,11 +169,13 @@ export class OpenRouterApiService {
           } else if (error.message) {
             errorMessage += error.message;
           }
-          
-          
+
           this.aiLogger.logError(logId, errorMessage, duration);
           this.cleanupRequest(requestId);
         }
+      }),
+      catchError(error => {
+        return throwError(() => error);
       })
     );
   }
@@ -166,12 +183,12 @@ export class OpenRouterApiService {
   abortRequest(requestId: string): void {
     const abortSubject = this.abortSubjects.get(requestId);
     const metadata = this.requestMetadata.get(requestId);
-    
+
     if (abortSubject && metadata) {
       // Log the abort
       const duration = Date.now() - metadata.startTime;
       this.aiLogger.logAborted(metadata.logId, duration);
-      
+
       // Abort the request
       abortSubject.next();
       this.cleanupRequest(requestId);
@@ -198,17 +215,17 @@ export class OpenRouterApiService {
   } = {}): Observable<string> {
     const settings = this.settingsService.getSettings();
     const startTime = Date.now();
-    
-    if (!settings.openRouter.enabled || !settings.openRouter.apiKey) {
-      throw new Error('OpenRouter API ist nicht aktiviert oder API-Key fehlt');
+
+    if (!settings.openAICompatible.enabled || !settings.openAICompatible.baseUrl) {
+      return throwError(() => new Error('OpenAI-Compatible API is not enabled or base URL is missing'));
     }
 
-    const model = options.model || settings.openRouter.model;
+    const model = options.model || settings.openAICompatible.model;
     if (!model) {
-      throw new Error('No AI model selected');
+      return throwError(() => new Error('No AI model selected'));
     }
 
-    const maxTokens = options.maxTokens || 500;
+    const maxTokens = options.maxTokens || settings.openAICompatible.maxTokens;
     const wordCount = options.wordCount || Math.floor(maxTokens / 1.3);
 
     // Build prompt for logging - use messages if prompt is empty
@@ -219,23 +236,32 @@ export class OpenRouterApiService {
         .join('\n\n');
     }
 
+    const url = `${settings.openAICompatible.baseUrl}/v1/chat/completions`;
+
     // Log the request
     const logId = this.aiLogger.logRequest({
-      endpoint: this.API_URL,
+      endpoint: url,
       model: model,
       wordCount: wordCount,
       maxTokens: maxTokens,
-      prompt: promptForLogging
+      prompt: promptForLogging,
+      apiProvider: 'openaiCompatible',
+      streamingMode: true,
+      requestDetails: {
+        temperature: options.temperature !== undefined ? options.temperature : settings.openAICompatible.temperature,
+        topP: options.topP !== undefined ? options.topP : settings.openAICompatible.topP,
+        baseUrl: settings.openAICompatible.baseUrl
+      }
     });
 
-    const request: OpenRouterRequest = {
+    const request: OpenAICompatibleRequest = {
       model: model,
       messages: options.messages && options.messages.length > 0
         ? options.messages
         : [{ role: 'user', content: prompt }],
       max_tokens: maxTokens,
-      temperature: options.temperature !== undefined ? options.temperature : settings.openRouter.temperature,
-      top_p: options.topP !== undefined ? options.topP : settings.openRouter.topP,
+      temperature: options.temperature !== undefined ? options.temperature : settings.openAICompatible.temperature,
+      top_p: options.topP !== undefined ? options.topP : settings.openAICompatible.topP,
       stream: true
     };
 
@@ -243,18 +269,17 @@ export class OpenRouterApiService {
     const requestId = options.requestId || this.generateRequestId();
     const abortSubject = new Subject<void>();
     this.abortSubjects.set(requestId, abortSubject);
-    
+
     // Store request metadata for abort handling
     this.requestMetadata.set(requestId, { logId, startTime });
-
 
     return new Observable<string>(observer => {
       let accumulatedContent = '';
       let aborted = false;
-      
+
       // Create AbortController for cancellation
       const abortController = new AbortController();
-      
+
       // Subscribe to abort signal
       const abortSubscription = abortSubject.subscribe(() => {
         aborted = true;
@@ -262,15 +287,12 @@ export class OpenRouterApiService {
         observer.complete();
         this.cleanupRequest(requestId);
       });
-      
+
       // Use fetch for streaming
-      fetch(this.API_URL, {
+      fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${settings.openRouter.apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Creative Writer'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(request),
         signal: abortController.signal
@@ -280,12 +302,12 @@ export class OpenRouterApiService {
           const errorBody = await response.text();
           throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
         }
-        
+
         const reader = response.body?.getReader();
         if (!reader) {
           throw new Error('Failed to get response reader');
         }
-        
+
         const decoder = new TextDecoder();
         let buffer = '';
 
@@ -328,27 +350,26 @@ export class OpenRouterApiService {
 
             return readStream();
           });
-        }
-        
+        };
+
         return readStream();
       }).catch(error => {
         if (aborted) return; // Don't handle errors if we aborted
-        
+
         const duration = Date.now() - startTime;
         let errorMessage = 'Unknown error';
-        
+
         // Extract detailed error information for streaming
         if (error.message) {
           errorMessage = error.message;
         }
-        
-        
+
         observer.error(error);
         this.aiLogger.logError(logId, errorMessage, duration);
         this.cleanupRequest(requestId);
         abortSubscription.unsubscribe();
       });
-      
+
       return () => {
         aborted = true;
         abortController.abort();
@@ -357,6 +378,60 @@ export class OpenRouterApiService {
     }).pipe(
       takeUntil(abortSubject)
     );
+  }
+
+  listModels(): Observable<OpenAICompatibleModelsResponse> {
+    const settings = this.settingsService.getSettings();
+
+    if (!settings.openAICompatible.baseUrl) {
+      return throwError(() => new Error('OpenAI-Compatible base URL is not configured'));
+    }
+
+    const url = `${settings.openAICompatible.baseUrl}/v1/models`;
+
+    return this.http.get<OpenAICompatibleModelsResponse>(url)
+      .pipe(
+        catchError(error => {
+          console.error('Failed to load OpenAI-Compatible models:', error);
+          return throwError(() => error);
+        })
+      );
+  }
+
+  testConnection(): Observable<boolean> {
+    const settings = this.settingsService.getSettings();
+
+    if (!settings.openAICompatible.baseUrl) {
+      return throwError(() => new Error('OpenAI-Compatible base URL is not configured'));
+    }
+
+    const url = `${settings.openAICompatible.baseUrl}/v1/models`;
+
+    return this.http.get(url)
+      .pipe(
+        map(() => true),
+        tap(() => console.log('OpenAI-Compatible connection test successful')),
+        catchError(error => {
+          console.error('OpenAI-Compatible connection test failed:', error);
+          return throwError(() => new Error('Failed to connect to OpenAI-Compatible server'));
+        })
+      );
+  }
+
+  cancelRequest(requestId: string): void {
+    const abortSubject = this.abortSubjects.get(requestId);
+    if (abortSubject) {
+      abortSubject.next();
+      abortSubject.complete();
+      this.abortSubjects.delete(requestId);
+
+      const metadata = this.requestMetadata.get(requestId);
+      if (metadata) {
+        const duration = Date.now() - metadata.startTime;
+        this.aiLogger.logError(metadata.logId, 'Request cancelled by user', duration);
+        this.requestMetadata.delete(requestId);
+      }
+    }
   }
 
   private generateRequestId(): string {

@@ -55,7 +55,7 @@ import { environment } from '../../../environments/environment';
           </ion-input>
         </ion-item>
         <ion-note class="input-note">
-          Enter the email address you used to purchase your subscription.
+          Enter your subscription email. You will be redirected to Stripe to verify ownership.
         </ion-note>
 
         <!-- Actions -->
@@ -63,10 +63,10 @@ import { environment } from '../../../environments/environment';
           <ion-button
             expand="block"
             (click)="verifySubscription()"
-            [disabled]="isVerifying || !email">
-            <ion-spinner *ngIf="isVerifying" name="crescent" slot="start"></ion-spinner>
-            <ion-icon *ngIf="!isVerifying" name="refresh" slot="start"></ion-icon>
-            {{ isVerifying ? 'Verifying...' : 'Verify Subscription' }}
+            [disabled]="isVerifying || verificationPending || !email">
+            <ion-spinner *ngIf="isVerifying || verificationPending" name="crescent" slot="start"></ion-spinner>
+            <ion-icon *ngIf="!isVerifying && !verificationPending" name="refresh" slot="start"></ion-icon>
+            {{ isVerifying || verificationPending ? 'Verifying...' : 'Verify via Stripe Portal' }}
           </ion-button>
 
         </div>
@@ -226,6 +226,7 @@ export class PremiumSettingsComponent implements OnInit, OnDestroy {
   email = '';
   isPremium = false;
   isVerifying = false;
+  verificationPending = false;
   plan?: 'monthly' | 'yearly';
   expiresAt?: Date;
   message = '';
@@ -263,6 +264,43 @@ export class PremiumSettingsComponent implements OnInit, OnDestroy {
     // Initialize status
     this.subscriptionService.initialize();
     this.updateStatusFromCache();
+
+    // Check for verification code in URL (from Stripe portal redirect)
+    this.checkVerificationCode();
+  }
+
+  /**
+   * Check URL for verification code after returning from Stripe portal
+   */
+  private async checkVerificationCode(): Promise<void> {
+    const urlParams = new URLSearchParams(window.location.search);
+    const verifyCode = urlParams.get('verify');
+
+    if (verifyCode) {
+      // Remove code from URL to prevent re-processing
+      const url = new URL(window.location.href);
+      url.searchParams.delete('verify');
+      window.history.replaceState({}, '', url.toString());
+
+      this.verificationPending = true;
+      try {
+        const isActive = await this.subscriptionService.exchangeVerificationCode(verifyCode);
+        this.updateStatusFromCache();
+
+        if (isActive) {
+          this.message = 'Subscription verified successfully!';
+          this.messageType = 'success';
+        } else {
+          this.message = 'No active subscription found';
+          this.messageType = 'error';
+        }
+      } catch {
+        this.message = 'Verification failed. Please try again.';
+        this.messageType = 'error';
+      } finally {
+        this.verificationPending = false;
+      }
+    }
   }
 
   ngOnDestroy(): void {
@@ -300,19 +338,17 @@ export class PremiumSettingsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    try {
-      const isActive = await this.subscriptionService.setEmail(this.email);
-      this.updateStatusFromCache();
+    // Save email before redirecting
+    await this.subscriptionService.setEmail(this.email);
 
-      if (isActive) {
-        this.message = 'Subscription verified successfully!';
-        this.messageType = 'success';
-      } else {
-        this.message = 'No active subscription found for this email';
-        this.messageType = 'error';
-      }
-    } catch {
-      this.message = 'Failed to verify subscription. Please check your connection.';
+    try {
+      // Get portal URL and redirect
+      const portalUrl = await this.subscriptionService.initiatePortalVerification(this.email);
+      window.location.href = portalUrl;
+    } catch (error) {
+      this.message = error instanceof Error
+        ? error.message
+        : 'Failed to initiate verification. Please check your email and try again.';
       this.messageType = 'error';
     }
   }

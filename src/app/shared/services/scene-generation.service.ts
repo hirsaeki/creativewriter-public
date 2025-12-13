@@ -8,6 +8,7 @@ import { OpenRouterApiService, OpenRouterResponse } from '../../core/services/op
 import { GoogleGeminiApiService, GoogleGeminiResponse } from '../../core/services/google-gemini-api.service';
 import { OllamaApiService, OllamaResponse, OllamaChatResponse } from '../../core/services/ollama-api.service';
 import { ClaudeApiService, ClaudeResponse } from '../../core/services/claude-api.service';
+import { OpenAICompatibleApiService, OpenAICompatibleResponse } from '../../core/services/openai-compatible-api.service';
 import { AIProviderValidationService } from '../../core/services/ai-provider-validation.service';
 import { Story, DEFAULT_STORY_SETTINGS } from '../../stories/models/story.interface';
 
@@ -35,6 +36,7 @@ export class SceneGenerationService {
   private gemini = inject(GoogleGeminiApiService);
   private ollama = inject(OllamaApiService);
   private claude = inject(ClaudeApiService);
+  private openAICompatible = inject(OpenAICompatibleApiService);
   private aiProviderValidation = inject(AIProviderValidationService);
 
   async generateFromOutline(
@@ -114,6 +116,14 @@ export class SceneGenerationService {
               messages: [{ role: 'system', content: systemMessage }, ...msgs],
               requestId
             })
+          : provider === 'openaiCompatible'
+          ? this.openAICompatible.generateText(promptForLogging, {
+              model: modelId,
+              maxTokens,
+              temperature,
+              messages: [{ role: 'system', content: systemMessage }, ...msgs],
+              requestId
+            })
           : this.claude.generateText(promptForLogging, {
               model: modelId,
               maxTokens,
@@ -137,6 +147,9 @@ export class SceneGenerationService {
                 } else {
                   finalize((r as OllamaChatResponse).message?.content?.trim() || '');
                 }
+              } else if (provider === 'openaiCompatible') {
+                const r = response as OpenAICompatibleResponse;
+                finalize(r.choices?.[0]?.message?.content?.trim() || '');
               } else {
                 const r = response as ClaudeResponse;
                 finalize(r.content?.[0]?.text?.trim() || '');
@@ -155,6 +168,7 @@ export class SceneGenerationService {
                 if (provider === 'gemini') this.gemini.abortRequest(requestId);
                 else if (provider === 'openrouter') this.openRouter.abortRequest(requestId);
                 else if (provider === 'claude') this.claude.abortRequest(requestId);
+                else if (provider === 'openaiCompatible') this.openAICompatible.cancelRequest(requestId);
                 else this.ollama.abortRequest(requestId);
               } catch {/* noop */}
             });
@@ -260,6 +274,7 @@ export class SceneGenerationService {
     if (provider === 'openrouter') return s.openRouter?.temperature ?? 0.7;
     if (provider === 'ollama') return s.ollama?.temperature ?? 0.7;
     if (provider === 'claude') return s.claude?.temperature ?? 0.7;
+    if (provider === 'openaiCompatible') return s.openAICompatible?.temperature ?? 0.7;
     return 0.7;
   }
 

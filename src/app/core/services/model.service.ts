@@ -12,6 +12,7 @@ import {
 import { SettingsService } from './settings.service';
 import { OllamaApiService, OllamaModelsResponse } from './ollama-api.service';
 import { ClaudeApiService, ClaudeModel } from './claude-api.service';
+import { OpenAICompatibleApiService, OpenAICompatibleModelsResponse } from './openai-compatible-api.service';
 
 @Injectable({
   providedIn: 'root'
@@ -21,6 +22,7 @@ export class ModelService {
   private settingsService = inject(SettingsService);
   private ollamaApiService = inject(OllamaApiService);
   private claudeApiService = inject(ClaudeApiService);
+  private openAICompatibleApiService = inject(OpenAICompatibleApiService);
 
   private readonly OPENROUTER_API_URL = 'https://openrouter.ai/api/v1';
   private readonly REPLICATE_API_URL = '/api/replicate';
@@ -31,6 +33,7 @@ export class ModelService {
   private geminiModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private ollamaModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private claudeModelsSubject = new BehaviorSubject<ModelOption[]>([]);
+  private openAICompatibleModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private loadingSubject = new BehaviorSubject<boolean>(false);
 
   public openRouterModels$ = this.openRouterModelsSubject.asObservable();
@@ -38,6 +41,7 @@ export class ModelService {
   public geminiModels$ = this.geminiModelsSubject.asObservable();
   public ollamaModels$ = this.ollamaModelsSubject.asObservable();
   public claudeModels$ = this.claudeModelsSubject.asObservable();
+  public openAICompatibleModels$ = this.openAICompatibleModelsSubject.asObservable();
   public loading$ = this.loadingSubject.asObservable();
 
   loadOpenRouterModels(): Observable<ModelOption[]> {
@@ -201,13 +205,37 @@ export class ModelService {
     );
   }
 
-  loadAllModels(): Observable<{ openRouter: ModelOption[], replicate: ModelOption[], gemini: ModelOption[], ollama: ModelOption[], claude: ModelOption[] }> {
+  loadOpenAICompatibleModels(): Observable<ModelOption[]> {
+    const settings = this.settingsService.getSettings();
+
+    if (!settings.openAICompatible.enabled || !settings.openAICompatible.baseUrl) {
+      return of([]);
+    }
+
+    this.loadingSubject.next(true);
+
+    return this.openAICompatibleApiService.listModels().pipe(
+      map(response => this.transformOpenAICompatibleModels(response)),
+      tap(models => {
+        this.openAICompatibleModelsSubject.next(models);
+        this.loadingSubject.next(false);
+      }),
+      catchError(error => {
+        console.error('Failed to load OpenAI-Compatible models:', error);
+        this.loadingSubject.next(false);
+        return of([]);
+      })
+    );
+  }
+
+  loadAllModels(): Observable<{ openRouter: ModelOption[], replicate: ModelOption[], gemini: ModelOption[], ollama: ModelOption[], claude: ModelOption[], openAICompatible: ModelOption[] }> {
     return forkJoin({
       openRouter: this.loadOpenRouterModels(),
       replicate: this.loadReplicateModels(),
       gemini: this.loadGeminiModels(),
       ollama: this.loadOllamaModels(),
-      claude: this.loadClaudeModels()
+      claude: this.loadClaudeModels(),
+      openAICompatible: this.loadOpenAICompatibleModels()
     });
   }
 
@@ -345,6 +373,44 @@ export class ModelService {
         
         return a.label.localeCompare(b.label);
       });
+  }
+
+  private transformOpenAICompatibleModels(response: OpenAICompatibleModelsResponse): ModelOption[] {
+    return response.data
+      .map(model => ({
+        id: model.id,
+        label: model.id,
+        description: 'Local OpenAI-compatible model',
+        costInputEur: 'Free',
+        costOutputEur: 'Free',
+        contextLength: this.estimateOpenAICompatibleContextLength(model.id),
+        provider: 'openaiCompatible' as const
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  private estimateOpenAICompatibleContextLength(modelId: string): number {
+    const lowerName = modelId.toLowerCase();
+
+    // Context length estimates based on common model families
+    if (lowerName.includes('llama-3') || lowerName.includes('llama3')) {
+      return 128000;
+    } else if (lowerName.includes('llama-2') || lowerName.includes('llama2')) {
+      return 4000;
+    } else if (lowerName.includes('mistral')) {
+      return 32000;
+    } else if (lowerName.includes('mixtral')) {
+      return 32000;
+    } else if (lowerName.includes('qwen')) {
+      return 32000;
+    } else if (lowerName.includes('gemma')) {
+      return 8000;
+    } else if (lowerName.includes('phi')) {
+      return 4000;
+    }
+
+    // Default context length for unknown models
+    return 4000;
   }
 
   private generateClaudeModelDescription(modelId: string): string {
@@ -526,6 +592,10 @@ export class ModelService {
     return this.ollamaModelsSubject.value;
   }
 
+  getCurrentOpenAICompatibleModels(): ModelOption[] {
+    return this.openAICompatibleModelsSubject.value;
+  }
+
   /**
    * Get available models based on the currently active API
    */
@@ -571,11 +641,15 @@ export class ModelService {
     if (settings.claude.enabled && settings.claude.apiKey) {
       modelsToLoad.push(this.loadClaudeModels());
     }
-    
+
+    if (settings.openAICompatible.enabled && settings.openAICompatible.baseUrl) {
+      modelsToLoad.push(this.loadOpenAICompatibleModels());
+    }
+
     if (modelsToLoad.length === 0) {
       return of([]);
     }
-    
+
     return forkJoin(modelsToLoad).pipe(
       map(results => {
         // Flatten and combine all models
@@ -647,7 +721,15 @@ export class ModelService {
       }));
       allModels.push(...ollamaModels);
     }
-    
+
+    if (settings.openAICompatible.enabled && settings.openAICompatible.baseUrl) {
+      const openAICompatibleModels = this.getCurrentOpenAICompatibleModels().map(model => ({
+        ...model,
+        id: `openaiCompatible:${model.id}`
+      }));
+      allModels.push(...openAICompatibleModels);
+    }
+
     return allModels;
   }
 }

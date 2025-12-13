@@ -7,7 +7,7 @@ import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
   IonTextarea, IonCheckbox, IonRadio, IonRadioGroup, IonChip, IonNote,
   IonText, IonGrid, IonRow, IonCol, IonProgressBar, IonList, IonThumbnail,
-  IonBadge, IonSelect, IonSelectOption
+  IonBadge, IonSelect, IonSelectOption, IonAccordion, IonAccordionGroup
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
@@ -16,7 +16,8 @@ import {
   settingsOutline, chatboxOutline, documentTextOutline, serverOutline,
   scanOutline, trashOutline, statsChartOutline,
   copyOutline, searchOutline, closeCircleOutline, checkboxOutline,
-  squareOutline, imageOutline
+  squareOutline, imageOutline, starOutline, createOutline, syncOutline,
+  chatbubblesOutline
 } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { Story, StorySettings, DEFAULT_STORY_SETTINGS, NarrativePerspective } from '../../models/story.interface';
@@ -40,7 +41,7 @@ import { AppHeaderComponent, HeaderAction } from '../../../ui/components/app-hea
     IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel,
     IonTextarea, IonCheckbox, IonRadio, IonRadioGroup, IonChip, IonNote,
     IonText, IonGrid, IonRow, IonCol, IonProgressBar, IonList, IonThumbnail,
-    IonBadge, IonSelect, IonSelectOption,
+    IonBadge, IonSelect, IonSelectOption, IonAccordion, IonAccordionGroup,
     SettingsTabsComponent, SettingsContentComponent, ImageUploadComponent,
     ModelFavoritesSettingsComponent, AppHeaderComponent
   ],
@@ -59,6 +60,7 @@ export class StorySettingsComponent implements OnInit {
     { value: 'cover-image', icon: 'image-outline', label: 'Cover Image' },
     { value: 'ai-system', icon: 'chatbox-outline', label: 'AI System' },
     { value: 'beat-config', icon: 'settings-outline', label: 'Beat Config' },
+    { value: 'favorites', icon: 'star-outline', label: 'AI Favorites' },
     { value: 'db-maintenance', icon: 'server-outline', label: 'DB Maintenance' }
   ];
   
@@ -114,13 +116,14 @@ export class StorySettingsComponent implements OnInit {
   private readonly modelService = inject(ModelService);
 
   constructor() {
-    addIcons({ 
+    addIcons({
       arrowBack, saveOutline, refreshOutline, checkmarkCircleOutline,
       warningOutline, informationCircleOutline, codeSlashOutline,
       settingsOutline, chatboxOutline, documentTextOutline, serverOutline,
       scanOutline, trashOutline, statsChartOutline,
       copyOutline, searchOutline, closeCircleOutline, checkboxOutline,
-      squareOutline, imageOutline
+      squareOutline, imageOutline, starOutline, createOutline, syncOutline,
+      chatbubblesOutline
     });
   }
 
@@ -225,7 +228,8 @@ export class StorySettingsComponent implements OnInit {
       this.settings.favoriteModelLists = {
         beatInput: [...this.settings.favoriteModels],
         sceneSummary: [],
-        rewrite: []
+        rewrite: [],
+        characterChat: []
       };
     }
 
@@ -245,6 +249,12 @@ export class StorySettingsComponent implements OnInit {
       this.settings.favoriteModelLists.rewrite = [];
     } else {
       this.settings.favoriteModelLists.rewrite = [...this.settings.favoriteModelLists.rewrite];
+    }
+
+    if (!Array.isArray(this.settings.favoriteModelLists.characterChat)) {
+      this.settings.favoriteModelLists.characterChat = [];
+    } else {
+      this.settings.favoriteModelLists.characterChat = [...this.settings.favoriteModelLists.characterChat];
     }
   }
 

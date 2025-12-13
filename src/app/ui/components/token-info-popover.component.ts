@@ -56,8 +56,8 @@ import { TokenCounterService, SupportedModel, TokenCountResult } from '../../sha
         <!-- Model Info -->
         <ion-item lines="none">
           <ion-label>
-            <h2>{{ modelInfo.name }}</h2>
-            <p>{{ modelInfo.provider }}</p>
+            <h2>{{ displayModelName }}</h2>
+            <p>{{ displayModelProvider }}</p>
           </ion-label>
           <ion-badge slot="end" color="primary">{{ model }}</ion-badge>
         </ion-item>
@@ -407,12 +407,29 @@ export class TokenInfoPopoverComponent implements OnInit {
   @Input() prompt = '';
   @Input() model: SupportedModel = 'claude-3.7-sonnet';
   @Input() showComparison = false;
+  @Input() customModelName?: string;
+  @Input() customModelProvider?: string;
 
   tokenResult!: TokenCountResult;
   modelInfo!: ReturnType<TokenCounterService['getModelInfo']>;
   usagePercentage = 0;
   loading = true;
   Math = Math;
+
+  // Computed display values that use custom names when available
+  get displayModelName(): string {
+    if (this.model === 'custom' && this.customModelName) {
+      return this.customModelName;
+    }
+    return this.modelInfo?.name || 'Unknown Model';
+  }
+
+  get displayModelProvider(): string {
+    if (this.model === 'custom' && this.customModelProvider) {
+      return this.customModelProvider;
+    }
+    return this.modelInfo?.provider || 'Unknown';
+  }
 
   comparisonModels: { id: SupportedModel; name: string }[] = [
     { id: 'claude-sonnet-4-5', name: 'Claude 4.5' },

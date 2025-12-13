@@ -403,11 +403,15 @@ export class StoryService {
       const rewriteList = Array.isArray(existingLists.rewrite)
         ? existingLists.rewrite
         : [];
+      const characterChatList = Array.isArray(existingLists.characterChat)
+        ? existingLists.characterChat
+        : [];
 
       migrated.settings.favoriteModelLists = {
         beatInput: [...(beatInputList ?? [])],
         sceneSummary: [...sceneSummaryList],
-        rewrite: [...rewriteList]
+        rewrite: [...rewriteList],
+        characterChat: [...characterChatList]
       };
     }
 

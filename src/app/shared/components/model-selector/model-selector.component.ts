@@ -1,7 +1,10 @@
-import { Component, EventEmitter, Input, Output, OnInit, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
+import { IonIcon } from '@ionic/angular/standalone';
+import { addIcons } from 'ionicons';
+import { starOutline, logoGoogle } from 'ionicons/icons';
 import { ModelService } from '../../../core/services/model.service';
 import { ModelOption } from '../../../core/models/model.interface';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -13,7 +16,7 @@ import { OllamaIconComponent } from '../../../ui/icons/ollama-icon.component';
 @Component({
   selector: 'app-model-selector',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgSelectModule, OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent],
+  imports: [CommonModule, FormsModule, NgSelectModule, IonIcon, OpenRouterIconComponent, ClaudeIconComponent, ReplicateIconComponent, OllamaIconComponent],
   templateUrl: './model-selector.component.html',
   styleUrls: ['./model-selector.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -21,6 +24,11 @@ import { OllamaIconComponent } from '../../../ui/icons/ollama-icon.component';
 export class ModelSelectorComponent implements OnInit {
   private modelService = inject(ModelService);
   private settingsService = inject(SettingsService);
+  private cdr = inject(ChangeDetectorRef);
+
+  constructor() {
+    addIcons({ starOutline, logoGoogle });
+  }
 
   @Input() placeholder = 'Select model...';
   @Input() clearable = false;
@@ -31,7 +39,11 @@ export class ModelSelectorComponent implements OnInit {
   @Input() model = '';
   @Output() modelChange = new EventEmitter<string>();
 
+  // Quick picks: array of model IDs to show as quick-select buttons
+  @Input() quickPickIds: string[] = [];
+
   availableModels: ModelOption[] = [];
+  quickPickModels: ModelOption[] = [];
 
   ngOnInit(): void {
     this.modelService.loadAllModels().subscribe(({ openRouter, gemini, ollama, claude, replicate }) => {
@@ -43,18 +55,31 @@ export class ModelSelectorComponent implements OnInit {
         ...replicate.map(m => ({ ...m, id: `replicate:${m.id}` })),
       ];
       this.availableModels = enriched;
+
+      // Resolve quick pick IDs to full ModelOption objects
+      this.quickPickModels = this.quickPickIds
+        .map(id => this.availableModels.find(m => m.id === id))
+        .filter((m): m is ModelOption => m !== undefined);
+
       // Initialize from settings if not set
       if (!this.model) {
         const settings = this.settingsService.getSettings();
         this.model = settings.selectedModel || enriched[0]?.id || '';
         this.modelChange.emit(this.model);
       }
+
+      this.cdr.markForCheck();
     });
   }
 
   onModelChange(value: string): void {
     this.model = value;
     this.modelChange.emit(value);
+  }
+
+  selectQuickPick(model: ModelOption): void {
+    this.model = model.id;
+    this.modelChange.emit(model.id);
   }
 
   getProviderIcon(provider: string): string {

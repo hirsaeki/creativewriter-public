@@ -90,7 +90,15 @@ export class BeatHistoryService {
 
       try {
         const existingDoc = await this.historyDb.get<BeatVersionHistory>(docId);
-        history = existingDoc;
+
+        // Convert date strings to Date objects (PouchDB stores dates as strings)
+        history = {
+          ...existingDoc,
+          versions: existingDoc.versions.map(v => ({
+            ...v,
+            generatedAt: new Date(v.generatedAt)
+          }))
+        };
 
         // Only mark all existing versions as not current if new version will be current
         if (versionData.isCurrent !== false) {
@@ -292,11 +300,20 @@ export class BeatHistoryService {
     const docId = `history-${beatId}`;
 
     try {
-      const history = await this.historyDb.get<BeatVersionHistory>(docId);
+      const rawHistory = await this.historyDb.get<BeatVersionHistory>(docId);
 
-      if (history.versions.length <= keepCount) {
+      if (rawHistory.versions.length <= keepCount) {
         return; // Nothing to delete
       }
+
+      // Convert date strings to Date objects (PouchDB stores dates as strings)
+      const history: BeatVersionHistory = {
+        ...rawHistory,
+        versions: rawHistory.versions.map(v => ({
+          ...v,
+          generatedAt: new Date(v.generatedAt)
+        }))
+      };
 
       // Sort by generation date (newest first) and keep only keepCount versions
       history.versions = history.versions

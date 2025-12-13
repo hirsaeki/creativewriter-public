@@ -288,23 +288,22 @@ export class PDFExportService {
   }
 
   private async addContentToPDF(
-    pdf: jsPDF, 
-    htmlContent: string, 
+    pdf: jsPDF,
+    htmlContent: string,
     config: Required<PDFExportOptions>,
     leftMargin: number,
-    rightMargin: number,
+    _rightMargin: number,
     maxWidth: number,
     pageHeight: number,
     startY: number
   ): Promise<void> {
     this.currentYPosition = startY;
-    // const bottomMargin = pageHeight - config.margins.bottom; // Unused in this function
-    
+
     // Use DOMParser for safe HTML parsing
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlContent, 'text/html');
     const tempDiv = doc.body;
-    
+
     // Remove Beat AI components first
     const beatAIElements = tempDiv.querySelectorAll('.beat-ai-wrapper, .beat-ai-container, .beat-ai-node');
     beatAIElements.forEach(element => {
@@ -315,30 +314,89 @@ export class PDFExportService {
       });
       element.remove();
     });
-    
-    // Process all child nodes in order
-    const nodes = Array.from(tempDiv.childNodes);
-    
-    for (const node of nodes) {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const element = node as Element;
-        
+
+    // Recursively process all nodes to handle nested structures
+    await this.processNodeRecursively(tempDiv, pdf, config, leftMargin, maxWidth, pageHeight);
+  }
+
+  /**
+   * Recursively process DOM nodes to extract all content at any nesting level.
+   * This fixes text truncation caused by nested HTML structures.
+   * @param depth - Current recursion depth (defaults to 0)
+   * @param maxDepth - Maximum allowed recursion depth to prevent stack overflow (defaults to 50)
+   */
+  private async processNodeRecursively(
+    node: Node,
+    pdf: jsPDF,
+    config: Required<PDFExportOptions>,
+    leftMargin: number,
+    maxWidth: number,
+    pageHeight: number,
+    depth = 0,
+    maxDepth = 50
+  ): Promise<void> {
+    // Prevent stack overflow from deeply nested or malicious HTML
+    if (depth > maxDepth) {
+      console.warn('PDF export: Max recursion depth reached, skipping nested content');
+      return;
+    }
+
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const element = child as Element;
+
         // Handle images
         if (element.tagName === 'IMG') {
           await this.addImageToPDF(pdf, element as HTMLImageElement, config, leftMargin, maxWidth, pageHeight);
         }
-        // Handle paragraphs
+        // Handle paragraphs directly
         else if (element.tagName === 'P') {
-          await this.addParagraphToPDF(pdf, element.textContent || '', config, leftMargin, maxWidth, pageHeight);
+          const text = element.textContent?.trim();
+          if (text) {
+            await this.addParagraphToPDF(pdf, text, config, leftMargin, maxWidth, pageHeight);
+          }
         }
-        // Handle other elements with text content
+        // Handle headings
+        else if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(element.tagName)) {
+          const text = element.textContent?.trim();
+          if (text) {
+            await this.addParagraphToPDF(pdf, text, config, leftMargin, maxWidth, pageHeight);
+          }
+        }
+        // Handle lists - extract list items
+        else if (element.tagName === 'UL' || element.tagName === 'OL') {
+          const listItems = element.querySelectorAll('li');
+          for (const li of Array.from(listItems)) {
+            const text = li.textContent?.trim();
+            if (text) {
+              const bullet = element.tagName === 'UL' ? '\u2022 ' : '';
+              await this.addParagraphToPDF(pdf, bullet + text, config, leftMargin, maxWidth, pageHeight);
+            }
+          }
+        }
+        // Handle block elements - recurse into them
+        else if (['DIV', 'SECTION', 'ARTICLE', 'MAIN', 'BLOCKQUOTE', 'SPAN'].includes(element.tagName)) {
+          await this.processNodeRecursively(element, pdf, config, leftMargin, maxWidth, pageHeight, depth + 1, maxDepth);
+        }
+        // Handle inline elements and unknown elements with text
         else if (element.textContent?.trim()) {
-          await this.addParagraphToPDF(pdf, element.textContent, config, leftMargin, maxWidth, pageHeight);
+          // Check if element has block-level children
+          const hasBlockChildren = element.querySelector('p, div, section, ul, ol, h1, h2, h3, h4, h5, h6');
+          if (hasBlockChildren) {
+            // Recurse to handle children properly
+            await this.processNodeRecursively(element, pdf, config, leftMargin, maxWidth, pageHeight, depth + 1, maxDepth);
+          } else {
+            // Treat as inline text
+            await this.addParagraphToPDF(pdf, element.textContent.trim(), config, leftMargin, maxWidth, pageHeight);
+          }
         }
       }
       // Handle text nodes
-      else if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
-        await this.addParagraphToPDF(pdf, node.textContent, config, leftMargin, maxWidth, pageHeight);
+      else if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent?.trim();
+        if (text) {
+          await this.addParagraphToPDF(pdf, text, config, leftMargin, maxWidth, pageHeight);
+        }
       }
     }
   }

@@ -18,7 +18,7 @@
   --color: var(--ion-text-color);
   --background: var(--ion-background-color);
   --backdrop-opacity: 0.7;
-  
+
   .loading-wrapper {
     --color: var(--ion-text-color);
     --background: var(--ion-background-color);
@@ -28,17 +28,30 @@
     text-align: center;
     padding: 20px;
   }
-  
+
   .loading-content {
     color: var(--ion-text-color);
     font-size: 14px;
     line-height: 1.4;
     margin-top: 16px;
   }
-  
+
   .loading-spinner {
     --color: var(--ion-color-primary);
     margin: 0 auto 16px auto;
+  }
+}
+
+/* PDF Export Dialog Modal */
+.pdf-export-dialog-modal {
+  --width: 90%;
+  --max-width: 400px;
+  --height: 400px;
+  --border-radius: 12px;
+  --background: rgba(20, 20, 20, 0.95);
+
+  @media (max-width: 768px) {
+    --height: 450px;
   }
 }
 

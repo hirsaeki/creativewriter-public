@@ -7,6 +7,7 @@ import { OpenRouterApiService } from '../../core/services/openrouter-api.service
 import { GoogleGeminiApiService } from '../../core/services/google-gemini-api.service';
 import { OllamaApiService } from '../../core/services/ollama-api.service';
 import { ClaudeApiService } from '../../core/services/claude-api.service';
+import { OpenAICompatibleApiService } from '../../core/services/openai-compatible-api.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { AIProviderValidationService } from '../../core/services/ai-provider-validation.service';
 import { StoryService } from '../../stories/services/story.service';
@@ -17,7 +18,7 @@ import { CodexEntry, CustomField } from '../../stories/models/codex.interface';
 import { BeatHistoryService } from './beat-history.service';
 import { DatabaseService } from '../../core/services/database.service';
 
-type ProviderType = 'ollama' | 'claude' | 'gemini' | 'openrouter';
+type ProviderType = 'ollama' | 'claude' | 'gemini' | 'openrouter' | 'openaiCompatible';
 
 interface GenerationContext {
   beatId: string;
@@ -46,6 +47,7 @@ export class BeatAIService implements OnDestroy {
   private readonly googleGeminiApi = inject(GoogleGeminiApiService);
   private readonly ollamaApi = inject(OllamaApiService);
   private readonly claudeApi = inject(ClaudeApiService);
+  private readonly openAICompatibleApi = inject(OpenAICompatibleApiService);
   private readonly settingsService = inject(SettingsService);
   private readonly storyService = inject(StoryService);
   private readonly codexService = inject(CodexService);
@@ -191,6 +193,8 @@ export class BeatAIService implements OnDestroy {
         return `openrouter_visibility_${suffix}`;
       case 'ollama':
         return `ollama_visibility_${suffix}`;
+      case 'openaiCompatible':
+        return `openaiCompatible_visibility_${suffix}`;
       default:
         return `beat_visibility_${suffix}`;
     }
@@ -213,6 +217,9 @@ export class BeatAIService implements OnDestroy {
         break;
       case 'ollama':
         this.ollamaApi.abortRequest(requestId);
+        break;
+      case 'openaiCompatible':
+        this.openAICompatibleApi.abortRequest(requestId);
         break;
     }
   }
@@ -294,6 +301,24 @@ export class BeatAIService implements OnDestroy {
             } else if (response && 'message' in response && response.message?.content) {
               rawContent = response.message.content;
             }
+            const decodedContent = this.decodeHtmlEntities(rawContent);
+            const combined = pending ? pending + decodedContent : decodedContent;
+            return this.removeDuplicateCharacterAnalyses(combined);
+          })
+        );
+      case 'openaiCompatible':
+        return this.openAICompatibleApi.generateText(prompt, {
+          model: options.model,
+          maxTokens,
+          temperature: options.temperature,
+          topP: options.topP,
+          wordCount,
+          requestId,
+          messages
+        }).pipe(
+          map(response => {
+            const pending = this.flushEntityDecodeBuffer(beatId);
+            const rawContent = response.choices?.[0]?.message?.content || '';
             const decodedContent = this.decodeHtmlEntities(rawContent);
             const combined = pending ? pending + decodedContent : decodedContent;
             return this.removeDuplicateCharacterAnalyses(combined);
@@ -451,6 +476,8 @@ export class BeatAIService implements OnDestroy {
           apiCall = this.callClaudeStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
         } else if (resolvedProvider === 'gemini') {
           apiCall = this.callGoogleGeminiStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
+        } else if (resolvedProvider === 'openaiCompatible') {
+          apiCall = this.callOpenAICompatibleStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
         } else {
           apiCall = this.callOpenRouterStreamingAPI(enhancedPrompt, updatedOptions, maxTokens, wordCount, requestId, beatId);
         }
@@ -914,6 +941,127 @@ export class BeatAIService implements OnDestroy {
               this.isStreamingSubject.next(false);
             }
             
+            return accumulatedContent;
+          })
+        );
+      })
+    );
+  }
+
+  private callOpenAICompatibleStreamingAPI(prompt: string, options: { model?: string; temperature?: number; topP?: number }, maxTokens: number, wordCount: number, requestId: string, beatId: string): Observable<string> {
+    // Parse the structured prompt to extract messages
+    const messages = this.parseStructuredPrompt(prompt);
+
+    let accumulatedContent = '';
+    this.entityDecodeBuffers.set(beatId, '');
+
+    return this.openAICompatibleApi.generateTextStream(prompt, {
+      model: options.model,
+      maxTokens: maxTokens,
+      temperature: options.temperature,
+      topP: options.topP,
+      wordCount: wordCount,
+      requestId: requestId,
+      messages: messages
+    }).pipe(
+      map(chunk => this.decodeStreamingChunk(beatId, chunk)),
+      tap((decodedChunk: string) => {
+        // Emit each chunk as it arrives
+        accumulatedContent += decodedChunk;
+        this.generationSubject.next({
+          beatId,
+          chunk: decodedChunk,
+          isComplete: false
+        });
+      }),
+      scan((acc, decodedChunk) => acc + decodedChunk, ''), // Accumulate chunks
+      tap({
+        complete: () => {
+          if (this.pendingVisibilityFallbacks.has(beatId)) {
+            return;
+          }
+          const remainder = this.flushEntityDecodeBuffer(beatId);
+          if (remainder) {
+            accumulatedContent += remainder;
+            this.generationSubject.next({
+              beatId,
+              chunk: remainder,
+              isComplete: false
+            });
+          }
+          // Post-process to remove duplicate character analyses
+          accumulatedContent = this.removeDuplicateCharacterAnalyses(accumulatedContent);
+
+          // Emit completion
+          this.generationSubject.next({
+            beatId,
+            chunk: '',
+            isComplete: true
+          });
+
+          // Clean up active generation
+          this.activeGenerations.delete(beatId);
+
+          // Signal streaming stopped if no more active generations
+          if (this.activeGenerations.size === 0) {
+            this.isStreamingSubject.next(false);
+          }
+        },
+        error: () => {
+          // Clean up on error
+          this.activeGenerations.delete(beatId);
+          this.entityDecodeBuffers.delete(beatId);
+
+          // Signal streaming stopped if no more active generations
+          if (this.activeGenerations.size === 0) {
+            this.isStreamingSubject.next(false);
+          }
+        }
+      }),
+      map(() => accumulatedContent), // Return full content at the end
+      catchError(() => {
+        // Try non-streaming API as fallback
+        return this.openAICompatibleApi.generateText(prompt, {
+          model: options.model,
+          maxTokens: maxTokens,
+          temperature: options.temperature,
+          topP: options.topP,
+          wordCount: wordCount,
+          requestId: requestId,
+          messages: messages
+        }).pipe(
+          map(response => {
+            const pending = this.flushEntityDecodeBuffer(beatId);
+            const rawContent = response.choices?.[0]?.message?.content || '';
+            const decodedContent = this.decodeHtmlEntities(rawContent);
+            accumulatedContent = pending ? pending + decodedContent : decodedContent;
+
+            // Simulate streaming by emitting in chunks
+            const chunkSize = 50;
+            for (let i = 0; i < accumulatedContent.length; i += chunkSize) {
+              const chunk = accumulatedContent.substring(i, i + chunkSize);
+              this.generationSubject.next({
+                beatId,
+                chunk: chunk,
+                isComplete: false
+              });
+            }
+
+            // Emit completion
+            this.generationSubject.next({
+              beatId,
+              chunk: '',
+              isComplete: true
+            });
+
+            // Clean up
+            this.activeGenerations.delete(beatId);
+
+            // Signal streaming stopped if no more active generations
+            if (this.activeGenerations.size === 0) {
+              this.isStreamingSubject.next(false);
+            }
+
             return accumulatedContent;
           })
         );
@@ -1452,6 +1600,8 @@ ${bridgingSection}
         this.claudeApi.abortRequest(requestId);
       } else if (requestId.startsWith('ollama_')) {
         this.ollamaApi.abortRequest(requestId);
+      } else if (requestId.startsWith('openaiCompatible_')) {
+        this.openAICompatibleApi.abortRequest(requestId);
       } else {
         this.openRouterApi.abortRequest(requestId);
       }

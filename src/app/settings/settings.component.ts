@@ -935,7 +935,8 @@ export class SettingsComponent implements OnInit, OnDestroy {
           this.settings.favoriteModelLists = {
             beatInput: [...(this.settings.favoriteModels ?? [])],
             sceneSummary: [],
-            rewrite: []
+            rewrite: [],
+            characterChat: []
           };
         }
 
@@ -949,6 +950,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
         if (!Array.isArray(this.settings.favoriteModelLists.rewrite)) {
           this.settings.favoriteModelLists.rewrite = [];
+        }
+
+        if (!Array.isArray(this.settings.favoriteModelLists.characterChat)) {
+          this.settings.favoriteModelLists.characterChat = [];
         }
       })
     );
@@ -986,13 +991,15 @@ export class SettingsComponent implements OnInit, OnDestroy {
     const currentLists = this.settings.favoriteModelLists ?? {
       beatInput: [...(this.settings.favoriteModels ?? [])],
       sceneSummary: [],
-      rewrite: []
+      rewrite: [],
+      characterChat: []
     };
 
     const normalizedLists: Settings['favoriteModelLists'] = {
       beatInput: Array.isArray(currentLists.beatInput) ? [...currentLists.beatInput] : [...(this.settings.favoriteModels ?? [])],
       sceneSummary: Array.isArray(currentLists.sceneSummary) ? [...currentLists.sceneSummary] : [],
-      rewrite: Array.isArray(currentLists.rewrite) ? [...currentLists.rewrite] : []
+      rewrite: Array.isArray(currentLists.rewrite) ? [...currentLists.rewrite] : [],
+      characterChat: Array.isArray(currentLists.characterChat) ? [...currentLists.characterChat] : []
     };
 
     normalizedLists[list] = [...favoriteIds];
