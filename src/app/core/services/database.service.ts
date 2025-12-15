@@ -462,6 +462,13 @@ export class DatabaseService {
         const remoteInfo = await this.remoteDb.allDocs({ limit: 50, include_docs: true });
         console.info('[Sync] Remote has', remoteInfo.rows.length, 'documents');
 
+        // Log first 5 documents to debug structure
+        remoteInfo.rows.slice(0, 5).forEach(row => {
+          const doc = row.doc as Record<string, unknown> | undefined;
+          const fields = doc ? Object.keys(doc).join(', ') : 'no doc';
+          console.info('[Sync] Doc:', row.id, '| Fields:', fields);
+        });
+
         const hasStories = remoteInfo.rows.some(row => {
           const doc = row.doc as Record<string, unknown> | undefined;
           const isStory = doc && typeof doc === 'object' && 'chapters' in doc && !row.id.startsWith('_');
