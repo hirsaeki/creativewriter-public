@@ -3,7 +3,6 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { AuthService, User } from './auth.service';
 import { SyncLoggerService } from './sync-logger.service';
 import { PouchDB } from '../../app';
-import { countStories } from '../../shared/utils/document-filters';
 
 // Minimal static type for the PouchDB constructor when loaded via ESM
 interface PouchDBStatic {
@@ -68,7 +67,17 @@ export class DatabaseService {
   // Used when local database is empty and metadata index is missing
   private bootstrapSyncMode = false;
 
+  // Track if sync has been initialized (to prevent premature sync before user choice)
+  private syncInitialized = false;
+
   public syncStatus$: Observable<SyncStatus> = this.syncStatusSubject.asObservable();
+
+  /**
+   * Check if user is in local-only mode (no sync)
+   */
+  private isLocalOnlyMode(): boolean {
+    return localStorage.getItem('creative-writer-local-only') === 'true';
+  }
 
   constructor() {
     // Use preloaded PouchDB from app.ts
@@ -155,11 +164,10 @@ export class DatabaseService {
       console.warn('[DatabaseService] Index creation failed:', err);
     });
 
-    // PERFORMANCE FIX: Don't await sync setup - let it happen in background
-    // This prevents network delays from blocking database availability
-    this.setupSync().catch(err => {
-      console.warn('[DatabaseService] Background sync setup failed:', err);
-    });
+    // NOTE: We no longer call setupSync() here automatically.
+    // Sync is now only initialized after user makes a choice (login or local-only)
+    // via the initializeSync() method called from handleUserChange().
+    // This prevents unauthorized sync attempts before authentication.
   }
 
   private async handleUserChange(user: User | null): Promise<void> {
@@ -167,8 +175,16 @@ export class DatabaseService {
     if (user) {
       const userDbName = this.authService.getUserDatabaseName();
       if (userDbName && userDbName !== (this.db?.name)) {
+        // Reset sync flag when switching databases to ensure fresh sync setup
+        this.syncInitialized = false;
+
         this.initializationPromise = this.initializeDatabase(userDbName);
         await this.initializationPromise;
+
+        // Initialize sync after database switch (respects local-only mode)
+        this.initializeSync().catch(err => {
+          console.warn('[DatabaseService] Sync setup failed:', err);
+        });
       }
     } else {
       // User logged out - switch to anonymous database
@@ -176,8 +192,32 @@ export class DatabaseService {
       if (this.db?.name !== anonymousDb) {
         this.initializationPromise = this.initializeDatabase(anonymousDb);
         await this.initializationPromise;
+
+        // Stop sync and reset flag when logged out
+        this.stopSync();
+        this.syncInitialized = false;
       }
     }
+  }
+
+  /**
+   * Initialize sync connection (called after user login/choice)
+   * Does NOT start sync in local-only mode
+   */
+  async initializeSync(): Promise<void> {
+    if (this.syncInitialized) {
+      console.debug('[DatabaseService] Sync already initialized');
+      return;
+    }
+
+    if (this.isLocalOnlyMode()) {
+      console.info('[DatabaseService] Local-only mode - skipping sync setup');
+      this.syncInitialized = true;
+      return;
+    }
+
+    this.syncInitialized = true;
+    await this.setupSync();
   }
 
   async getDatabase(): Promise<PouchDB.Database> {
@@ -194,6 +234,14 @@ export class DatabaseService {
   // Synchronous getter for backwards compatibility (use with caution)
   getDatabaseSync(): PouchDB.Database | null {
     return this.db;
+  }
+
+  /**
+   * Get the remote database instance (if connected)
+   * Returns null if not connected to remote
+   */
+  getRemoteDatabase(): PouchDB.Database | null {
+    return this.remoteDb;
   }
 
   /**
@@ -218,8 +266,10 @@ export class DatabaseService {
       }).catch(err => {
         console.error('Error restarting sync after story change:', err);
       });
-    } else if (changed && !this.syncHandler) {
-      console.warn('[DatabaseService] activeStoryId changed but sync is not running');
+    } else if (changed && !this.syncHandler && storyId && this.remoteDb) {
+      // Sync not running yet - start it now that we have an active story
+      console.info('[DatabaseService] Starting sync for newly selected story:', storyId);
+      this.startSync();
     }
   }
 
@@ -259,6 +309,12 @@ export class DatabaseService {
   }
 
   async setupSync(remoteUrl?: string): Promise<void> {
+    // Don't setup sync in local-only mode
+    if (this.isLocalOnlyMode()) {
+      console.info('[DatabaseService] Local-only mode enabled - sync disabled');
+      return;
+    }
+
     try {
       // Use provided URL or try to detect from environment/location
       const couchUrl = remoteUrl || this.getCouchDBUrl();
@@ -297,8 +353,10 @@ export class DatabaseService {
       // Connection successful, clear connecting state
       this.updateSyncStatus({ isConnecting: false });
 
-      // Start bidirectional sync
-      this.startSync();
+      // Note: We don't start full sync here anymore.
+      // - Metadata index is queried directly from remote by StoryMetadataIndexService
+      // - Full sync only starts when user selects a story (setActiveStoryId)
+      // - Bootstrap sync is triggered if needed when metadata index is missing
 
     } catch (error) {
       console.warn('Could not setup sync:', error);
@@ -341,6 +399,94 @@ export class DatabaseService {
     return port === '3080' || (port !== '5984' && port !== '');
   }
 
+  /**
+   * Returns the selective sync filter function.
+   *
+   * BLACKLIST APPROACH: Instead of whitelisting specific document types,
+   * we identify story-specific documents by their properties and exclude them
+   * when appropriate. This makes the filter future-proof for new document types.
+   *
+   * Story-specific documents are identified by:
+   * 1. Having a `storyId` field (codex, scene-chat, story-research, character-chat, etc.)
+   * 2. Being a story document itself (has `chapters` field)
+   *
+   * All other documents sync by default, ensuring new features work automatically.
+   */
+  private getSyncFilter(): (doc: PouchDB.Core.Document<Record<string, unknown>>) => boolean {
+    return (doc: PouchDB.Core.Document<Record<string, unknown>>) => {
+      const docId = doc._id;
+      const docType = (doc as { type?: string }).type;
+      const storyId = (doc as { storyId?: string }).storyId;
+      const hasChapters = 'chapters' in doc;
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // ALWAYS EXCLUDE: Snapshots are too large, handled separately
+      // ═══════════════════════════════════════════════════════════════════════
+      if (docType === 'story-snapshot') {
+        return false;
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // ALWAYS SYNC: Critical system documents
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // Story metadata index - lightweight document for story list
+      if (docId === 'story-metadata-index' || docType === 'story-metadata-index') {
+        return true;
+      }
+
+      // Design documents (CouchDB indexes) and local documents
+      if (docId.startsWith('_')) {
+        return true;
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // BOOTSTRAP MODE: Sync everything to populate empty database
+      // ═══════════════════════════════════════════════════════════════════════
+      if (this.bootstrapSyncMode) {
+        console.info(`[SyncFilter] ✓ Bootstrap mode: syncing ${docId}`);
+        return true;
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // SELECTIVE SYNC: Filter story-specific documents
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // Check if this is a story document (has chapters field)
+      if (hasChapters) {
+        if (!this.activeStoryId) {
+          console.debug(`[SyncFilter] Excluding story ${docId} (no active story)`);
+          return false;
+        }
+        if (docId === this.activeStoryId) {
+          console.info(`[SyncFilter] ✓ Syncing active story: ${docId}`);
+          return true;
+        }
+        console.debug(`[SyncFilter] Excluding story ${docId} (not active story ${this.activeStoryId})`);
+        return false;
+      }
+
+      // Check if this is a story-specific document (has non-empty storyId field)
+      if (storyId && typeof storyId === 'string' && storyId.length > 0) {
+        if (!this.activeStoryId) {
+          console.debug(`[SyncFilter] Excluding ${docType || 'doc'} ${docId} (no active story)`);
+          return false;
+        }
+        if (storyId === this.activeStoryId) {
+          console.info(`[SyncFilter] ✓ Syncing ${docType || 'doc'} for active story: ${docId}`);
+          return true;
+        }
+        console.debug(`[SyncFilter] Excluding ${docType || 'doc'} ${docId} (storyId ${storyId} != active ${this.activeStoryId})`);
+        return false;
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // DEFAULT: Sync all other documents (user-wide resources, new doc types)
+      // ═══════════════════════════════════════════════════════════════════════
+      return true;
+    };
+  }
+
   private startSync(): void {
     if (!this.remoteDb || !this.db) return;
 
@@ -350,72 +496,7 @@ export class DatabaseService {
       timeout: 30000,
       // SELECTIVE SYNC: Filter to only sync active story and related documents
       // This significantly reduces memory usage and sync operations on mobile
-      filter: (doc: PouchDB.Core.Document<Record<string, unknown>>) => {
-        const docType = (doc as { type?: string }).type;
-        const docId = doc._id;
-
-        // Always exclude snapshots
-        if (docType === 'story-snapshot') {
-          return false;
-        }
-
-        // ALWAYS sync the story metadata index (lightweight document for story list)
-        if (docId === 'story-metadata-index' || docType === 'story-metadata-index') {
-          return true;
-        }
-
-        // Sync user-wide documents (not story-specific)
-        // These include: custom backgrounds, videos, etc.
-        const userWideTypes = ['custom-background', 'video', 'image-video-association'];
-        if (docType && userWideTypes.includes(docType)) {
-          return true;
-        }
-
-        // BOOTSTRAP MODE: When enabled, sync ALL documents to populate empty database
-        // This is used when local database is empty and metadata index is missing
-        if (this.bootstrapSyncMode) {
-          // In bootstrap mode, sync everything except snapshots (already excluded above)
-          console.info(`[SyncFilter] ✓ Bootstrap mode: syncing ${docId}`);
-          return true;
-        }
-
-        // If no active story is set (viewing story list), ONLY sync index + user-wide docs
-        // DO NOT sync individual story documents - they're not needed for the list view
-        if (!this.activeStoryId) {
-          // Story documents have no type field - exclude them
-          if (!docType) {
-            console.debug(`[SyncFilter] Excluding story document ${docId} (no activeStoryId)`);
-            return false;
-          }
-          // Codex documents are story-specific - exclude them
-          if (docType === 'codex') {
-            return false;
-          }
-          // Allow other document types (already handled user-wide types above)
-          return true;
-        }
-
-        // SELECTIVE SYNC ENABLED: Only sync active story and related documents
-
-        // 1. Sync the active story document (stories have no type field)
-        if (!docType && docId === this.activeStoryId) {
-          console.info(`[SyncFilter] ✓ Syncing active story: ${docId}`);
-          return true;
-        }
-
-        // 2. Sync codex for the active story
-        const storyId = (doc as { storyId?: string }).storyId;
-        if (docType === 'codex' && storyId === this.activeStoryId) {
-          console.info(`[SyncFilter] ✓ Syncing codex for active story: ${docId}`);
-          return true;
-        }
-
-        // 3. Exclude all other documents (other stories, their codex entries, etc.)
-        if (!docType) {
-          console.debug(`[SyncFilter] Excluding story document ${docId} (not active story ${this.activeStoryId})`);
-        }
-        return false;
-      }
+      filter: this.getSyncFilter()
     }) as unknown as PouchSync;
 
     this.syncHandler = (handler as unknown as PouchDB.Replication.Sync<Record<string, unknown>>)
@@ -590,11 +671,12 @@ export class DatabaseService {
       let lastActivityTime = Date.now();
       const timeoutMs = 90000;      // 90s hard timeout
       const idleThresholdMs = 3000; // 3s of no activity = likely complete
+      let idleChecker: ReturnType<typeof setInterval> | null = null;
 
       const complete = (docs: number) => {
         if (syncCompleted) return;
         syncCompleted = true;
-        clearInterval(idleChecker);
+        if (idleChecker) clearInterval(idleChecker);
         subscription.unsubscribe();
 
         // Small delay to ensure IndexedDB writes complete before resolving
@@ -604,6 +686,14 @@ export class DatabaseService {
           resolve({ docsProcessed: docs });
         }, 500);
       };
+
+      // Idle detection: if no activity for 3s after receiving docs, assume complete
+      idleChecker = setInterval(() => {
+        if (totalDocsProcessed > 0 && Date.now() - lastActivityTime > idleThresholdMs && !syncCompleted) {
+          console.info('[DatabaseService] Bootstrap sync idle timeout');
+          complete(totalDocsProcessed);
+        }
+      }, 1000);
 
       const subscription = this.syncStatus$.subscribe(status => {
         // Track activity and documents processed
@@ -619,14 +709,6 @@ export class DatabaseService {
           complete(totalDocsProcessed);
         }
       });
-
-      // Idle detection: if no activity for 3s after receiving docs, assume complete
-      const idleChecker = setInterval(() => {
-        if (totalDocsProcessed > 0 && Date.now() - lastActivityTime > idleThresholdMs && !syncCompleted) {
-          console.info('[DatabaseService] Bootstrap sync idle timeout');
-          complete(totalDocsProcessed);
-        }
-      }, 1000);
 
       // Hard timeout fallback
       setTimeout(() => {
@@ -721,9 +803,17 @@ export class DatabaseService {
     try {
       // Create replication with progress tracking
       const replicationPromise = (async () => {
+        // If no active story, only sync story-metadata-index (server-side efficient)
+        // If active story, use the client-side filter for selective sync
+        const replicationOptions = this.activeStoryId
+          ? { filter: this.getSyncFilter() }
+          : { doc_ids: ['story-metadata-index'] };
+
+        console.info(`[Sync] Force ${direction} with ${this.activeStoryId ? 'filter (active story: ' + this.activeStoryId + ')' : 'doc_ids (metadata-index only)'}`);
+
         const replication = direction === 'push'
-          ? this.db!.replicate.to(this.remoteDb!)
-          : this.db!.replicate.from(this.remoteDb!);
+          ? this.db!.replicate.to(this.remoteDb!, replicationOptions)
+          : this.db!.replicate.from(this.remoteDb!, replicationOptions);
 
         // Track progress during replication with document details
         let totalProcessed = 0;
@@ -959,57 +1049,4 @@ export class DatabaseService {
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   }
 
-  /**
-   * Check if there are stories in the remote database that are missing locally
-   * This is a quick check that compares story counts between local and remote databases
-   * @returns Object with hasMissing flag and counts, or null if remote DB is unavailable
-   */
-  async checkForMissingStories(): Promise<{
-    hasMissing: boolean;
-    localCount: number;
-    remoteCount: number;
-  } | null> {
-    try {
-      // Check if we have a remote database connection
-      if (!this.remoteDb) {
-        return null;
-      }
-
-      // Get local database
-      const localDb = await this.getDatabase();
-
-      // Quick count using allDocs (same efficient method used by StoryService)
-      const countStoriesInDb = async (db: PouchDB.Database): Promise<number> => {
-        const result = await db.allDocs({
-          include_docs: true  // REQUIRED: filterStoryRows needs full documents to check type/chapters fields
-        });
-        // Use shared utility function for consistent story document filtering
-        return countStories(result.rows);
-      };
-
-      // Count local stories first
-      const localCount = await countStoriesInDb(localDb);
-
-      // Count remote stories with separate error handling
-      // Remote DB may be unavailable or return malformed responses
-      let remoteCount: number;
-      try {
-        remoteCount = await countStoriesInDb(this.remoteDb);
-      } catch {
-        // Remote database unavailable or returned invalid response
-        // This is expected when offline or server is unreachable
-        console.warn('[DatabaseService] Remote database unavailable for story count check');
-        return null;
-      }
-
-      return {
-        hasMissing: remoteCount > localCount,
-        localCount,
-        remoteCount
-      };
-    } catch (error) {
-      console.error('[DatabaseService] Error checking for missing stories:', error);
-      return null;
-    }
-  }
 }

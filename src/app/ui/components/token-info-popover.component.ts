@@ -1,6 +1,6 @@
 import { Component, Input, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonList, IonItem, IonLabel, IonNote, IonProgressBar, IonBadge, IonGrid, IonRow, IonCol } from '@ionic/angular/standalone';
+import { IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonList, IonItem, IonLabel, IonNote, IonProgressBar, IonGrid, IonRow, IonCol } from '@ionic/angular/standalone';
 import { PopoverController } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { closeOutline, informationCircleOutline } from 'ionicons/icons';
@@ -23,7 +23,6 @@ import { TokenCounterService, SupportedModel, TokenCountResult } from '../../sha
     IonLabel,
     IonNote,
     IonProgressBar,
-    IonBadge,
     IonGrid,
     IonRow,
     IonCol
@@ -56,10 +55,9 @@ import { TokenCounterService, SupportedModel, TokenCountResult } from '../../sha
         <!-- Model Info -->
         <ion-item lines="none">
           <ion-label>
-            <h2>{{ modelInfo.name }}</h2>
-            <p>{{ modelInfo.provider }}</p>
+            <h2>{{ displayModelName }}</h2>
+            <p>{{ displayModelProvider }}</p>
           </ion-label>
-          <ion-badge slot="end" color="primary">{{ model }}</ion-badge>
         </ion-item>
 
         <!-- Token Count -->
@@ -407,12 +405,31 @@ export class TokenInfoPopoverComponent implements OnInit {
   @Input() prompt = '';
   @Input() model: SupportedModel = 'claude-3.7-sonnet';
   @Input() showComparison = false;
+  @Input() customModelName?: string;
+  @Input() customModelProvider?: string;
+  @Input() customContextLength?: number;
+  @Input() customOutputLimit?: number;
 
   tokenResult!: TokenCountResult;
   modelInfo!: ReturnType<TokenCounterService['getModelInfo']>;
   usagePercentage = 0;
   loading = true;
   Math = Math;
+
+  // Computed display values that use custom names when available
+  get displayModelName(): string {
+    if (this.model === 'custom' && this.customModelName) {
+      return this.customModelName;
+    }
+    return this.modelInfo?.name || 'Unknown Model';
+  }
+
+  get displayModelProvider(): string {
+    if (this.model === 'custom' && this.customModelProvider) {
+      return this.customModelProvider;
+    }
+    return this.modelInfo?.provider || 'Unknown';
+  }
 
   comparisonModels: { id: SupportedModel; name: string }[] = [
     { id: 'claude-sonnet-4-5', name: 'Claude 4.5' },
@@ -434,7 +451,7 @@ export class TokenInfoPopoverComponent implements OnInit {
 
   async calculateTokens() {
     this.loading = true;
-    
+
     try {
       // Try async tokenization first for Claude models
       this.tokenResult = await this.tokenCounter.countTokens(this.prompt, this.model);
@@ -443,8 +460,14 @@ export class TokenInfoPopoverComponent implements OnInit {
       console.warn('Failed to use async tokenization, falling back to sync:', error);
       this.tokenResult = this.tokenCounter.countTokensSync(this.prompt, this.model);
     }
-    
-    this.modelInfo = this.tokenCounter.getModelInfo(this.model);
+
+    // Pass custom values for custom models to get accurate context/output limits
+    this.modelInfo = this.tokenCounter.getModelInfo(this.model, {
+      customContextLength: this.customContextLength,
+      customOutputLimit: this.customOutputLimit,
+      customModelName: this.customModelName,
+      customModelProvider: this.customModelProvider
+    });
     this.usagePercentage = (this.tokenResult.tokens / this.modelInfo.contextWindow) * 100;
     this.loading = false;
   }

@@ -152,9 +152,6 @@ CreativeWriter is built with modern web technologies:
 
 ### Quick Start with Docker
 
-> **🎉 All images are now published!** Use the simple docker-compose setup from the public repository.
-
-#### Option 1: Use Pre-built Images (Recommended)
 ```bash
 # Create directory AND persistent storage
 mkdir creativewriter && cd creativewriter
@@ -174,31 +171,6 @@ ls -la ./data/couchdb-data/  # Should contain database files after first run
 
 # Access at http://localhost:3080
 ```
-
-#### Option 2: Development Setup (Local Build)
-For development or customization:
-```bash
-git clone https://github.com/MarcoDroll/creativewriter-public.git
-cd creativewriter-public
-
-# CRITICAL: Create data directory for database persistence
-mkdir -p data
-chmod 755 data
-
-# Build all Docker images
-docker build -t ghcr.io/marcodroll/creativewriter2:latest .
-docker build -t ghcr.io/marcodroll/creativewriter2-nginx:latest -f Dockerfile.nginx .
-docker build -t ghcr.io/marcodroll/creativewriter2-proxy:latest -f Dockerfile.proxy .
-docker build -t ghcr.io/marcodroll/creativewriter2-gemini-proxy:latest -f Dockerfile.gemini-proxy .
-
-# Start with persistent storage
-docker compose up -d
-
-# Verify data persistence
-ls -la ./data/couchdb-data/  # Should contain database files after first run
-```
-
-Then configure your AI providers in Settings with your API keys.
 
 ### Environment Variables
 
@@ -220,38 +192,6 @@ COUCHDB_USER=admin
 COUCHDB_PASSWORD=your_secure_password
 COUCHDB_SECRET=your_secure_secret
 ```
-
-**Security Note:** Always change the default CouchDB credentials in production environments!
-
-### Development Setup
-
-For development or customization, clone the repository:
-
-1. **Clone and setup**
-   ```bash
-   git clone https://github.com/MarcoDroll/creativewriter-public.git
-   cd creativewriter-public
-   ```
-
-2. **Prerequisites**
-   - Node.js 20+
-   - npm 10+
-   - Angular CLI 19+
-
-3. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-4. **Start development server**
-   ```bash
-   npm start
-   ```
-
-5. **Build for production**
-   ```bash
-   npm run build
-   ```
 
 ### Configuration
 
@@ -308,27 +248,6 @@ The application uses PouchDB for local storage with optional CouchDB sync:
 - Port 3080 available (or configure a different port)
 - **Persistent storage location for database** (default: `./data` directory)
 
-### Single Instance
-Build and run locally:
-```bash
-git clone https://github.com/MarcoDroll/creativewriter-public.git
-cd creativewriter-public
-
-# IMPORTANT: Create data directory for persistent storage
-mkdir -p data
-chmod 755 data
-
-# Build all required images
-docker build -t ghcr.io/marcodroll/creativewriter2:latest .
-docker build -t ghcr.io/marcodroll/creativewriter2-nginx:latest -f Dockerfile.nginx .
-docker build -t ghcr.io/marcodroll/creativewriter2-proxy:latest -f Dockerfile.proxy .
-docker build -t ghcr.io/marcodroll/creativewriter2-gemini-proxy:latest -f Dockerfile.gemini-proxy .
-
-# Start the application with persistent storage
-docker compose up -d
-```
-Then configure your AI API keys in Settings after accessing the app at http://localhost:3080.
-
 ### 📁 Data Persistence & Backup
 
 **Critical: Your stories are stored in CouchDB within the Docker container.** The docker-compose.yml file maps the following volumes:
@@ -350,66 +269,6 @@ volumes:
    ```
 4. **Verify persistence:** Check that `./data/couchdb-data` contains files after first run
 5. **Use the built-in backup feature:** Go to Settings → Backup & Restore to create downloadable backups
-
-### Multiple Instances
-Run multiple isolated instances on the same host:
-
-```bash
-# Clone once
-git clone https://github.com/MarcoDroll/creativewriter-public.git creativewriter-base
-cd creativewriter-base
-
-# Build images once
-docker build -t ghcr.io/marcodroll/creativewriter2:latest .
-docker build -t ghcr.io/marcodroll/creativewriter2-nginx:latest -f Dockerfile.nginx .
-docker build -t ghcr.io/marcodroll/creativewriter2-proxy:latest -f Dockerfile.proxy .
-docker build -t ghcr.io/marcodroll/creativewriter2-gemini-proxy:latest -f Dockerfile.gemini-proxy .
-
-# Instance 1 - Personal Writing
-echo "PORT=3080" > .env
-docker compose -p writer-personal up -d
-
-# Instance 2 - Work Projects (using different port)
-echo "PORT=3081" > .env
-docker compose -p writer-work up -d
-```
-
-Each instance maintains its own database and settings, so configure API keys separately in each instance's Settings.
-
-See [README-MULTI-INSTANCE.md](README-MULTI-INSTANCE.md) for detailed multi-instance setup.
-
-## 📦 Docker Images
-
-> **✅ All Images Available:** Complete set of pre-built Docker images ready for production use.
-
-| Image | Status | Registry Path |
-|-------|--------|--------------|
-| Main Application | ✅ Published | `ghcr.io/marcodroll/creativewriter-public:latest` |
-| Nginx Proxy | ✅ Published | `ghcr.io/marcodroll/creativewriter-public-nginx:latest` |
-| Replicate Proxy | ✅ Published | `ghcr.io/marcodroll/creativewriter-public-proxy:latest` |
-| Gemini Proxy | ✅ Published | `ghcr.io/marcodroll/creativewriter-public-gemini-proxy:latest` |
-
-## 🛠️ Development
-
-### Project Structure
-```
-src/
-├── app/
-│   ├── core/        # Core services and models
-│   ├── shared/      # Shared components and utilities
-│   ├── stories/     # Story management module
-│   └── settings/    # Settings module
-├── assets/          # Static assets and templates
-└── styles.scss      # Global styles
-```
-
-### Key Technologies
-- **Angular 20**: Modern web framework
-- **Ionic 8**: UI components and mobile support
-- **ProseMirror**: Powerful text editor framework
-- **PouchDB**: Local-first database
-- **RxJS**: Reactive programming
-- **TypeScript**: Type-safe development
 
 ## 📝 Usage Tips
 
@@ -437,14 +296,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Developed using AI-powered pair programming with [Claude Code](https://claude.ai/code) (paid subscription)
 - Significant human expertise and effort guiding the AI development
 - Community contributors and testers
-
-## 📚 Documentation
-
-- [Beat Version History User Guide](docs/beat-version-history/user-guide.md) - Learn how to use version history for beat generations
-- [Multi-Instance Deployment](README-MULTI-INSTANCE.md)
-- [Image Generation Setup](README-IMAGE-GENERATION.md)
-- [Release Process](RELEASE.md)
-- [API Documentation](docs/api.md)
 
 ## 🔗 Links
 

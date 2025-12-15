@@ -248,8 +248,21 @@ export class StoryEditorStateService {
     // Prevent concurrent saves unless forced
     if (state.isSaving && !options.force) {
       this.pendingSave = true;
+      // Wait for the current save to complete if there's a valid promise
       if (this.currentSavePromise) {
-        await this.currentSavePromise;
+        try {
+          await this.currentSavePromise;
+        } catch {
+          // Current save failed - we'll check hasUnsavedChanges below
+        }
+      }
+
+      // After waiting, check if we still need to save
+      // This handles cases where the awaited save failed or new changes arrived
+      const postWaitState = this.stateSubject.value;
+      if (postWaitState.hasUnsavedChanges && !postWaitState.isSaving) {
+        // Actually perform the save now
+        return this.saveStory(options);
       }
       return;
     }
@@ -259,72 +272,78 @@ export class StoryEditorStateService {
       return;
     }
 
+    // CRITICAL FIX: Create deferred promise and assign BEFORE setting isSaving
+    // This eliminates the race condition window where isSaving=true but
+    // currentSavePromise is null/stale
+    let resolvePromise!: () => void;
+    let rejectPromise!: (error: unknown) => void;
+
+    this.currentSavePromise = new Promise<void>((resolve, reject) => {
+      resolvePromise = resolve;
+      rejectPromise = reject;
+    });
+
+    // NOW set isSaving - after currentSavePromise is valid
     this.updateState({ isSaving: true });
 
-    const saveOperation = (async () => {
-      try {
-        // Get fresh state right before saving to avoid stale content
-        const freshState = this.stateSubject.value;
+    try {
+      // Get fresh state right before saving to avoid stale content
+      const freshState = this.stateSubject.value;
 
-        // Save active scene changes
-        if (freshState.activeScene && freshState.activeChapterId && freshState.story) {
-          await this.storyService.updateScene(
-            freshState.story.id,
-            freshState.activeChapterId,
-            freshState.activeScene.id,
-            {
-              title: freshState.activeScene.title,
-              content: freshState.activeScene.content
-            }
-          );
-        }
-
-        // Save story title if changed (get fresh state again for title)
-        const currentState = this.stateSubject.value;
-        if (currentState.story) {
-          const currentStory = await this.storyService.getStory(currentState.story.id);
-          if (currentStory && currentStory.title !== currentState.story.title) {
-            await this.storyService.updateStory({
-              ...currentStory,
-              title: currentState.story.title,
-              updatedAt: new Date()
-            });
+      // Save active scene changes
+      if (freshState.activeScene && freshState.activeChapterId && freshState.story) {
+        await this.storyService.updateScene(
+          freshState.story.id,
+          freshState.activeChapterId,
+          freshState.activeScene.id,
+          {
+            title: freshState.activeScene.title,
+            content: freshState.activeScene.content
           }
-        }
+        );
+      }
 
-        this.updateState({ hasUnsavedChanges: false });
-
-        // Refresh prompt manager unless skipped
-        const finalState = this.stateSubject.value;
-        if (!options.skipPromptManagerRefresh && finalState.story) {
-          await this.promptManager.setCurrentStory(null);
-          await new Promise(resolve => setTimeout(resolve, 50));
-          await this.promptManager.setCurrentStory(finalState.story.id);
-        }
-
-      } catch (error) {
-        console.error('Error saving story:', error);
-        // Re-mark as unsaved so it can be retried
-        this.updateState({ hasUnsavedChanges: true });
-        throw error;
-      } finally {
-        this.updateState({ isSaving: false });
-
-        // If there was a pending save request during save, execute it
-        if (this.pendingSave) {
-          this.pendingSave = false;
-          setTimeout(() => this.saveStory(), 100);
+      // Save story title if changed (get fresh state again for title)
+      const currentState = this.stateSubject.value;
+      if (currentState.story) {
+        const currentStory = await this.storyService.getStory(currentState.story.id);
+        if (currentStory && currentStory.title !== currentState.story.title) {
+          await this.storyService.updateStory({
+            ...currentStory,
+            title: currentState.story.title,
+            updatedAt: new Date()
+          });
         }
       }
-    })();
 
-    this.currentSavePromise = saveOperation;
+      this.updateState({ hasUnsavedChanges: false });
 
-    try {
-      await saveOperation;
+      // Refresh prompt manager unless skipped
+      const finalState = this.stateSubject.value;
+      if (!options.skipPromptManagerRefresh && finalState.story) {
+        await this.promptManager.setCurrentStory(null);
+        await new Promise(resolve => setTimeout(resolve, 50));
+        await this.promptManager.setCurrentStory(finalState.story.id);
+      }
+
+      // Resolve the deferred promise on success
+      resolvePromise();
+
+    } catch (error) {
+      console.error('Error saving story:', error);
+      // Re-mark as unsaved so it can be retried
+      this.updateState({ hasUnsavedChanges: true });
+      // Reject the deferred promise
+      rejectPromise(error);
+      throw error;
     } finally {
-      if (this.currentSavePromise === saveOperation) {
-        this.currentSavePromise = null;
+      this.updateState({ isSaving: false });
+      this.currentSavePromise = null;
+
+      // If there was a pending save request during save, execute it
+      if (this.pendingSave) {
+        this.pendingSave = false;
+        setTimeout(() => this.saveStory(), 100);
       }
     }
   }

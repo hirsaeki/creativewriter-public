@@ -822,44 +822,22 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // Find the selected model in our available models to get its metadata
     const selectedModelOption = this.availableModels.find(model => model.id === this.selectedModel);
-    
-    // Map the model based on its label/name instead of trying to parse the ID
-    let mappedModel: SupportedModel = 'custom';
 
-    if (selectedModelOption) {
-      const modelLabel = selectedModelOption.label.toLowerCase();
-      const modelId = selectedModelOption.id.toLowerCase();
-
-      // Map based on the human-readable model name or model ID
-      if (modelLabel.includes('sonnet 4.5') || modelLabel.includes('sonnet-4-5') ||
-          modelId.includes('sonnet-4-5') || modelId.includes('sonnet-4.5')) {
-        mappedModel = 'claude-sonnet-4-5';
-      } else if (modelLabel.includes('sonnet 4') || modelLabel.includes('sonnet-4') ||
-          modelId.includes('sonnet-4') || (modelLabel.includes('claude 4') && !modelLabel.includes('4.5'))) {
-        mappedModel = 'claude-sonnet-4';
-      } else if (modelLabel.includes('claude 3.7') || modelLabel.includes('claude-3.7') ||
-          modelLabel.includes('claude 3.5 sonnet v2') || modelLabel.includes('sonnet v2')) {
-        mappedModel = 'claude-3.7-sonnet';
-      } else if (modelLabel.includes('claude 3.5') || modelLabel.includes('claude-3.5')) {
-        mappedModel = 'claude-3.5-sonnet';
-      } else if (modelLabel.includes('gemini 2.5 flash') || modelLabel.includes('gemini-2.5-flash') ||
-          modelId.includes('flash')) {
-        mappedModel = 'gemini-2.5-flash';
-      } else if (modelLabel.includes('gemini 2.5') || modelLabel.includes('gemini-2.5')) {
-        mappedModel = 'gemini-2.5-pro';
-      } else if (modelLabel.includes('gemini 1.5') || modelLabel.includes('gemini-1.5')) {
-        mappedModel = 'gemini-1.5-pro';
-      } else if (modelLabel.includes('grok')) {
-        mappedModel = 'grok-3';
-      }
-    }
+    // Always use the actual model info from the selected model option
+    // Extract provider from the model ID (format: provider:model-id)
+    const providerMatch = selectedModelOption?.id.match(/^([^:]+):/);
+    const customModelProvider = providerMatch ? this.formatProviderName(providerMatch[1]) :
+      (selectedModelOption?.provider ? this.formatProviderName(selectedModelOption.provider) : undefined);
 
     const popover = await this.popoverController.create({
       component: TokenInfoPopoverComponent,
       componentProps: {
         prompt: fullPrompt || this.currentPrompt,
-        model: mappedModel,
-        showComparison: true
+        model: 'custom' as SupportedModel, // Always use 'custom' to leverage actual model data
+        showComparison: false, // Disable comparison since we're using actual model data
+        customModelName: selectedModelOption?.label,
+        customModelProvider,
+        customContextLength: selectedModelOption?.contextLength
       },
       cssClass: 'token-info-popover',
       translucent: true,
@@ -869,6 +847,18 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     });
 
     await popover.present();
+  }
+
+  private formatProviderName(provider: string): string {
+    const providerNames: Record<string, string> = {
+      'openrouter': 'OpenRouter',
+      'ollama': 'Ollama (Local)',
+      'claude': 'Anthropic',
+      'gemini': 'Google',
+      'replicate': 'Replicate',
+      'openaicompatible': 'OpenAI-Compatible'
+    };
+    return providerNames[provider.toLowerCase()] || provider;
   }
 
   stopGeneration(): void {

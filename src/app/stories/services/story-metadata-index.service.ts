@@ -31,6 +31,16 @@ export class StoryMetadataIndexService {
   private metadataCache: StoryMetadataIndex | null = null;
 
   /**
+   * Check if user is in local-only mode (no sync)
+   */
+  private isLocalOnlyMode(): boolean {
+    return localStorage.getItem('creative-writer-local-only') === 'true';
+  }
+
+  // Guard to prevent concurrent getMetadataIndex calls (which cause loops during initial sync)
+  private pendingFetch: Promise<StoryMetadataIndex> | null = null;
+
+  /**
    * Get the current database instance
    * Always get fresh reference to handle user login/logout which creates new databases
    */
@@ -43,30 +53,113 @@ export class StoryMetadataIndexService {
   }
 
   /**
-   * Get the metadata index (from cache or database)
+   * Get the metadata index (from remote, cache, or local database)
+   *
+   * Priority:
+   * 1. Remote database (if available) - always fresh
+   * 2. Cache (if available)
+   * 3. Local database
+   * 4. Rebuild from stories
    *
    * @returns The metadata index containing all story previews
    * @throws Error if index cannot be loaded or created
    */
   async getMetadataIndex(): Promise<StoryMetadataIndex> {
-    const db = await this.getDb();
-
-    // Return from cache if available
+    // Return cached result if available (quick path)
     if (this.metadataCache) {
       return this.metadataCache;
     }
 
+    // If a fetch is already in progress, wait for it instead of starting a new one
+    // This prevents concurrent calls during initial sync from causing loops
+    if (this.pendingFetch) {
+      console.debug('[MetadataIndex] Fetch already in progress, waiting...');
+      return this.pendingFetch;
+    }
+
+    // Start fetch and store the promise
+    this.pendingFetch = this.doGetMetadataIndex();
+
+    try {
+      return await this.pendingFetch;
+    } finally {
+      this.pendingFetch = null;
+    }
+  }
+
+  /**
+   * Internal implementation of getMetadataIndex
+   */
+  private async doGetMetadataIndex(): Promise<StoryMetadataIndex> {
+    const db = await this.getDb();
+    const remoteDb = this.databaseService.getRemoteDatabase();
+
+    // Try remote database first (always fresh) - skip in local-only mode
+    if (remoteDb && !this.isLocalOnlyMode()) {
+      try {
+        // Log database name for debugging
+        const dbName = (remoteDb as { name?: string }).name || 'unknown';
+        console.info(`[MetadataIndex] Fetching from remote database: ${dbName}`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const doc = await remoteDb.get('story-metadata-index') as any;
+
+        if (isStoryMetadataIndex(doc)) {
+          const storyCount = (doc.stories || []).length;
+          console.info('[MetadataIndex] Got index from remote with', storyCount, 'stories');
+
+          // If remote index is empty, check if remote actually has stories (stale index)
+          if (storyCount === 0) {
+            console.info('[MetadataIndex] Remote index is empty, checking for story documents...');
+            const hasStories = await this.checkRemoteHasStories(remoteDb);
+
+            if (hasStories) {
+              console.info('[MetadataIndex] Remote has stories but empty index - rebuilding from remote');
+              return await this.rebuildIndexFromRemote(remoteDb);
+            }
+          }
+
+          const index = this.deserializeIndex(doc);
+          this.metadataCache = index;
+
+          // Save to local DB for offline access
+          // MUST await to prevent race condition with removeStoryMetadata/updateStoryMetadata
+          // which also modify the index document
+          try {
+            await this.saveIndexToLocal(index);
+          } catch (err) {
+            console.warn('[MetadataIndex] Failed to save remote index locally:', err);
+          }
+
+          return index;
+        }
+      } catch (err) {
+        const error = err as { status?: number };
+        if (error.status !== 404) {
+          console.warn('[MetadataIndex] Error fetching from remote:', err);
+        } else {
+          console.info('[MetadataIndex] Index not found on remote');
+        }
+      }
+    }
+
+    // Return from cache if available
+    if (this.metadataCache) {
+      console.info('[MetadataIndex] Returning cached index');
+      return this.metadataCache;
+    }
+
+    // Try local database
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const doc = await db.get('story-metadata-index') as any;
 
       // Validate that it's actually a metadata index
       if (!isStoryMetadataIndex(doc)) {
-        console.warn('Document story-metadata-index exists but is not a valid metadata index, rebuilding');
+        console.warn('[MetadataIndex] Local index invalid, rebuilding');
         return await this.rebuildIndex();
       }
 
-      // Deserialize dates
+      console.info('[MetadataIndex] Got index from local database');
       const index = this.deserializeIndex(doc);
       this.metadataCache = index;
       return index;
@@ -75,7 +168,7 @@ export class StoryMetadataIndexService {
       const error = err as { status?: number };
       if (error.status === 404) {
         // Index doesn't exist - create it
-        console.info('Metadata index not found, creating new index');
+        console.info('[MetadataIndex] Index not found locally, rebuilding');
         return await this.rebuildIndex();
       }
       throw err;
@@ -83,14 +176,191 @@ export class StoryMetadataIndexService {
   }
 
   /**
+   * Save the index to local database for offline access
+   * Updates the cache's _rev to prevent conflicts on subsequent writes
+   * IMPORTANT: Only saves if content actually changed to prevent sync loops
+   */
+  private async saveIndexToLocal(index: StoryMetadataIndex): Promise<void> {
+    const db = await this.getDb();
+
+    try {
+      // Try to get existing doc for _rev and comparison
+      const existing = await db.get('story-metadata-index').catch(() => null) as StoryMetadataIndex | null;
+
+      // Check if content actually changed before saving
+      // This prevents sync loops: remote fetch → local save → sync event → reload → repeat
+      if (existing && this.indexContentEqual(existing, index)) {
+        // Content identical - just update cache _rev, don't save
+        if (this.metadataCache) {
+          this.metadataCache._rev = (existing as { _rev: string })._rev;
+        }
+        console.debug('[MetadataIndex] Local index identical to remote, skipping save');
+        return;
+      }
+
+      const docToSave = {
+        ...index,
+        _id: 'story-metadata-index',
+        _rev: existing ? (existing as { _rev: string })._rev : undefined
+      };
+      const result = await db.put(docToSave);
+
+      // Update cache with new _rev to prevent conflicts on subsequent writes
+      if (this.metadataCache && result.rev) {
+        this.metadataCache._rev = result.rev;
+      }
+
+      console.info('[MetadataIndex] Saved remote index to local database');
+    } catch (err) {
+      // Conflict is OK - someone else saved it, but we need fresh _rev for cache
+      const error = err as { status?: number };
+      if (error.status === 409) {
+        // Refresh cache with current local _rev
+        try {
+          const current = await db.get('story-metadata-index') as { _rev: string };
+          if (this.metadataCache && current._rev) {
+            this.metadataCache._rev = current._rev;
+          }
+        } catch {
+          // Couldn't get fresh _rev, cache will be stale but retry logic should handle it
+        }
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  /**
+   * Compare two metadata indexes for content equality
+   * Ignores _id, _rev, and lastUpdated (which change on every save)
+   */
+  private indexContentEqual(a: StoryMetadataIndex, b: StoryMetadataIndex): boolean {
+    // Different number of stories = different content
+    if (a.stories.length !== b.stories.length) {
+      return false;
+    }
+
+    // Compare each story by ID and key fields
+    for (const storyA of a.stories) {
+      const storyB = b.stories.find(s => s.id === storyA.id);
+
+      if (!storyB) {
+        return false; // Story in A not found in B
+      }
+
+      // Compare key fields that matter for display
+      if (storyA.title !== storyB.title ||
+          storyA.wordCount !== storyB.wordCount ||
+          storyA.chapterCount !== storyB.chapterCount ||
+          storyA.sceneCount !== storyB.sceneCount ||
+          storyA.order !== storyB.order ||
+          storyA.previewText !== storyB.previewText) {
+        return false;
+      }
+
+      // Compare updatedAt timestamps (important for showing last edit time)
+      const aUpdated = storyA.updatedAt instanceof Date ? storyA.updatedAt.getTime() : new Date(storyA.updatedAt).getTime();
+      const bUpdated = storyB.updatedAt instanceof Date ? storyB.updatedAt.getTime() : new Date(storyB.updatedAt).getTime();
+      if (aUpdated !== bUpdated) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if remote database has story documents
+   */
+  private async checkRemoteHasStories(remoteDb: PouchDB.Database): Promise<boolean> {
+    try {
+      // Get all documents - don't limit as stories may be after other docs alphabetically
+      const result = await remoteDb.allDocs({ include_docs: true });
+      console.info(`[MetadataIndex] Checking ${result.rows.length} remote documents for stories...`);
+
+      const storyCount = result.rows.filter(row => {
+        const doc = row.doc as { type?: string; chapters?: unknown; _id?: string } | undefined;
+        // Stories don't have a type field, must have chapters, and are not system docs
+        return doc && !doc.type && doc.chapters && !row.id.startsWith('_');
+      }).length;
+
+      console.info(`[MetadataIndex] Found ${storyCount} story documents on remote`);
+      return storyCount > 0;
+    } catch (err) {
+      console.warn('[MetadataIndex] Failed to check remote for stories:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Rebuild the metadata index from remote story documents
+   * Called when remote index exists but is stale (empty)
+   */
+  private async rebuildIndexFromRemote(remoteDb: PouchDB.Database): Promise<StoryMetadataIndex> {
+    console.info('[MetadataIndex] Rebuilding index from remote stories...');
+
+    try {
+      // Load all docs from remote
+      const result = await remoteDb.allDocs({ include_docs: true });
+
+      // Filter to story documents only
+      const stories: Story[] = result.rows
+        .filter(row => {
+          const doc = row.doc as { type?: string; chapters?: unknown; _id?: string } | undefined;
+          // Stories don't have a type field and must have chapters
+          return doc && !doc.type && doc.chapters && !row.id.startsWith('_');
+        })
+        .map(row => this.deserializeStory(row.doc as Story));
+
+      console.info(`[MetadataIndex] Found ${stories.length} stories on remote, extracting metadata...`);
+
+      // Create new index
+      const index: StoryMetadataIndex = {
+        _id: 'story-metadata-index',
+        type: 'story-metadata-index',
+        lastUpdated: new Date(),
+        stories: stories.map(s => this.extractMetadata(s))
+      };
+
+      // Get existing _rev from remote for update
+      try {
+        const existing = await remoteDb.get('story-metadata-index');
+        index._rev = (existing as { _rev?: string })._rev;
+      } catch {
+        // No existing index, that's fine
+      }
+
+      // Save to remote
+      await remoteDb.put(index);
+      console.info(`[MetadataIndex] Rebuilt index saved to remote with ${index.stories.length} stories`);
+
+      // Also save to local - await to prevent race conditions
+      try {
+        await this.saveIndexToLocal(index);
+      } catch (err) {
+        console.warn('[MetadataIndex] Failed to save rebuilt index locally:', err);
+      }
+
+      this.metadataCache = index;
+      return index;
+
+    } catch (error) {
+      console.error('[MetadataIndex] Error rebuilding index from remote:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Update a single story's metadata in the index
    *
    * Call this after any story modification (create, update, reorder)
+   * Updates BOTH local and remote databases to ensure immediate sync
    *
    * @param story The story to update in the index
    */
   async updateStoryMetadata(story: Story): Promise<void> {
     const db = await this.getDb();
+    const remoteDb = this.databaseService.getRemoteDatabase();
 
     // Retry up to 3 times for conflict resolution
     const maxRetries = 3;
@@ -106,6 +376,7 @@ export class StoryMetadataIndexService {
         // Find existing entry
         const existingIndex = index.stories.findIndex(s => s.id === story.id);
         const metadata = this.extractMetadata(story);
+        const isNewStory = existingIndex < 0;
 
         if (existingIndex >= 0) {
           // Update existing entry
@@ -117,10 +388,36 @@ export class StoryMetadataIndexService {
 
         index.lastUpdated = new Date();
 
-        // Save to database and update _rev in cached object
-        const result = await db.put(index);
+        // Save to REMOTE first (if available and not in local-only mode) - this is the source of truth
+        if (remoteDb && !this.isLocalOnlyMode()) {
+          try {
+            // Get fresh _rev from remote
+            const remoteDoc = await remoteDb.get('story-metadata-index').catch(() => null);
+            const remoteIndex = {
+              ...index,
+              _id: 'story-metadata-index',
+              _rev: remoteDoc ? (remoteDoc as { _rev: string })._rev : undefined
+            };
+            const remoteResult = await remoteDb.put(remoteIndex);
+            index._rev = remoteResult.rev;
+            console.info(`[MetadataIndex] ${isNewStory ? 'Added' : 'Updated'} story ${story.id} in remote index`);
+          } catch (remoteErr) {
+            console.warn('[MetadataIndex] Failed to update remote index:', remoteErr);
+            // Continue with local update even if remote fails
+          }
+        }
+
+        // Save to local database
+        const localDoc = await db.get('story-metadata-index').catch(() => null);
+        const localIndex = {
+          ...index,
+          _id: 'story-metadata-index',
+          _rev: localDoc ? (localDoc as { _rev: string })._rev : undefined
+        };
+        const result = await db.put(localIndex);
         index._rev = result.rev;
         this.metadataCache = index;
+        console.info(`[MetadataIndex] ${isNewStory ? 'Added' : 'Updated'} story ${story.id} in local index`);
         return; // Success - exit retry loop
 
       } catch (error) {
@@ -147,11 +444,13 @@ export class StoryMetadataIndexService {
    * Remove a story from the index
    *
    * Call this after story deletion
+   * Updates BOTH local and remote databases to prevent re-sync issues
    *
    * @param storyId The ID of the story to remove
    */
   async removeStoryMetadata(storyId: string): Promise<void> {
     const db = await this.getDb();
+    const remoteDb = this.databaseService.getRemoteDatabase();
 
     // Retry up to 3 times for conflict resolution
     const maxRetries = 3;
@@ -170,9 +469,37 @@ export class StoryMetadataIndexService {
         // Only update if something was actually removed
         if (index.stories.length < originalCount) {
           index.lastUpdated = new Date();
-          const result = await db.put(index);
+
+          // Save to REMOTE first (if available and not in local-only mode) - this is the source of truth
+          if (remoteDb && !this.isLocalOnlyMode()) {
+            try {
+              // Get fresh _rev from remote
+              const remoteDoc = await remoteDb.get('story-metadata-index').catch(() => null);
+              const remoteIndex = {
+                ...index,
+                _id: 'story-metadata-index',
+                _rev: remoteDoc ? (remoteDoc as { _rev: string })._rev : undefined
+              };
+              const remoteResult = await remoteDb.put(remoteIndex);
+              index._rev = remoteResult.rev;
+              console.info(`[MetadataIndex] Removed story ${storyId} from remote index`);
+            } catch (remoteErr) {
+              console.warn('[MetadataIndex] Failed to update remote index:', remoteErr);
+              // Continue with local update even if remote fails
+            }
+          }
+
+          // Save to local database
+          const localDoc = await db.get('story-metadata-index').catch(() => null);
+          const localIndex = {
+            ...index,
+            _id: 'story-metadata-index',
+            _rev: localDoc ? (localDoc as { _rev: string })._rev : undefined
+          };
+          const result = await db.put(localIndex);
           index._rev = result.rev;
           this.metadataCache = index;
+          console.info(`[MetadataIndex] Removed story ${storyId} from local index`);
         }
         return; // Success - exit retry loop
 
@@ -230,12 +557,10 @@ export class StoryMetadataIndexService {
       console.info(`Found ${stories.length} stories, extracting metadata...`);
 
       // CRITICAL: Don't create an empty index that would overwrite a syncing remote index
-      // This prevents the race condition where a fresh Firefox install creates an empty
-      // index before sync completes, which then syncs to remote and overwrites Chrome's index
       if (stories.length === 0 && !force) {
         console.info('[MetadataIndex] Local database has 0 stories - checking for existing index');
 
-        // Check if an index exists (might have synced already)
+        // Check if an index exists locally (might have synced already)
         try {
           const existing = await db.get('story-metadata-index');
           console.info('[MetadataIndex] Found existing index, returning it');
@@ -243,18 +568,41 @@ export class StoryMetadataIndexService {
           this.metadataCache = deserializedIndex;
           return deserializedIndex;
         } catch {
-          // No existing index - return a temporary empty index (NOT saved to DB)
-          // This allows the UI to show empty state while sync is in progress
-          // The actual index will arrive from remote when sync completes
-          console.info('[MetadataIndex] No existing index found, returning temporary empty index');
-          console.info('[MetadataIndex] Sync will bring the real index from remote shortly');
+          // No local index - check if remote has stories and trigger bootstrap sync (skip in local-only mode)
+          const remoteDb = this.databaseService.getRemoteDatabase();
+          if (remoteDb && !this.isLocalOnlyMode()) {
+            console.info('[MetadataIndex] Checking remote for stories...');
+            try {
+              const remoteInfo = await remoteDb.allDocs({ limit: 20, include_docs: true });
+              const hasStories = remoteInfo.rows.some(row => {
+                const doc = row.doc as Record<string, unknown> | undefined;
+                return doc && typeof doc === 'object' && 'chapters' in doc && !row.id.startsWith('_');
+              });
+
+              if (hasStories) {
+                console.info('[MetadataIndex] Remote has stories - triggering bootstrap sync');
+                // Trigger bootstrap sync (async - don't await)
+                this.databaseService.enableBootstrapSync().then(result => {
+                  console.info('[MetadataIndex] Bootstrap sync completed:', result.docsProcessed, 'docs');
+                  // Clear cache to force refresh on next request
+                  this.clearCache();
+                }).catch(err => {
+                  console.error('[MetadataIndex] Bootstrap sync failed:', err);
+                });
+              }
+            } catch (remoteErr) {
+              console.warn('[MetadataIndex] Could not check remote for stories:', remoteErr);
+            }
+          }
+
+          // Return temporary empty index while bootstrap sync runs
+          console.info('[MetadataIndex] Returning temporary empty index');
           const tempIndex: StoryMetadataIndex = {
             _id: 'story-metadata-index',
             type: 'story-metadata-index',
             lastUpdated: new Date(),
             stories: []
           };
-          // Don't cache this temporary index - we want to retry getting the real one
           return tempIndex;
         }
       }

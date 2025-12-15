@@ -229,7 +229,12 @@ export class TokenCounterService {
   }
 
   // Get token limit for a model
-  getModelTokenLimit(model: SupportedModel): number {
+  getModelTokenLimit(model: SupportedModel, customContextLength?: number): number {
+    // For custom models, use the provided context length if available
+    if (model === 'custom' && customContextLength !== undefined && customContextLength > 0) {
+      return customContextLength;
+    }
+
     const tokenLimits: Record<SupportedModel, number> = {
       'claude-3.5-sonnet': 200000,
       'claude-3.7-sonnet': 200000,
@@ -273,7 +278,12 @@ export class TokenCounterService {
   }
 
   // Get output token limit for a model
-  getModelOutputLimit(model: SupportedModel): number {
+  getModelOutputLimit(model: SupportedModel, customOutputLimit?: number): number {
+    // For custom models, use the provided output limit if available
+    if (model === 'custom' && customOutputLimit !== undefined && customOutputLimit > 0) {
+      return customOutputLimit;
+    }
+
     const outputLimits: Record<SupportedModel, number> = {
       'claude-3.5-sonnet': 4096,
       'claude-3.7-sonnet': 128000, // With extended output API header
@@ -290,7 +300,12 @@ export class TokenCounterService {
   }
 
   // Get model information
-  getModelInfo(model: SupportedModel): {
+  getModelInfo(model: SupportedModel, options?: {
+    customContextLength?: number;
+    customOutputLimit?: number;
+    customModelName?: string;
+    customModelProvider?: string;
+  }): {
     name: string;
     contextWindow: number;
     outputLimit: number;
@@ -309,10 +324,18 @@ export class TokenCounterService {
       'custom': { name: 'Custom Model', provider: 'Unknown', releaseDate: 'Unknown' }
     };
 
+    const baseInfo = modelInfo[model];
+
+    // For custom models, use provided custom values if available
+    const name = (model === 'custom' && options?.customModelName) ? options.customModelName : baseInfo.name;
+    const provider = (model === 'custom' && options?.customModelProvider) ? options.customModelProvider : baseInfo.provider;
+
     return {
-      ...modelInfo[model],
-      contextWindow: this.getModelTokenLimit(model),
-      outputLimit: this.getModelOutputLimit(model)
+      name,
+      provider,
+      releaseDate: baseInfo.releaseDate,
+      contextWindow: this.getModelTokenLimit(model, options?.customContextLength),
+      outputLimit: this.getModelOutputLimit(model, options?.customOutputLimit)
     };
   }
 }

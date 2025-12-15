@@ -1601,12 +1601,19 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
     // Check if save is needed (either pending or unsaved changes)
     const state = this.editorState.getCurrentState();
     if (this.editorState.hasPendingSave() || state.hasUnsavedChanges) {
-      // Save once and wait for completion
-      await this.editorState.saveStory();
+      try {
+        // Skip prompt manager refresh to avoid race condition with throttled content updates.
+        // The race occurs because content deletion triggers a throttled update (500ms) that can
+        // set hasUnsavedChanges=true after saveStory() sets it to false but before we check it.
+        await this.editorState.saveStory({ skipPromptManagerRefresh: true });
+        return true; // Save completed without throwing - consider it successful
+      } catch (error) {
+        console.error('Failed to persist scene:', error);
+        return false;
+      }
     }
 
-    // Return true if save succeeded (no unsaved changes remain)
-    return !this.editorState.getCurrentState().hasUnsavedChanges;
+    return true; // No save needed
   }
 
   private handleBeatContentUpdate(): void {
