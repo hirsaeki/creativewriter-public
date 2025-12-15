@@ -61,7 +61,9 @@ export class StoryMetadataIndexService {
     // Try remote database first (always fresh)
     if (remoteDb) {
       try {
-        console.info('[MetadataIndex] Fetching from remote database...');
+        // Log database name for debugging
+        const dbName = (remoteDb as { name?: string }).name || 'unknown';
+        console.info(`[MetadataIndex] Fetching from remote database: ${dbName}`);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const doc = await remoteDb.get('story-metadata-index') as any;
 
