@@ -90,16 +90,23 @@ jobs:
           rm -f docker-compose.public.yml || true  # Remove the public compose file itself
           rm -rf backend/ || true  # Remove Cloudflare Worker backend (premium features)
 
-          # Selectively remove private docs, keeping public ones (screenshots, unraid)
-          rm -rf docs/premium-feature-plan/ || true  # Remove premium docs
-          rm -f docs/reddit-*.md || true  # Remove all reddit draft posts
-          rm -f docs/sample-beat-prompt.txt || true  # Remove sample files
-          # Remove internal drafts from unraid folder
-          rm -f docs/unraid/CA-ISSUE-DRAFT.md || true
-          rm -f docs/unraid/CA-SUBMISSION.md || true
-          rm -f docs/unraid/FORUM-POST-DRAFT.md || true
-          rm -f docs/unraid/USER-REPLY-DRAFT.md || true
-          # Keep: docs/screenshots/, docs/unraid/ (README, docker-compose, xml, png), docs/beat-version-history/
+          # Whitelist approach: only keep docs/screenshots and docs/unraid
+          if [ -d "docs" ]; then
+            mkdir -p /tmp/docs-keep
+            [ -d "docs/screenshots" ] && cp -r docs/screenshots /tmp/docs-keep/
+            [ -d "docs/unraid" ] && cp -r docs/unraid /tmp/docs-keep/
+            rm -rf docs/
+            mkdir -p docs
+            [ -d "/tmp/docs-keep/screenshots" ] && mv /tmp/docs-keep/screenshots docs/
+            [ -d "/tmp/docs-keep/unraid" ] && mv /tmp/docs-keep/unraid docs/
+            # Remove internal drafts from unraid folder
+            rm -f docs/unraid/CA-ISSUE-DRAFT.md || true
+            rm -f docs/unraid/CA-SUBMISSION.md || true
+            rm -f docs/unraid/FORUM-POST-DRAFT.md || true
+            rm -f docs/unraid/USER-REPLY-DRAFT.md || true
+            rm -rf /tmp/docs-keep
+            echo "✅ Filtered docs/ to only screenshots/ and unraid/"
+          fi
 
           # Replace premium components with public stubs
           CHAR_CHAT_DIR="src/app/stories/components/character-chat"
