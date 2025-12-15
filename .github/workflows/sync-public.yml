@@ -92,7 +92,7 @@ jobs:
 
           # Selectively remove private docs, keeping public ones (screenshots, unraid)
           rm -rf docs/premium-feature-plan/ || true  # Remove premium docs
-          rm -f docs/reddit-post.md || true  # Remove private drafts
+          rm -f docs/reddit-*.md || true  # Remove all reddit draft posts
           rm -f docs/sample-beat-prompt.txt || true  # Remove sample files
           # Remove internal drafts from unraid folder
           rm -f docs/unraid/CA-ISSUE-DRAFT.md || true
