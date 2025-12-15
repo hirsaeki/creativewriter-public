@@ -2,7 +2,7 @@
 - BEFORE DOING ANYTHING: Switch to main branch and pull from git remote!!!!!!!!
 - ALWAYS: After completing a task - review your changes with a subagent - address the recommendation - commit and push the changes.
 - NEVER: leave uncommitted or unpushed changes - always maintain a consistent and backed-up repository state
-- ALWAYS: Before declaring a task as complete, test if the app builds using `npm run build` AND run the tests!
+- ALWAYS: Before declaring a task as complete test if the app builds using `npm run build` AND run the tests!
 - ALWAYS: Before declaring a task as complete, test if the app has linting errors using `npm run lint`!
 - Keep the App modular!
 - ALWAYS: Consider if a web research for best practices in 2025 could be useful.
