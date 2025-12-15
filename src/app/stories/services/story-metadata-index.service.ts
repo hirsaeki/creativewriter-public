@@ -66,7 +66,20 @@ export class StoryMetadataIndexService {
         const doc = await remoteDb.get('story-metadata-index') as any;
 
         if (isStoryMetadataIndex(doc)) {
-          console.info('[MetadataIndex] Got index from remote with', (doc.stories || []).length, 'stories');
+          const storyCount = (doc.stories || []).length;
+          console.info('[MetadataIndex] Got index from remote with', storyCount, 'stories');
+
+          // If remote index is empty, check if remote actually has stories (stale index)
+          if (storyCount === 0) {
+            console.info('[MetadataIndex] Remote index is empty, checking for story documents...');
+            const hasStories = await this.checkRemoteHasStories(remoteDb);
+
+            if (hasStories) {
+              console.info('[MetadataIndex] Remote has stories but empty index - rebuilding from remote');
+              return await this.rebuildIndexFromRemote(remoteDb);
+            }
+          }
+
           const index = this.deserializeIndex(doc);
           this.metadataCache = index;
 
@@ -142,6 +155,79 @@ export class StoryMetadataIndexService {
       if (error.status !== 409) {
         throw err;
       }
+    }
+  }
+
+  /**
+   * Check if remote database has story documents
+   */
+  private async checkRemoteHasStories(remoteDb: PouchDB.Database): Promise<boolean> {
+    try {
+      const result = await remoteDb.allDocs({ limit: 50, include_docs: true });
+      return result.rows.some(row => {
+        const doc = row.doc as { type?: string; chapters?: unknown; _id?: string } | undefined;
+        // Stories don't have a type field, must have chapters, and are not system docs
+        return doc && !doc.type && doc.chapters && !row.id.startsWith('_');
+      });
+    } catch (err) {
+      console.warn('[MetadataIndex] Failed to check remote for stories:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Rebuild the metadata index from remote story documents
+   * Called when remote index exists but is stale (empty)
+   */
+  private async rebuildIndexFromRemote(remoteDb: PouchDB.Database): Promise<StoryMetadataIndex> {
+    console.info('[MetadataIndex] Rebuilding index from remote stories...');
+
+    try {
+      // Load all docs from remote
+      const result = await remoteDb.allDocs({ include_docs: true });
+
+      // Filter to story documents only
+      const stories: Story[] = result.rows
+        .filter(row => {
+          const doc = row.doc as { type?: string; chapters?: unknown; _id?: string } | undefined;
+          // Stories don't have a type field and must have chapters
+          return doc && !doc.type && doc.chapters && !row.id.startsWith('_');
+        })
+        .map(row => this.deserializeStory(row.doc as Story));
+
+      console.info(`[MetadataIndex] Found ${stories.length} stories on remote, extracting metadata...`);
+
+      // Create new index
+      const index: StoryMetadataIndex = {
+        _id: 'story-metadata-index',
+        type: 'story-metadata-index',
+        lastUpdated: new Date(),
+        stories: stories.map(s => this.extractMetadata(s))
+      };
+
+      // Get existing _rev from remote for update
+      try {
+        const existing = await remoteDb.get('story-metadata-index');
+        index._rev = (existing as { _rev?: string })._rev;
+      } catch {
+        // No existing index, that's fine
+      }
+
+      // Save to remote
+      await remoteDb.put(index);
+      console.info(`[MetadataIndex] Rebuilt index saved to remote with ${index.stories.length} stories`);
+
+      // Also save to local
+      this.saveIndexToLocal(index).catch(err =>
+        console.warn('[MetadataIndex] Failed to save rebuilt index locally:', err)
+      );
+
+      this.metadataCache = index;
+      return index;
+
+    } catch (error) {
+      console.error('[MetadataIndex] Error rebuilding index from remote:', error);
+      throw error;
     }
   }
 
