@@ -85,10 +85,14 @@ export class StoryMetadataIndexService {
           const index = this.deserializeIndex(doc);
           this.metadataCache = index;
 
-          // Also save to local DB for offline access (fire and forget)
-          this.saveIndexToLocal(index).catch(err =>
-            console.warn('[MetadataIndex] Failed to save remote index locally:', err)
-          );
+          // Save to local DB for offline access
+          // MUST await to prevent race condition with removeStoryMetadata/updateStoryMetadata
+          // which also modify the index document
+          try {
+            await this.saveIndexToLocal(index);
+          } catch (err) {
+            console.warn('[MetadataIndex] Failed to save remote index locally:', err);
+          }
 
           return index;
         }
@@ -137,6 +141,7 @@ export class StoryMetadataIndexService {
 
   /**
    * Save the index to local database for offline access
+   * Updates the cache's _rev to prevent conflicts on subsequent writes
    */
   private async saveIndexToLocal(index: StoryMetadataIndex): Promise<void> {
     const db = await this.getDb();
@@ -149,12 +154,28 @@ export class StoryMetadataIndexService {
         _id: 'story-metadata-index',
         _rev: existing ? (existing as { _rev: string })._rev : undefined
       };
-      await db.put(docToSave);
+      const result = await db.put(docToSave);
+
+      // Update cache with new _rev to prevent conflicts on subsequent writes
+      if (this.metadataCache && result.rev) {
+        this.metadataCache._rev = result.rev;
+      }
+
       console.info('[MetadataIndex] Saved remote index to local database');
     } catch (err) {
-      // Conflict is OK - someone else saved it
+      // Conflict is OK - someone else saved it, but we need fresh _rev for cache
       const error = err as { status?: number };
-      if (error.status !== 409) {
+      if (error.status === 409) {
+        // Refresh cache with current local _rev
+        try {
+          const current = await db.get('story-metadata-index') as { _rev: string };
+          if (this.metadataCache && current._rev) {
+            this.metadataCache._rev = current._rev;
+          }
+        } catch {
+          // Couldn't get fresh _rev, cache will be stale but retry logic should handle it
+        }
+      } else {
         throw err;
       }
     }
@@ -225,10 +246,12 @@ export class StoryMetadataIndexService {
       await remoteDb.put(index);
       console.info(`[MetadataIndex] Rebuilt index saved to remote with ${index.stories.length} stories`);
 
-      // Also save to local
-      this.saveIndexToLocal(index).catch(err =>
-        console.warn('[MetadataIndex] Failed to save rebuilt index locally:', err)
-      );
+      // Also save to local - await to prevent race conditions
+      try {
+        await this.saveIndexToLocal(index);
+      } catch (err) {
+        console.warn('[MetadataIndex] Failed to save rebuilt index locally:', err);
+      }
 
       this.metadataCache = index;
       return index;
