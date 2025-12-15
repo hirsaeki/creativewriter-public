@@ -30,6 +30,13 @@ export class StoryMetadataIndexService {
 
   private metadataCache: StoryMetadataIndex | null = null;
 
+  /**
+   * Check if user is in local-only mode (no sync)
+   */
+  private isLocalOnlyMode(): boolean {
+    return localStorage.getItem('creative-writer-local-only') === 'true';
+  }
+
   // Guard to prevent concurrent getMetadataIndex calls (which cause loops during initial sync)
   private pendingFetch: Promise<StoryMetadataIndex> | null = null;
 
@@ -87,8 +94,8 @@ export class StoryMetadataIndexService {
     const db = await this.getDb();
     const remoteDb = this.databaseService.getRemoteDatabase();
 
-    // Try remote database first (always fresh)
-    if (remoteDb) {
+    // Try remote database first (always fresh) - skip in local-only mode
+    if (remoteDb && !this.isLocalOnlyMode()) {
       try {
         // Log database name for debugging
         const dbName = (remoteDb as { name?: string }).name || 'unknown';
@@ -434,8 +441,8 @@ export class StoryMetadataIndexService {
         if (index.stories.length < originalCount) {
           index.lastUpdated = new Date();
 
-          // Save to REMOTE first (if available) - this is the source of truth
-          if (remoteDb) {
+          // Save to REMOTE first (if available and not in local-only mode) - this is the source of truth
+          if (remoteDb && !this.isLocalOnlyMode()) {
             try {
               // Get fresh _rev from remote
               const remoteDoc = await remoteDb.get('story-metadata-index').catch(() => null);
@@ -532,9 +539,9 @@ export class StoryMetadataIndexService {
           this.metadataCache = deserializedIndex;
           return deserializedIndex;
         } catch {
-          // No local index - check if remote has stories and trigger bootstrap sync
+          // No local index - check if remote has stories and trigger bootstrap sync (skip in local-only mode)
           const remoteDb = this.databaseService.getRemoteDatabase();
-          if (remoteDb) {
+          if (remoteDb && !this.isLocalOnlyMode()) {
             console.info('[MetadataIndex] Checking remote for stories...');
             try {
               const remoteInfo = await remoteDb.allDocs({ limit: 20, include_docs: true });

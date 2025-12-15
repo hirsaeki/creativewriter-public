@@ -67,7 +67,17 @@ export class DatabaseService {
   // Used when local database is empty and metadata index is missing
   private bootstrapSyncMode = false;
 
+  // Track if sync has been initialized (to prevent premature sync before user choice)
+  private syncInitialized = false;
+
   public syncStatus$: Observable<SyncStatus> = this.syncStatusSubject.asObservable();
+
+  /**
+   * Check if user is in local-only mode (no sync)
+   */
+  private isLocalOnlyMode(): boolean {
+    return localStorage.getItem('creative-writer-local-only') === 'true';
+  }
 
   constructor() {
     // Use preloaded PouchDB from app.ts
@@ -154,11 +164,10 @@ export class DatabaseService {
       console.warn('[DatabaseService] Index creation failed:', err);
     });
 
-    // PERFORMANCE FIX: Don't await sync setup - let it happen in background
-    // This prevents network delays from blocking database availability
-    this.setupSync().catch(err => {
-      console.warn('[DatabaseService] Background sync setup failed:', err);
-    });
+    // NOTE: We no longer call setupSync() here automatically.
+    // Sync is now only initialized after user makes a choice (login or local-only)
+    // via the initializeSync() method called from handleUserChange().
+    // This prevents unauthorized sync attempts before authentication.
   }
 
   private async handleUserChange(user: User | null): Promise<void> {
@@ -166,8 +175,16 @@ export class DatabaseService {
     if (user) {
       const userDbName = this.authService.getUserDatabaseName();
       if (userDbName && userDbName !== (this.db?.name)) {
+        // Reset sync flag when switching databases to ensure fresh sync setup
+        this.syncInitialized = false;
+
         this.initializationPromise = this.initializeDatabase(userDbName);
         await this.initializationPromise;
+
+        // Initialize sync after database switch (respects local-only mode)
+        this.initializeSync().catch(err => {
+          console.warn('[DatabaseService] Sync setup failed:', err);
+        });
       }
     } else {
       // User logged out - switch to anonymous database
@@ -175,8 +192,32 @@ export class DatabaseService {
       if (this.db?.name !== anonymousDb) {
         this.initializationPromise = this.initializeDatabase(anonymousDb);
         await this.initializationPromise;
+
+        // Stop sync and reset flag when logged out
+        this.stopSync();
+        this.syncInitialized = false;
       }
     }
+  }
+
+  /**
+   * Initialize sync connection (called after user login/choice)
+   * Does NOT start sync in local-only mode
+   */
+  async initializeSync(): Promise<void> {
+    if (this.syncInitialized) {
+      console.debug('[DatabaseService] Sync already initialized');
+      return;
+    }
+
+    if (this.isLocalOnlyMode()) {
+      console.info('[DatabaseService] Local-only mode - skipping sync setup');
+      this.syncInitialized = true;
+      return;
+    }
+
+    this.syncInitialized = true;
+    await this.setupSync();
   }
 
   async getDatabase(): Promise<PouchDB.Database> {
@@ -268,6 +309,12 @@ export class DatabaseService {
   }
 
   async setupSync(remoteUrl?: string): Promise<void> {
+    // Don't setup sync in local-only mode
+    if (this.isLocalOnlyMode()) {
+      console.info('[DatabaseService] Local-only mode enabled - sync disabled');
+      return;
+    }
+
     try {
       // Use provided URL or try to detect from environment/location
       const couchUrl = remoteUrl || this.getCouchDBUrl();
