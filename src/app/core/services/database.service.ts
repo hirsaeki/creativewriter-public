@@ -299,11 +299,9 @@ export class DatabaseService {
       // Connection successful, clear connecting state
       this.updateSyncStatus({ isConnecting: false });
 
-      // Only fetch metadata index on startup - full sync starts when user selects a story
-      // Non-blocking: don't delay other operations waiting on setupSync
-      this.fetchMetadataIndexOnly().catch(err => {
-        console.warn('[DatabaseService] Failed to fetch metadata index on startup:', err);
-      });
+      // Fetch metadata index on startup - must complete before UI loads story list
+      // This is blocking to ensure the story list has data to display
+      await this.fetchMetadataIndexOnly();
 
     } catch (error) {
       console.warn('Could not setup sync:', error);
@@ -445,10 +443,18 @@ export class DatabaseService {
 
     try {
       console.info('[Sync] Fetching story-metadata-index only...');
-      await this.db.replicate.from(this.remoteDb, {
+      const result = await this.db.replicate.from(this.remoteDb, {
         doc_ids: ['story-metadata-index']
       });
-      console.info('[Sync] story-metadata-index fetch complete');
+      console.info('[Sync] story-metadata-index fetch complete, docs:', result.docs_written);
+
+      // Emit sync status update to trigger UI refresh (story list subscribes to this)
+      if (result.docs_written > 0) {
+        this.updateSyncStatus({
+          lastSync: new Date(),
+          syncProgress: { docsProcessed: result.docs_written, operation: 'pull' }
+        });
+      }
     } catch (error) {
       console.warn('[Sync] Failed to fetch story-metadata-index:', error);
     }
