@@ -354,11 +354,13 @@ export class StoryMetadataIndexService {
    * Update a single story's metadata in the index
    *
    * Call this after any story modification (create, update, reorder)
+   * Updates BOTH local and remote databases to ensure immediate sync
    *
    * @param story The story to update in the index
    */
   async updateStoryMetadata(story: Story): Promise<void> {
     const db = await this.getDb();
+    const remoteDb = this.databaseService.getRemoteDatabase();
 
     // Retry up to 3 times for conflict resolution
     const maxRetries = 3;
@@ -374,6 +376,7 @@ export class StoryMetadataIndexService {
         // Find existing entry
         const existingIndex = index.stories.findIndex(s => s.id === story.id);
         const metadata = this.extractMetadata(story);
+        const isNewStory = existingIndex < 0;
 
         if (existingIndex >= 0) {
           // Update existing entry
@@ -385,10 +388,36 @@ export class StoryMetadataIndexService {
 
         index.lastUpdated = new Date();
 
-        // Save to database and update _rev in cached object
-        const result = await db.put(index);
+        // Save to REMOTE first (if available and not in local-only mode) - this is the source of truth
+        if (remoteDb && !this.isLocalOnlyMode()) {
+          try {
+            // Get fresh _rev from remote
+            const remoteDoc = await remoteDb.get('story-metadata-index').catch(() => null);
+            const remoteIndex = {
+              ...index,
+              _id: 'story-metadata-index',
+              _rev: remoteDoc ? (remoteDoc as { _rev: string })._rev : undefined
+            };
+            const remoteResult = await remoteDb.put(remoteIndex);
+            index._rev = remoteResult.rev;
+            console.info(`[MetadataIndex] ${isNewStory ? 'Added' : 'Updated'} story ${story.id} in remote index`);
+          } catch (remoteErr) {
+            console.warn('[MetadataIndex] Failed to update remote index:', remoteErr);
+            // Continue with local update even if remote fails
+          }
+        }
+
+        // Save to local database
+        const localDoc = await db.get('story-metadata-index').catch(() => null);
+        const localIndex = {
+          ...index,
+          _id: 'story-metadata-index',
+          _rev: localDoc ? (localDoc as { _rev: string })._rev : undefined
+        };
+        const result = await db.put(localIndex);
         index._rev = result.rev;
         this.metadataCache = index;
+        console.info(`[MetadataIndex] ${isNewStory ? 'Added' : 'Updated'} story ${story.id} in local index`);
         return; // Success - exit retry loop
 
       } catch (error) {
