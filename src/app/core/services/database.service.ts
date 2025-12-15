@@ -1002,24 +1002,4 @@ export class DatabaseService {
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   }
 
-  /**
-   * Check if there are stories in the remote database that are missing locally
-   *
-   * NOTE: This check is no longer relevant with the metadata index architecture.
-   * Stories are displayed from the remote metadata index (no sync needed for list view).
-   * Full story content syncs on-demand when user opens a story.
-   *
-   * @returns Always returns null (no missing stories) - feature disabled
-   * @deprecated No longer needed with metadata index architecture
-   */
-  async checkForMissingStories(): Promise<{
-    hasMissing: boolean;
-    localCount: number;
-    remoteCount: number;
-  } | null> {
-    // With the metadata index architecture, stories are displayed from the remote
-    // metadata index, not from local documents. Full story documents sync on-demand
-    // when a user opens a story. The concept of "missing stories" is no longer relevant.
-    return null;
-  }
 }

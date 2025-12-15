@@ -11,7 +11,7 @@ import {
 } from '@ionic/angular/standalone';
 import { CdkDropList, CdkDrag, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { addIcons } from 'ionicons';
-import { add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline, cloudDownload, warning, checkmarkCircle, alertCircle, sync } from 'ionicons/icons';
+import { add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline, checkmarkCircle, alertCircle, sync } from 'ionicons/icons';
 import { StoryService } from '../../services/story.service';
 import { StoryMetadata } from '../../models/story-metadata.interface';
 import { StoryMetadataIndexService } from '../../services/story-metadata-index.service';
@@ -101,24 +101,9 @@ export class StoryListComponent implements OnInit, OnDestroy {
   hasMoreStories = false;
   isLoadingMore = false;
 
-  // Missing stories check
-  missingStoriesInfo: { localCount: number; remoteCount: number } | null = null;
-  isCheckingMissingStories = false;
-  isSyncingMissingStories = false;
-
   constructor() {
     // Register Ionic icons
-    addIcons({ add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline, cloudDownload, warning, checkmarkCircle, alertCircle, sync });
-  }
-
-  /**
-   * Get the count of missing stories (remote - local)
-   * Used in template to avoid repeated calculations
-   */
-  get missingStoriesCount(): number {
-    return this.missingStoriesInfo
-      ? this.missingStoriesInfo.remoteCount - this.missingStoriesInfo.localCount
-      : 0;
+    addIcons({ add, download, settings, statsChart, trash, create, images, menu, close, reorderThree, swapVertical, move, appsOutline, checkmarkCircle, alertCircle, sync });
   }
 
   ngOnInit(): void {
@@ -269,34 +254,16 @@ export class StoryListComponent implements OnInit, OnDestroy {
       this.hasMoreStories = loadedCount < this.totalStories && newStories.length === this.pageSize;
 
       // Set final loading state based on whether we have stories
+      // Note: With metadata index architecture, if we get 0 stories here, it means:
+      // - Remote metadata index was empty AND remote had no stories (rebuildIndexFromRemote handles stale index)
+      // - OR we're offline and local has no stories
       if (this.stories.length > 0) {
         this.loadingState = LoadingState.READY;
-        // Check for missing stories after loading (only on reset/initial load)
-        if (reset) {
-          this.checkForMissingStories();
-        }
       } else if (this.syncStatus.isSync || this.syncStatus.isConnecting) {
         // Sync is in progress - show syncing state
         this.loadingState = LoadingState.SYNCING;
-      } else if (reset && this.currentUser) {
-        // No stories locally - check if remote has stories we should sync
-        // This handles both fresh install and selective sync filter scenarios
-        console.info('[StoryList] No stories found - checking remote for stories to sync');
-        this.loadingState = LoadingState.SYNCING;
-        this.cdr.markForCheck();
-
-        const missingCheck = await this.databaseService.checkForMissingStories();
-        if (missingCheck && missingCheck.remoteCount > 0) {
-          console.info(`[StoryList] Remote has ${missingCheck.remoteCount} stories - triggering bootstrap sync`);
-          await this.triggerBootstrapSync();
-          return; // Exit - bootstrap sync handled everything
-        } else {
-          // Truly empty - no stories locally or remotely
-          console.info('[StoryList] No stories found locally or remotely');
-          this.loadingState = LoadingState.EMPTY;
-        }
       } else {
-        // Not logged in and no stories - show empty
+        // No stories found - show empty state
         this.loadingState = LoadingState.EMPTY;
       }
 
@@ -311,20 +278,6 @@ export class StoryListComponent implements OnInit, OnDestroy {
 
         if (reset) {
           this.totalStories = await this.storyService.getTotalStoriesCount();
-        }
-
-        // BOOTSTRAP SYNC: If local DB is empty but we have a remote connection,
-        // it likely means the selective sync filter is blocking story documents.
-        // Enable bootstrap mode to sync ALL documents and populate the database.
-        if (newStories.length === 0 && reset && this.currentUser) {
-          const missingCheck = await this.databaseService.checkForMissingStories();
-          if (missingCheck && missingCheck.remoteCount > 0) {
-            console.info('[StoryList] Fallback: Local DB empty but remote has stories - triggering bootstrap sync');
-            this.loadingState = LoadingState.SYNCING;
-            this.cdr.markForCheck();
-            await this.triggerBootstrapSync();
-            return; // Exit early, bootstrap sync handled everything
-          }
         }
 
         // Map Story to StoryMetadata for display
@@ -597,149 +550,6 @@ export class StoryListComponent implements OnInit, OnDestroy {
       return 'First time loading may take a moment';
     }
     return null;
-  }
-
-  /**
-   * Trigger bootstrap sync to load all stories from remote
-   * Used when local database is empty but remote has stories
-   */
-  private async triggerBootstrapSync(): Promise<void> {
-    try {
-      const result = await this.databaseService.enableBootstrapSync();
-      console.info(`[StoryList] Bootstrap sync completed: ${result.docsProcessed} docs synced`);
-
-      // Reload stories after bootstrap sync
-      const bootstrappedStories = await this.storyService.getAllStories(
-        this.pageSize,
-        0
-      );
-      this.totalStories = await this.storyService.getTotalStoriesCount();
-
-      // Map Story to StoryMetadata for display
-      const bootstrappedMetadata: StoryMetadata[] = bootstrappedStories.map(story => ({
-        id: story.id,
-        title: story.title,
-        coverImageThumbnail: story.coverImage,
-        previewText: this.storyService.getStoryPreview(story),
-        chapterCount: story.chapters.length,
-        sceneCount: story.chapters.reduce((sum, ch) => sum + ch.scenes.length, 0),
-        wordCount: this.storyService.getWordCount(story),
-        createdAt: story.createdAt,
-        updatedAt: story.updatedAt,
-        order: story.order
-      }));
-
-      this.stories = bootstrappedMetadata;
-      this.hasMoreStories = bootstrappedStories.length === this.pageSize && this.totalStories > this.pageSize;
-
-      // Rebuild the metadata index from the newly synced stories
-      console.info('[StoryList] Rebuilding metadata index after bootstrap sync');
-      try {
-        await this.metadataIndexService.rebuildIndex(true); // force=true since we just synced
-      } catch (indexError) {
-        console.warn('[StoryList] Failed to rebuild metadata index:', indexError);
-        // Not critical - index will be rebuilt naturally as stories are modified
-      }
-
-      // Set state based on whether bootstrap succeeded
-      this.loadingState = this.stories.length > 0 ? LoadingState.READY : LoadingState.EMPTY;
-    } catch (bootstrapError) {
-      console.error('[StoryList] Bootstrap sync failed:', bootstrapError);
-      this.loadingState = LoadingState.EMPTY;
-    } finally {
-      this.cdr.markForCheck();
-    }
-  }
-
-  /**
-   * Check if there are stories in the remote database that are missing locally
-   */
-  async checkForMissingStories(): Promise<void> {
-    if (this.isCheckingMissingStories) {
-      return;
-    }
-
-    this.isCheckingMissingStories = true;
-    try {
-      const result = await this.databaseService.checkForMissingStories();
-
-      if (result && result.hasMissing) {
-        this.missingStoriesInfo = {
-          localCount: result.localCount,
-          remoteCount: result.remoteCount
-        };
-      } else {
-        this.missingStoriesInfo = null;
-      }
-
-      this.cdr.markForCheck();
-    } catch (error) {
-      console.error('[StoryList] Error checking for missing stories:', error);
-    } finally {
-      this.isCheckingMissingStories = false;
-    }
-  }
-
-  /**
-   * Sync missing stories from remote database
-   */
-  async syncMissingStories(): Promise<void> {
-    if (this.isSyncingMissingStories) {
-      return;
-    }
-
-    this.isSyncingMissingStories = true;
-    this.cdr.markForCheck();
-
-    try {
-      // Trigger a manual pull to get missing stories
-      const result = await this.databaseService.forcePull();
-
-      // Clear the missing stories banner
-      this.missingStoriesInfo = null;
-
-      // Reload stories to show the newly synced ones
-      await this.loadStories();
-
-      // Show success toast
-      const toast = await this.toastCtrl.create({
-        message: `Successfully synced ${result.docsProcessed} document${result.docsProcessed === 1 ? '' : 's'} from cloud`,
-        duration: 3000,
-        position: 'bottom',
-        color: 'success',
-        icon: 'checkmark-circle'
-      });
-      await toast.present();
-    } catch (error) {
-      console.error('[StoryList] Error syncing missing stories:', error);
-
-      // Show error toast
-      const toast = await this.toastCtrl.create({
-        message: 'Failed to sync stories. Please check your connection and try again.',
-        duration: 4000,
-        position: 'bottom',
-        color: 'danger',
-        icon: 'alert-circle',
-        buttons: [
-          {
-            text: 'Dismiss',
-            role: 'cancel'
-          }
-        ]
-      });
-      await toast.present();
-    } finally {
-      this.isSyncingMissingStories = false;
-      this.cdr.markForCheck();
-    }
-  }
-
-  /**
-   * Dismiss the missing stories banner
-   */
-  dismissMissingStoriesBanner(): void {
-    this.missingStoriesInfo = null;
-    this.cdr.markForCheck();
   }
 
   ngOnDestroy(): void {
