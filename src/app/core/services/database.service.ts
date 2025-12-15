@@ -674,11 +674,12 @@ export class DatabaseService {
       let lastActivityTime = Date.now();
       const timeoutMs = 90000;      // 90s hard timeout
       const idleThresholdMs = 3000; // 3s of no activity = likely complete
+      let idleChecker: ReturnType<typeof setInterval> | null = null;
 
       const complete = (docs: number) => {
         if (syncCompleted) return;
         syncCompleted = true;
-        clearInterval(idleChecker);
+        if (idleChecker) clearInterval(idleChecker);
         subscription.unsubscribe();
 
         // Small delay to ensure IndexedDB writes complete before resolving
@@ -688,6 +689,14 @@ export class DatabaseService {
           resolve({ docsProcessed: docs });
         }, 500);
       };
+
+      // Idle detection: if no activity for 3s after receiving docs, assume complete
+      idleChecker = setInterval(() => {
+        if (totalDocsProcessed > 0 && Date.now() - lastActivityTime > idleThresholdMs && !syncCompleted) {
+          console.info('[DatabaseService] Bootstrap sync idle timeout');
+          complete(totalDocsProcessed);
+        }
+      }, 1000);
 
       const subscription = this.syncStatus$.subscribe(status => {
         // Track activity and documents processed
@@ -703,14 +712,6 @@ export class DatabaseService {
           complete(totalDocsProcessed);
         }
       });
-
-      // Idle detection: if no activity for 3s after receiving docs, assume complete
-      const idleChecker = setInterval(() => {
-        if (totalDocsProcessed > 0 && Date.now() - lastActivityTime > idleThresholdMs && !syncCompleted) {
-          console.info('[DatabaseService] Bootstrap sync idle timeout');
-          complete(totalDocsProcessed);
-        }
-      }, 1000);
 
       // Hard timeout fallback
       setTimeout(() => {
