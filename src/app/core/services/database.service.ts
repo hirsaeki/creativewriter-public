@@ -218,8 +218,10 @@ export class DatabaseService {
       }).catch(err => {
         console.error('Error restarting sync after story change:', err);
       });
-    } else if (changed && !this.syncHandler) {
-      console.warn('[DatabaseService] activeStoryId changed but sync is not running');
+    } else if (changed && !this.syncHandler && storyId && this.remoteDb) {
+      // Sync not running yet - start it now that we have an active story
+      console.info('[DatabaseService] Starting sync for newly selected story:', storyId);
+      this.startSync();
     }
   }
 
@@ -297,8 +299,11 @@ export class DatabaseService {
       // Connection successful, clear connecting state
       this.updateSyncStatus({ isConnecting: false });
 
-      // Start bidirectional sync
-      this.startSync();
+      // Only fetch metadata index on startup - full sync starts when user selects a story
+      // Non-blocking: don't delay other operations waiting on setupSync
+      this.fetchMetadataIndexOnly().catch(err => {
+        console.warn('[DatabaseService] Failed to fetch metadata index on startup:', err);
+      });
 
     } catch (error) {
       console.warn('Could not setup sync:', error);
@@ -427,6 +432,26 @@ export class DatabaseService {
       // ═══════════════════════════════════════════════════════════════════════
       return true;
     };
+  }
+
+  /**
+   * Fetches only the story-metadata-index document from remote.
+   * Used on startup to minimize initial sync - full sync only starts when user selects a story.
+   */
+  private async fetchMetadataIndexOnly(): Promise<void> {
+    if (!this.db || !this.remoteDb) {
+      return;
+    }
+
+    try {
+      console.info('[Sync] Fetching story-metadata-index only...');
+      await this.db.replicate.from(this.remoteDb, {
+        doc_ids: ['story-metadata-index']
+      });
+      console.info('[Sync] story-metadata-index fetch complete');
+    } catch (error) {
+      console.warn('[Sync] Failed to fetch story-metadata-index:', error);
+    }
   }
 
   private startSync(): void {
@@ -743,11 +768,18 @@ export class DatabaseService {
 
     try {
       // Create replication with progress tracking
-      // Apply the same selective sync filter used by live sync
       const replicationPromise = (async () => {
+        // If no active story, only sync story-metadata-index (server-side efficient)
+        // If active story, use the client-side filter for selective sync
+        const replicationOptions = this.activeStoryId
+          ? { filter: this.getSyncFilter() }
+          : { doc_ids: ['story-metadata-index'] };
+
+        console.info(`[Sync] Force ${direction} with ${this.activeStoryId ? 'filter (active story: ' + this.activeStoryId + ')' : 'doc_ids (metadata-index only)'}`);
+
         const replication = direction === 'push'
-          ? this.db!.replicate.to(this.remoteDb!, { filter: this.getSyncFilter() })
-          : this.db!.replicate.from(this.remoteDb!, { filter: this.getSyncFilter() });
+          ? this.db!.replicate.to(this.remoteDb!, replicationOptions)
+          : this.db!.replicate.from(this.remoteDb!, replicationOptions);
 
         // Track progress during replication with document details
         let totalProcessed = 0;
