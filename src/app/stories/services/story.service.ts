@@ -298,37 +298,73 @@ export class StoryService {
   async deleteStory(id: string): Promise<void> {
     try {
       this.db = await this.databaseService.getDatabase();
-      let doc;
+      const remoteDb = this.databaseService.getRemoteDatabase();
+
+      let doc: PouchDB.Core.IdMeta & PouchDB.Core.GetMeta | null = null;
+      let targetDb: PouchDB.Database = this.db;
+
+      // Try local database first
       try {
         doc = await this.db.get(id);
       } catch (error) {
         if ((error as { status?: number }).status === 404) {
-          // Try to find by id field
+          // Try to find by id field in local
           const result = await this.db.find({
             selector: { id: id }
           });
           if (result.docs && result.docs.length > 0) {
-            doc = result.docs[0];
-          } else {
-            throw new Error('Story not found');
+            doc = result.docs[0] as PouchDB.Core.IdMeta & PouchDB.Core.GetMeta;
           }
         } else {
           throw error;
         }
       }
 
+      // If not found locally, try remote database
+      // This handles the case where story is shown from metadata index but not synced locally
+      if (!doc && remoteDb) {
+        console.info('[StoryService] Story not found locally, trying remote database...');
+        try {
+          doc = await remoteDb.get(id);
+          targetDb = remoteDb;
+        } catch (error) {
+          if ((error as { status?: number }).status === 404) {
+            // Try to find by id field in remote
+            const result = await remoteDb.find({
+              selector: { id: id }
+            });
+            if (result.docs && result.docs.length > 0) {
+              doc = result.docs[0] as PouchDB.Core.IdMeta & PouchDB.Core.GetMeta;
+              targetDb = remoteDb;
+            }
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      if (!doc) {
+        // Story not found anywhere - just remove from metadata index and return
+        console.warn('[StoryService] Story not found in any database, removing from metadata index only');
+        await this.metadataIndexService.removeStoryMetadata(id);
+        return;
+      }
+
       // Get the story ID for cleanup operations
       const storyId = (doc as Story).id || id;
 
-      // Delete all associated beat version histories
-      try {
-        await this.beatHistoryService.deleteAllHistoriesForStory(storyId);
-      } catch (historyError) {
-        // Log but don't fail the story deletion if history cleanup fails
-        console.error('[StoryService] Failed to delete beat histories:', historyError);
+      // Delete all associated beat version histories (only if deleting from local)
+      if (targetDb === this.db) {
+        try {
+          await this.beatHistoryService.deleteAllHistoriesForStory(storyId);
+        } catch (historyError) {
+          // Log but don't fail the story deletion if history cleanup fails
+          console.error('[StoryService] Failed to delete beat histories:', historyError);
+        }
       }
 
-      await this.db.remove(doc);
+      await targetDb.remove(doc);
+      console.info(`[StoryService] Story deleted from ${targetDb === this.db ? 'local' : 'remote'} database`);
 
       // Remove story from metadata index
       // Run in background - don't block story deletion
