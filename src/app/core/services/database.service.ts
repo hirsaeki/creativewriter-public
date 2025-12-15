@@ -459,20 +459,23 @@ export class DatabaseService {
         // Metadata index doesn't exist on remote - check if remote has any stories
         // If so, we need bootstrap sync to pull them and rebuild the index
         console.info('[Sync] No metadata index on remote, checking for stories...');
-        try {
-          const remoteInfo = await this.remoteDb.allDocs({ limit: 10, include_docs: true });
-          const hasStories = remoteInfo.rows.some(row => {
-            const doc = row.doc as Record<string, unknown> | undefined;
-            return doc && typeof doc === 'object' && 'chapters' in doc && !row.id.startsWith('_');
-          });
-          if (hasStories) {
-            console.info('[Sync] Remote has stories but no index - triggering bootstrap sync');
-            this.enableBootstrapSync();
-          } else {
-            console.info('[Sync] Remote has no stories - fresh database');
+        const remoteInfo = await this.remoteDb.allDocs({ limit: 50, include_docs: true });
+        console.info('[Sync] Remote has', remoteInfo.rows.length, 'documents');
+
+        const hasStories = remoteInfo.rows.some(row => {
+          const doc = row.doc as Record<string, unknown> | undefined;
+          const isStory = doc && typeof doc === 'object' && 'chapters' in doc && !row.id.startsWith('_');
+          if (isStory) {
+            console.info('[Sync] Found story document:', row.id);
           }
-        } catch (checkError) {
-          console.warn('[Sync] Could not check remote for stories:', checkError);
+          return isStory;
+        });
+
+        if (hasStories) {
+          console.info('[Sync] Remote has stories but no index - triggering bootstrap sync');
+          await this.enableBootstrapSync();
+        } else {
+          console.info('[Sync] Remote has no stories - fresh database');
         }
       }
     } catch (error) {
