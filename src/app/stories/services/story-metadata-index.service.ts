@@ -142,13 +142,26 @@ export class StoryMetadataIndexService {
   /**
    * Save the index to local database for offline access
    * Updates the cache's _rev to prevent conflicts on subsequent writes
+   * IMPORTANT: Only saves if content actually changed to prevent sync loops
    */
   private async saveIndexToLocal(index: StoryMetadataIndex): Promise<void> {
     const db = await this.getDb();
 
     try {
-      // Try to get existing doc for _rev
-      const existing = await db.get('story-metadata-index').catch(() => null);
+      // Try to get existing doc for _rev and comparison
+      const existing = await db.get('story-metadata-index').catch(() => null) as StoryMetadataIndex | null;
+
+      // Check if content actually changed before saving
+      // This prevents sync loops: remote fetch → local save → sync event → reload → repeat
+      if (existing && this.indexContentEqual(existing, index)) {
+        // Content identical - just update cache _rev, don't save
+        if (this.metadataCache) {
+          this.metadataCache._rev = (existing as { _rev: string })._rev;
+        }
+        console.debug('[MetadataIndex] Local index identical to remote, skipping save');
+        return;
+      }
+
       const docToSave = {
         ...index,
         _id: 'story-metadata-index',
@@ -179,6 +192,45 @@ export class StoryMetadataIndexService {
         throw err;
       }
     }
+  }
+
+  /**
+   * Compare two metadata indexes for content equality
+   * Ignores _id, _rev, and lastUpdated (which change on every save)
+   */
+  private indexContentEqual(a: StoryMetadataIndex, b: StoryMetadataIndex): boolean {
+    // Different number of stories = different content
+    if (a.stories.length !== b.stories.length) {
+      return false;
+    }
+
+    // Compare each story by ID and key fields
+    for (const storyA of a.stories) {
+      const storyB = b.stories.find(s => s.id === storyA.id);
+
+      if (!storyB) {
+        return false; // Story in A not found in B
+      }
+
+      // Compare key fields that matter for display
+      if (storyA.title !== storyB.title ||
+          storyA.wordCount !== storyB.wordCount ||
+          storyA.chapterCount !== storyB.chapterCount ||
+          storyA.sceneCount !== storyB.sceneCount ||
+          storyA.order !== storyB.order ||
+          storyA.previewText !== storyB.previewText) {
+        return false;
+      }
+
+      // Compare updatedAt timestamps (important for showing last edit time)
+      const aUpdated = storyA.updatedAt instanceof Date ? storyA.updatedAt.getTime() : new Date(storyA.updatedAt).getTime();
+      const bUpdated = storyB.updatedAt instanceof Date ? storyB.updatedAt.getTime() : new Date(storyB.updatedAt).getTime();
+      if (aUpdated !== bUpdated) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
