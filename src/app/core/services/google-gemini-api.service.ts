@@ -64,6 +64,7 @@ export class GoogleGeminiApiService {
   private aiLogger = inject(AIRequestLoggerService);
 
   private readonly API_BASE_URL = '/api/gemini/models';
+  private readonly MODELS_LIST_URL = '/api/gemini/models'; // Proxies often use this, or Google uses /v1beta/models
   private abortSubjects = new Map<string, Subject<void>>();
   private requestMetadata = new Map<string, { logId: string; startTime: number }>();
 
@@ -74,12 +75,12 @@ export class GoogleGeminiApiService {
     topP?: number;
     wordCount?: number;
     requestId?: string;
-    messages?: {role: 'system' | 'user' | 'assistant', content: string}[];
+    messages?: { role: 'system' | 'user' | 'assistant', content: string }[];
     stream?: boolean;
   } = {}): Observable<GoogleGeminiResponse> {
     const settings = this.settingsService.getSettings();
     const startTime = Date.now();
-    
+
     if (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) {
       throw new Error('Google Gemini API is not enabled or API key is missing');
     }
@@ -176,7 +177,7 @@ export class GoogleGeminiApiService {
         }
       }
     });
-    
+
     // Store request metadata for abort handling
     this.requestMetadata.set(requestId, { logId, startTime });
 
@@ -205,7 +206,7 @@ export class GoogleGeminiApiService {
         next: (response) => {
           const duration = Date.now() - startTime;
           const content = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          
+
           // Debug logging for response
           console.log('🔍 Gemini Response Debug:', {
             duration: duration + 'ms',
@@ -231,7 +232,7 @@ export class GoogleGeminiApiService {
           } else {
             console.log('ℹ️ No promptFeedback in response');
           }
-          
+
           // Log additional debug info including prompt feedback
           this.aiLogger.logDebugInfo(logId, {
             responseStructure: {
@@ -245,7 +246,7 @@ export class GoogleGeminiApiService {
             safetyRatings: response.candidates?.[0]?.safetyRatings,
             promptFeedback: response.promptFeedback
           });
-          
+
           this.aiLogger.logSuccess(logId, content, duration, {
             httpStatus: 200,
             responseHeaders: { 'content-type': 'application/json' },
@@ -260,7 +261,7 @@ export class GoogleGeminiApiService {
         error: (error) => {
           const duration = Date.now() - startTime;
           const errorDetails = this.extractErrorDetails(error);
-          
+
           // Log comprehensive error information
           console.error('🔍 Gemini API Error Debug:', {
             status: error.status,
@@ -272,7 +273,7 @@ export class GoogleGeminiApiService {
             headers: error.headers,
             errorType: error.name
           });
-          
+
           // Log debug info for error analysis
           this.aiLogger.logDebugInfo(logId, {
             errorAnalysis: {
@@ -288,7 +289,7 @@ export class GoogleGeminiApiService {
               stack: error.stack?.substring(0, 500)
             }
           });
-          
+
           this.aiLogger.logError(logId, errorDetails.message, duration, {
             httpStatus: error.status,
             errorDetails: errorDetails,
@@ -302,16 +303,16 @@ export class GoogleGeminiApiService {
   }
 
   private convertMessagesToContents(
-    messages?: {role: 'system' | 'user' | 'assistant', content: string}[],
+    messages?: { role: 'system' | 'user' | 'assistant', content: string }[],
     fallbackPrompt?: string
-  ): { contents: {parts: {text: string}[], role?: 'user' | 'model'}[]; systemInstruction?: { parts: { text: string }[] } } {
+  ): { contents: { parts: { text: string }[], role?: 'user' | 'model' }[]; systemInstruction?: { parts: { text: string }[] } } {
     if (!messages || messages.length === 0) {
       return {
         contents: [{ parts: [{ text: fallbackPrompt || '' }], role: 'user' }]
       };
     }
 
-    const contents: {parts: {text: string}[], role?: 'user' | 'model'}[] = [];
+    const contents: { parts: { text: string }[], role?: 'user' | 'model' }[] = [];
     let systemInstruction: { parts: { text: string }[] } | undefined;
 
     for (const message of messages) {
@@ -336,12 +337,12 @@ export class GoogleGeminiApiService {
   abortRequest(requestId: string): void {
     const abortSubject = this.abortSubjects.get(requestId);
     const metadata = this.requestMetadata.get(requestId);
-    
+
     if (abortSubject && metadata) {
       // Log the abort
       const duration = Date.now() - metadata.startTime;
       this.aiLogger.logAborted(metadata.logId, duration);
-      
+
       // Abort the request
       abortSubject.next();
       this.cleanupRequest(requestId);
@@ -364,11 +365,11 @@ export class GoogleGeminiApiService {
     topP?: number;
     wordCount?: number;
     requestId?: string;
-    messages?: {role: 'system' | 'user' | 'assistant', content: string}[];
+    messages?: { role: 'system' | 'user' | 'assistant', content: string }[];
   } = {}): Observable<string> {
     const settings = this.settingsService.getSettings();
     const startTime = Date.now();
-    
+
     if (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) {
       throw new Error('Google Gemini API is not enabled or API key is missing');
     }
@@ -458,7 +459,7 @@ export class GoogleGeminiApiService {
         streamingUrl: url
       }
     });
-    
+
     // Store request metadata for abort handling
     this.requestMetadata.set(requestId, { logId, startTime });
 
@@ -486,10 +487,10 @@ export class GoogleGeminiApiService {
       let buffer = ''; // Buffer for incomplete JSON chunks
       let aborted = false;
       let timeoutId: number;
-      
+
       // Create AbortController for cancellation
       const abortController = new AbortController();
-      
+
       // Subscribe to abort signal
       const abortSubscription = abortSubject.subscribe(() => {
         aborted = true;
@@ -500,14 +501,14 @@ export class GoogleGeminiApiService {
         observer.complete();
         this.cleanupRequest(requestId);
       });
-      
+
       // Use fetch for streaming since Angular HttpClient doesn't support streaming responses well
       console.log('🔍 Gemini Streaming Request:', {
         url: url,
         method: 'POST',
         request: JSON.stringify(request, null, 2)
       });
-      
+
       fetch(url, {
         method: 'POST',
         headers: {
@@ -528,23 +529,23 @@ export class GoogleGeminiApiService {
           ok: response.ok,
           statusText: response.statusText
         });
-        
+
         if (!response.ok) {
           return response.text().then(errorText => {
             console.error('🔍 Gemini Error Response Body:', errorText);
             throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
           });
         }
-        
+
         // Check if response is JSON (proxy doesn't support streaming)
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
           console.log('🔍 Gemini: Proxy returns JSON, falling back to non-streaming response');
-          
+
           // Read complete response as JSON
           return response.json().then(data => {
             console.log('🔍 Gemini Complete Response:', data);
-            
+
             // Handle array of responses from proxy
             let fullText = '';
             if (Array.isArray(data)) {
@@ -558,70 +559,70 @@ export class GoogleGeminiApiService {
               // Single response object
               fullText = data.candidates[0].content.parts[0].text;
             }
-            
+
             if (!fullText) {
               throw new Error('No text content in response');
             }
-            
+
             accumulatedContent = fullText;
-              
-              // Simulate streaming by sending text in chunks
-              const chunkSize = 50; // Characters per chunk
-              let position = 0;
-              
-              const sendChunk = () => {
-                if (aborted) return;
-                
-                if (position < fullText.length) {
-                  const chunk = fullText.substring(position, position + chunkSize);
-                  observer.next(chunk);
-                  position += chunkSize;
-                  timeoutId = setTimeout(sendChunk, 20); // 20ms delay between chunks
-                } else {
-                  observer.complete();
-                  const duration = Date.now() - startTime;
-                  console.log('🔍 Gemini Simulated Streaming Complete:', {
-                    duration: duration + 'ms',
-                    totalContentLength: accumulatedContent.length,
-                    wordCount: accumulatedContent.split(/\s+/).length,
-                    mode: 'simulated-streaming'
-                  });
-                  
-                  // Log comprehensive success info including prompt feedback
-                  this.aiLogger.logDebugInfo(logId, {
-                    streamingType: 'simulated',
-                    chunkCount: Math.ceil(fullText.length / chunkSize),
-                    chunkSize: chunkSize,
-                    totalChunks: Math.ceil(fullText.length / chunkSize),
-                    promptFeedback: data.promptFeedback || (Array.isArray(data) && data[0]?.promptFeedback)
-                  });
-                  
-                  this.aiLogger.logSuccess(logId, accumulatedContent, duration, {
-                    httpStatus: 200,
-                    responseHeaders: { 'content-type': 'application/json' },
-                    safetyRatings: {
-                      promptFeedback: data.promptFeedback || (Array.isArray(data) && data[0]?.promptFeedback),
-                      candidateSafetyRatings: data.candidates?.[0]?.safetyRatings || (Array.isArray(data) && data[0]?.candidates?.[0]?.safetyRatings),
-                      finishReason: data.candidates?.[0]?.finishReason || (Array.isArray(data) && data[0]?.candidates?.[0]?.finishReason)
-                    }
-                  });
-                  this.cleanupRequest(requestId);
-                  abortSubscription.unsubscribe();
-                }
-              };
-              
-              sendChunk();
+
+            // Simulate streaming by sending text in chunks
+            const chunkSize = 50; // Characters per chunk
+            let position = 0;
+
+            const sendChunk = () => {
+              if (aborted) return;
+
+              if (position < fullText.length) {
+                const chunk = fullText.substring(position, position + chunkSize);
+                observer.next(chunk);
+                position += chunkSize;
+                timeoutId = setTimeout(sendChunk, 20); // 20ms delay between chunks
+              } else {
+                observer.complete();
+                const duration = Date.now() - startTime;
+                console.log('🔍 Gemini Simulated Streaming Complete:', {
+                  duration: duration + 'ms',
+                  totalContentLength: accumulatedContent.length,
+                  wordCount: accumulatedContent.split(/\s+/).length,
+                  mode: 'simulated-streaming'
+                });
+
+                // Log comprehensive success info including prompt feedback
+                this.aiLogger.logDebugInfo(logId, {
+                  streamingType: 'simulated',
+                  chunkCount: Math.ceil(fullText.length / chunkSize),
+                  chunkSize: chunkSize,
+                  totalChunks: Math.ceil(fullText.length / chunkSize),
+                  promptFeedback: data.promptFeedback || (Array.isArray(data) && data[0]?.promptFeedback)
+                });
+
+                this.aiLogger.logSuccess(logId, accumulatedContent, duration, {
+                  httpStatus: 200,
+                  responseHeaders: { 'content-type': 'application/json' },
+                  safetyRatings: {
+                    promptFeedback: data.promptFeedback || (Array.isArray(data) && data[0]?.promptFeedback),
+                    candidateSafetyRatings: data.candidates?.[0]?.safetyRatings || (Array.isArray(data) && data[0]?.candidates?.[0]?.safetyRatings),
+                    finishReason: data.candidates?.[0]?.finishReason || (Array.isArray(data) && data[0]?.candidates?.[0]?.finishReason)
+                  }
+                });
+                this.cleanupRequest(requestId);
+                abortSubscription.unsubscribe();
+              }
+            };
+
+            sendChunk();
           });
         }
-        
+
         // Original streaming code for real SSE responses
         const reader = response.body?.getReader();
         if (!reader) {
           throw new Error('Failed to get response reader');
         }
-        
+
         const decoder = new TextDecoder();
-        
+
         const readStream = (): Promise<void> => {
           return reader.read().then(({ done, value }) => {
             if (aborted || done) {
@@ -633,14 +634,14 @@ export class GoogleGeminiApiService {
                   wordCount: accumulatedContent.split(/\s+/).length,
                   mode: 'real-streaming'
                 });
-                
+
                 // Log comprehensive success info for real streaming
                 this.aiLogger.logDebugInfo(logId, {
                   streamingType: 'real',
                   mode: 'server-sent-events',
                   bufferLength: buffer.length
                 });
-                
+
                 observer.complete();
                 this.aiLogger.logSuccess(logId, accumulatedContent, duration, {
                   httpStatus: 200,
@@ -654,33 +655,33 @@ export class GoogleGeminiApiService {
               }
               return;
             }
-            
+
             const chunk = decoder.decode(value, { stream: true });
             console.log('🔍 Gemini Raw Chunk:', chunk);
-            
+
             // Process SSE format for Gemini API
             // Buffer incomplete chunks
             buffer += chunk;
             const lines = buffer.split('\n');
-            
+
             // Keep the last potentially incomplete line in the buffer
             buffer = lines.pop() || '';
-            
+
             for (const line of lines) {
               console.log('🔍 Gemini Processing Line:', line);
-              
+
               if (line.trim().startsWith('data: ')) {
                 const data = line.substring(6).trim();
-                
+
                 // Skip empty data or [DONE] signal
                 if (!data || data === '[DONE]') {
                   continue;
                 }
-                
+
                 try {
                   const parsed = JSON.parse(data);
                   console.log('🔍 Gemini SSE Chunk:', parsed);
-                  
+
                   // Gemini API sends partial text in each chunk
                   if (parsed.candidates?.[0]?.content?.parts?.[0]?.text) {
                     const newText = parsed.candidates[0].content.parts[0].text;
@@ -688,12 +689,12 @@ export class GoogleGeminiApiService {
                     console.log('🔍 Gemini New Text:', newText);
                     observer.next(newText);
                   }
-                  
+
                   // Check for finish reason
                   if (parsed.candidates?.[0]?.finishReason) {
                     console.log('🔍 Gemini Finish Reason:', parsed.candidates[0].finishReason);
                   }
-                  
+
                   // Check for prompt feedback in streaming chunk
                   if (parsed.promptFeedback) {
                     console.log('🛡️ Gemini Streaming Prompt Feedback:', parsed.promptFeedback);
@@ -707,18 +708,18 @@ export class GoogleGeminiApiService {
                 }
               }
             }
-            
+
             return readStream();
           });
         }
-        
+
         return readStream();
       }).catch(error => {
         if (aborted) return; // Don't handle errors if we aborted
-        
+
         const duration = Date.now() - startTime;
         const errorDetails = this.extractErrorDetails(error);
-        
+
         // Log comprehensive error information for streaming
         console.error('🔍 Gemini Streaming API Error Debug:', {
           name: error.name,
@@ -729,7 +730,7 @@ export class GoogleGeminiApiService {
           fullError: error,
           stack: error.stack
         });
-        
+
         // Log debug info for streaming error
         this.aiLogger.logDebugInfo(logId, {
           streamingError: {
@@ -743,7 +744,7 @@ export class GoogleGeminiApiService {
             requestMethod: 'POST'
           }
         });
-        
+
         observer.error(error);
         this.aiLogger.logError(logId, errorDetails.message, duration, {
           httpStatus: error.status || 0,
@@ -753,7 +754,7 @@ export class GoogleGeminiApiService {
         this.cleanupRequest(requestId);
         abortSubscription.unsubscribe();
       });
-      
+
       return () => {
         aborted = true;
         abortController.abort();
@@ -771,10 +772,26 @@ export class GoogleGeminiApiService {
     return 'gemini_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
   }
 
+  listModels(): Observable<any> {
+    const settings = this.settingsService.getSettings();
+    if (!settings.googleGemini.apiKey) {
+      throw new Error('API key is missing');
+    }
+
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/json',
+      'X-API-Key': settings.googleGemini.apiKey
+    });
+
+    // We try the standard models endpoint. 
+    // If it's the proxy, Nginx will rewrite it or the proxy handles /v1/models (which we'll handle in ModelService)
+    return this.http.get<any>(this.MODELS_LIST_URL, { headers });
+  }
+
   testConnection(): Observable<Record<string, unknown>> {
     const url = '/api/gemini/test';
     console.log('🔍 Testing Gemini proxy connection at:', url);
-    
+
     return this.http.get<Record<string, unknown>>(url).pipe(
       tap((response: Record<string, unknown>) => {
         console.log('✅ Gemini proxy test successful:', response);
@@ -801,22 +818,22 @@ export class GoogleGeminiApiService {
 
     // HTTP error response from Angular HttpClient
     const errorObj = error as { error?: { error?: { message?: string; code?: string; status?: string; details?: Record<string, unknown> } }; status?: number };
-    const errorAny = error as unknown as { 
-      error?: { 
+    const errorAny = error as unknown as {
+      error?: {
         error?: { message?: string; code?: string; status?: string; details?: Record<string, unknown> };
         message?: string;
         code?: string;
-      } | string; 
-      status?: number; 
-      message?: string; 
+      } | string;
+      status?: number;
+      message?: string;
       statusText?: string;
       code?: string;
       name?: string;
     };
-    
+
     if (errorObj.error) {
       status = errorObj.status || status;
-      
+
       // Google API error structure: error.error.error.message
       if (errorObj.error && errorObj.error.error) {
         const apiError = errorObj.error.error;
@@ -877,12 +894,12 @@ export class GoogleGeminiApiService {
     let contentFilterMessage: string | null = null;
     const details: Record<string, unknown> = {};
     const errorObj = error as { candidates?: { finishReason?: string }[] };
-    const errorAny = error as unknown as { 
-      candidates?: { 
+    const errorAny = error as unknown as {
+      candidates?: {
         finishReason?: string;
         safetyRatings?: { category: string; probability: string }[];
-      }[]; 
-      message?: string; 
+      }[];
+      message?: string;
       statusText?: string;
       promptFeedback?: {
         blockReason?: string;
@@ -922,10 +939,10 @@ export class GoogleGeminiApiService {
     // Check for safety ratings that might indicate high-risk content
     else if (errorAny.candidates?.[0]?.safetyRatings) {
       const candidates = errorAny.candidates as { safetyRatings: { category: string; probability: string }[] }[];
-      const highRiskRatings = candidates[0].safetyRatings.filter((rating) => 
+      const highRiskRatings = candidates[0].safetyRatings.filter((rating) =>
         rating.probability === 'HIGH' || rating.probability === 'MEDIUM'
       );
-      
+
       if (highRiskRatings.length > 0) {
         const categories = highRiskRatings.map((r) => r.category).join(', ');
         contentFilterMessage = `Content flagged for safety categories: ${categories}`;

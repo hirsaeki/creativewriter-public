@@ -81,12 +81,12 @@ export class ClaudeApiService {
     topP?: number;
     wordCount?: number;
     requestId?: string;
-    messages?: {role: 'system' | 'user' | 'assistant', content: string}[];
+    messages?: { role: 'system' | 'user' | 'assistant', content: string }[];
     stream?: boolean;
   } = {}): Observable<ClaudeResponse> {
     const settings = this.settingsService.getSettings();
     const startTime = Date.now();
-    
+
     if (!settings.claude.enabled || !settings.claude.apiKey) {
       throw new Error('Claude API is not enabled or API key is missing');
     }
@@ -123,7 +123,7 @@ export class ClaudeApiService {
 
     // Convert messages format to Claude format
     const messages = this.convertMessagesToClaudeFormat(options.messages, prompt);
-    
+
     // Extract system message if present
     let systemMessage: string | undefined;
     if (options.messages && options.messages.length > 0 && options.messages[0].role === 'system') {
@@ -155,7 +155,7 @@ export class ClaudeApiService {
       tap(response => {
         const endTime = Date.now();
         const metadata = this.requestMetadata.get(requestId);
-        
+
         if (metadata) {
           const content = response.content[0]?.text || '';
           const duration = endTime - metadata.startTime;
@@ -183,10 +183,10 @@ export class ClaudeApiService {
     topP?: number;
     wordCount?: number;
     requestId?: string;
-    messages?: {role: 'system' | 'user' | 'assistant', content: string}[];
+    messages?: { role: 'system' | 'user' | 'assistant', content: string }[];
   } = {}): Observable<string> {
     const settings = this.settingsService.getSettings();
-    
+
     if (!settings.claude.enabled || !settings.claude.apiKey) {
       throw new Error('Claude API is not enabled or API key is missing');
     }
@@ -210,7 +210,7 @@ export class ClaudeApiService {
 
     // Convert messages format to Claude format
     const messages = this.convertMessagesToClaudeFormat(options.messages, prompt);
-    
+
     // Extract system message if present
     let systemMessage: string | undefined;
     if (options.messages && options.messages.length > 0 && options.messages[0].role === 'system') {
@@ -280,7 +280,7 @@ export class ClaudeApiService {
 
               try {
                 const parsed = JSON.parse(data);
-                
+
                 if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
                   const chunk = parsed.delta.text;
                   accumulatedText += chunk;
@@ -325,7 +325,7 @@ export class ClaudeApiService {
     return this.http.post<ClaudeResponse>(this.API_URL, { ...request, stream: false }, { headers });
   }
 
-  private convertMessagesToClaudeFormat(messages?: {role: 'system' | 'user' | 'assistant', content: string}[], prompt?: string): {role: 'user' | 'assistant', content: string}[] {
+  private convertMessagesToClaudeFormat(messages?: { role: 'system' | 'user' | 'assistant', content: string }[], prompt?: string): { role: 'user' | 'assistant', content: string }[] {
     if (!messages || messages.length === 0) {
       return [{ role: 'user', content: prompt || '' }];
     }
@@ -359,7 +359,7 @@ export class ClaudeApiService {
 
   listModels(): Observable<ClaudeModelsResponse> {
     const settings = this.settingsService.getSettings();
-    
+
     if (!settings.claude.enabled || !settings.claude.apiKey) {
       throw new Error('Claude API is not enabled or API key is missing');
     }
@@ -386,7 +386,7 @@ export class ClaudeApiService {
 
   testConnection(): Observable<boolean> {
     const settings = this.settingsService.getSettings();
-    
+
     if (!settings.claude.apiKey) {
       return from(Promise.resolve(false));
     }

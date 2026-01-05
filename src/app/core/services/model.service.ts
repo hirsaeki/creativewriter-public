@@ -11,6 +11,7 @@ import {
 } from '../models/model.interface';
 import { SettingsService } from './settings.service';
 import { OllamaApiService, OllamaModelsResponse } from './ollama-api.service';
+import { GoogleGeminiApiService } from './google-gemini-api.service';
 import { ClaudeApiService, ClaudeModel } from './claude-api.service';
 import { OpenAICompatibleApiService, OpenAICompatibleModelsResponse } from './openai-compatible-api.service';
 
@@ -21,6 +22,7 @@ export class ModelService {
   private http = inject(HttpClient);
   private settingsService = inject(SettingsService);
   private ollamaApiService = inject(OllamaApiService);
+  private geminiApiService = inject(GoogleGeminiApiService);
   private claudeApiService = inject(ClaudeApiService);
   private openAICompatibleApiService = inject(OpenAICompatibleApiService);
 
@@ -46,7 +48,7 @@ export class ModelService {
 
   loadOpenRouterModels(): Observable<ModelOption[]> {
     const settings = this.settingsService.getSettings();
-    
+
     if (!settings.openRouter.enabled || !settings.openRouter.apiKey) {
       return of([]);
     }
@@ -105,37 +107,63 @@ export class ModelService {
 
   loadGeminiModels(): Observable<ModelOption[]> {
     const settings = this.settingsService.getSettings();
-    
+
     if (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) {
       return of([]);
     }
 
     this.loadingSubject.next(true);
 
-    // Gemini models are predefined since the API doesn't provide a models list endpoint
-    const predefinedModels: ModelOption[] = [
+    return this.geminiApiService.listModels()
+      .pipe(
+        map(response => this.transformGeminiModels(response)),
+        tap(models => {
+          this.geminiModelsSubject.next(models);
+          this.loadingSubject.next(false);
+        }),
+        catchError(error => {
+          console.warn('Failed to load dynamic Gemini models, falling back to predefined list:', error);
+          const predefinedModels = this.getPredefinedGeminiModels();
+          this.geminiModelsSubject.next(predefinedModels);
+          this.loadingSubject.next(false);
+          return of(predefinedModels);
+        })
+      );
+  }
+
+  private getPredefinedGeminiModels(): ModelOption[] {
+    return [
       {
-        id: 'gemini-2.5-flash',
-        label: 'Gemini 2.5 Flash',
-        description: 'Google\'s fastest and most cost-effective model with multimodal capabilities',
-        costInputEur: '0.07 €',
-        costOutputEur: '0.21 €',
-        contextLength: 1000000,
-        provider: 'gemini'
-      },
-      {
-        id: 'gemini-2.5-pro',
-        label: 'Gemini 2.5 Pro',
-        description: 'Google\'s most capable model with advanced reasoning and multimodal capabilities',
+        id: 'gemini-3-pro-preview',
+        label: 'Gemini 3 Pro Preview',
+        description: 'Next generation Gemini model with experimental features',
         costInputEur: '3.50 €',
         costOutputEur: '10.50 €',
         contextLength: 2000000,
         provider: 'gemini'
       },
       {
-        id: 'gemini-1.5-flash',
-        label: 'Gemini 1.5 Flash',
-        description: 'Fast and efficient model with good performance for most tasks',
+        id: 'gemini-3-flash-preview',
+        label: 'Gemini 3 Flash Preview',
+        description: 'Next generation Gemini Flash model',
+        costInputEur: '0.07 €',
+        costOutputEur: '0.21 €',
+        contextLength: 1000000,
+        provider: 'gemini'
+      },
+      {
+        id: 'gemini-2.0-pro-exp-02-05',
+        label: 'Gemini 2.0 Pro Experimental',
+        description: 'Latest experimental Pro model',
+        costInputEur: '3.50 €',
+        costOutputEur: '10.50 €',
+        contextLength: 2000000,
+        provider: 'gemini'
+      },
+      {
+        id: 'gemini-2.0-flash-exp',
+        label: 'Gemini 2.0 Flash Experimental',
+        description: 'Latest experimental Flash model',
         costInputEur: '0.07 €',
         costOutputEur: '0.21 €',
         contextLength: 1000000,
@@ -149,18 +177,72 @@ export class ModelService {
         costOutputEur: '10.50 €',
         contextLength: 2000000,
         provider: 'gemini'
+      },
+      {
+        id: 'gemini-1.5-flash',
+        label: 'Gemini 1.5 Flash',
+        description: 'Fast and efficient model with good performance for most tasks',
+        costInputEur: '0.07 €',
+        costOutputEur: '0.21 €',
+        contextLength: 1000000,
+        provider: 'gemini'
       }
     ];
+  }
 
-    this.geminiModelsSubject.next(predefinedModels);
-    this.loadingSubject.next(false);
-    
-    return of(predefinedModels);
+  private transformGeminiModels(response: any): ModelOption[] {
+    let rawModels: any[] = [];
+
+    // Handle OpenAI format (Proxy)
+    if (response?.data && Array.isArray(response.data)) {
+      rawModels = response.data;
+    }
+    // Handle Google format
+    else if (response?.models && Array.isArray(response.models)) {
+      rawModels = response.models;
+    }
+
+    if (!rawModels || rawModels.length === 0) return this.getPredefinedGeminiModels();
+
+    return rawModels
+      .map(model => {
+        const id = model.id || (model.name?.startsWith('models/') ? model.name.substring(7) : model.name);
+        const label = model.label || model.displayName || id;
+
+        return {
+          id: id,
+          label: label,
+          description: model.description || `Version: ${model.version || 'unknown'}`,
+          costInputEur: this.estimateGeminiCostInput(id),
+          costOutputEur: this.estimateGeminiCostOutput(id),
+          contextLength: model.inputTokenLimit || model.context_window || 128000,
+          provider: 'gemini' as const
+        };
+      })
+      .filter(m => m.id.includes('gemini') || m.id.includes('gpt') || m.id.includes('claude')); // Allow mixed models if from proxy
+  }
+
+  private estimateGeminiCostInput(modelId: string): string {
+    const lower = modelId.toLowerCase();
+    if (lower.includes('pro')) return '3.50 €';
+    if (lower.includes('flash')) return '0.07 €';
+    if (lower.includes('claude-sonnet')) return '2.76 €';
+    if (lower.includes('claude-opus')) return '13.80 €';
+    return '0.50 €';
+  }
+
+  private estimateGeminiCostOutput(modelId: string): string {
+    const lower = modelId.toLowerCase();
+    if (lower.includes('pro')) return '10.50 €';
+    if (lower.includes('flash')) return '0.21 €';
+    if (lower.includes('claude-sonnet')) return '13.80 €';
+    if (lower.includes('claude-opus')) return '69.00 €';
+    return '1.50 €';
   }
 
   loadOllamaModels(): Observable<ModelOption[]> {
     const settings = this.settingsService.getSettings();
-    
+
     if (!settings.ollama.enabled || !settings.ollama.baseUrl) {
       return of([]);
     }
@@ -184,7 +266,7 @@ export class ModelService {
 
   loadClaudeModels(): Observable<ModelOption[]> {
     const settings = this.settingsService.getSettings();
-    
+
     if (!settings.claude.enabled || !settings.claude.apiKey) {
       return of([]);
     }
@@ -192,7 +274,7 @@ export class ModelService {
     this.loadingSubject.next(true);
 
     return this.claudeApiService.listModels().pipe(
-      map(response => this.transformClaudeModels(response.data)),
+      map(response => this.transformClaudeModels(response)),
       tap(models => {
         this.claudeModelsSubject.next(models);
         this.loadingSubject.next(false);
@@ -240,13 +322,13 @@ export class ModelService {
   }
 
   private transformOpenRouterModels(models: OpenRouterModel[]): ModelOption[] {
-    
+
     // No filtering - show ALL models, let user search/filter in UI
     return models
       .map(model => {
         const promptCostUsd = parseFloat(model.pricing.prompt || '0');
         const completionCostUsd = parseFloat(model.pricing.completion || '0');
-        
+
         return {
           id: model.id,
           label: model.name,
@@ -268,14 +350,14 @@ export class ModelService {
           if (lowerLabel.includes('llama')) return 5;
           return 10;
         };
-        
+
         const scoreA = getPopularityScore(a.label);
         const scoreB = getPopularityScore(b.label);
-        
+
         if (scoreA !== scoreB) {
           return scoreA - scoreB;
         }
-        
+
         return a.label.localeCompare(b.label);
       });
   }
@@ -288,7 +370,7 @@ export class ModelService {
         // Replicate doesn't provide detailed pricing info via API
         // We'll show estimated costs based on typical Replicate pricing
         const estimatedCost = this.estimateReplicateCost(model.name);
-        
+
         return {
           id: `${model.owner}/${model.name}`,
           label: `${model.owner}/${model.name}`,
@@ -324,23 +406,38 @@ export class ModelService {
           if (lowerName.includes('gemma')) return 5;
           return 10;
         };
-        
+
         const priorityA = getModelPriority(a.label);
         const priorityB = getModelPriority(b.label);
-        
+
         if (priorityA !== priorityB) {
           return priorityA - priorityB;
         }
-        
+
         return a.label.localeCompare(b.label);
       });
   }
 
-  private transformClaudeModels(models: ClaudeModel[]): ModelOption[] {
-    return models
+  private transformClaudeModels(response: any): ModelOption[] {
+    let rawModels: any[] = [];
+
+    // Handle OpenAI format (Proxy)
+    if (response?.data && Array.isArray(response.data)) {
+      rawModels = response.data;
+    }
+    // Handle Claude native format
+    else if (Array.isArray(response)) {
+      rawModels = response;
+    }
+    // Fallback?
+    else if (response?.data) {
+      rawModels = Array.isArray(response.data) ? response.data : [response.data];
+    }
+
+    return rawModels
       .map(model => ({
         id: model.id,
-        label: model.display_name,
+        label: model.display_name || model.id,
         description: this.generateClaudeModelDescription(model.id),
         costInputEur: this.estimateClaudeCostInput(model.id),
         costOutputEur: this.estimateClaudeCostOutput(model.id),
@@ -363,14 +460,14 @@ export class ModelService {
           }
           return 10; // Older models
         };
-        
+
         const priorityA = getModelPriority(a.id);
         const priorityB = getModelPriority(b.id);
-        
+
         if (priorityA !== priorityB) {
           return priorityA - priorityB;
         }
-        
+
         return a.label.localeCompare(b.label);
       });
   }
@@ -415,7 +512,7 @@ export class ModelService {
 
   private generateClaudeModelDescription(modelId: string): string {
     const lowerName = modelId.toLowerCase();
-    
+
     if (lowerName.includes('claude-4') || lowerName.includes('sonnet-4') || lowerName.includes('opus-4')) {
       if (lowerName.includes('opus')) {
         return 'Most capable Claude model with superior reasoning and complex task handling';
@@ -433,13 +530,13 @@ export class ModelService {
       }
       return 'Claude 3 series model with strong capabilities';
     }
-    
+
     return 'Claude AI model for text generation and analysis';
   }
 
   private estimateClaudeCostInput(modelId: string): string {
     const lowerName = modelId.toLowerCase();
-    
+
     // Current Claude pricing (approximated in EUR)
     if (lowerName.includes('claude-4') || lowerName.includes('opus-4')) {
       return '13.80 €'; // Opus pricing tier
@@ -456,13 +553,13 @@ export class ModelService {
     } else if (lowerName.includes('haiku') && lowerName.includes('3')) {
       return '0.23 €'; // Claude 3 Haiku
     }
-    
+
     return '2.76 €'; // Default to Sonnet pricing
   }
 
   private estimateClaudeCostOutput(modelId: string): string {
     const lowerName = modelId.toLowerCase();
-    
+
     // Current Claude pricing (approximated in EUR)
     if (lowerName.includes('claude-4') || lowerName.includes('opus-4')) {
       return '69.00 €'; // Opus pricing tier
@@ -479,24 +576,24 @@ export class ModelService {
     } else if (lowerName.includes('haiku') && lowerName.includes('3')) {
       return '1.15 €'; // Claude 3 Haiku
     }
-    
+
     return '13.80 €'; // Default to Sonnet pricing
   }
 
   private estimateClaudeContextLength(modelId: string): number {
     // Most Claude models support 200K tokens, with some supporting up to 1M
     const lowerName = modelId.toLowerCase();
-    
+
     if (lowerName.includes('claude-4') && lowerName.includes('sonnet')) {
       return 1000000; // Claude 4 Sonnet can support 1M tokens with beta header
     }
-    
+
     return 200000; // Default context length for Claude models
   }
 
   private generateOllamaModelDescription(model: { details?: { parameter_size?: string; quantization_level?: string }; size: number }): string {
     let description = `Local Ollama model`;
-    
+
     if (model.details) {
       const details = model.details;
       if (details.parameter_size) {
@@ -506,17 +603,17 @@ export class ModelService {
         description += ` - ${details.quantization_level}`;
       }
     }
-    
+
     // Convert size to human-readable format
     const sizeGB = (model.size / (1024 * 1024 * 1024)).toFixed(1);
     description += ` - ${sizeGB}GB`;
-    
+
     return description;
   }
 
   private estimateOllamaContextLength(modelName: string): number {
     const lowerName = modelName.toLowerCase();
-    
+
     // Context length estimates based on model families
     if (lowerName.includes('llama3') || lowerName.includes('llama-3')) {
       return 128000; // Llama 3 typically supports 128K
@@ -531,7 +628,7 @@ export class ModelService {
     } else if (lowerName.includes('gemma')) {
       return 8000; // Gemma typically 8K
     }
-    
+
     // Default context length
     return 4000;
   }
@@ -547,7 +644,7 @@ export class ModelService {
   private estimateReplicateCost(modelName: string): number {
     // Rough estimates based on model size and typical Replicate pricing
     const lowerName = modelName.toLowerCase();
-    
+
     if (lowerName.includes('70b') || lowerName.includes('65b')) {
       return 50; // ~50 USD per 1M tokens for large models
     } else if (lowerName.includes('13b') || lowerName.includes('7b')) {
@@ -555,24 +652,24 @@ export class ModelService {
     } else if (lowerName.includes('3b') || lowerName.includes('1b')) {
       return 5; // ~5 USD per 1M tokens for small models
     }
-    
+
     return 25; // Default estimate
   }
 
   private estimateContextLength(modelName: string): number {
     const lowerName = modelName.toLowerCase();
-    
+
     if (lowerName.includes('32k')) return 32000;
     if (lowerName.includes('16k')) return 16000;
     if (lowerName.includes('8k')) return 8000;
     if (lowerName.includes('4k')) return 4000;
-    
+
     // Default context lengths based on model families
     if (lowerName.includes('llama-2')) return 4000;
     if (lowerName.includes('llama-3')) return 8000;
     if (lowerName.includes('mistral')) return 8000;
     if (lowerName.includes('code')) return 16000;
-    
+
     return 4000; // Default
   }
 
@@ -601,7 +698,7 @@ export class ModelService {
    */
   getAvailableModels(): Observable<ModelOption[]> {
     const settings = this.settingsService.getSettings();
-    
+
     if (settings.ollama.enabled && settings.ollama.baseUrl) {
       return this.loadOllamaModels();
     } else if (settings.googleGemini.enabled && settings.googleGemini.apiKey) {
@@ -611,7 +708,7 @@ export class ModelService {
     } else if (settings.replicate.enabled && settings.replicate.apiKey) {
       return this.loadReplicateModels();
     }
-    
+
     return of([]);
   }
 
@@ -621,23 +718,23 @@ export class ModelService {
   getCombinedModels(): Observable<ModelOption[]> {
     const settings = this.settingsService.getSettings();
     const modelsToLoad: Observable<ModelOption[]>[] = [];
-    
+
     if (settings.openRouter.enabled && settings.openRouter.apiKey) {
       modelsToLoad.push(this.loadOpenRouterModels());
     }
-    
+
     if (settings.googleGemini.enabled && settings.googleGemini.apiKey) {
       modelsToLoad.push(this.loadGeminiModels());
     }
-    
+
     if (settings.replicate.enabled && settings.replicate.apiKey) {
       modelsToLoad.push(this.loadReplicateModels());
     }
-    
+
     if (settings.ollama.enabled && settings.ollama.baseUrl) {
       modelsToLoad.push(this.loadOllamaModels());
     }
-    
+
     if (settings.claude.enabled && settings.claude.apiKey) {
       modelsToLoad.push(this.loadClaudeModels());
     }
@@ -654,7 +751,7 @@ export class ModelService {
       map(results => {
         // Flatten and combine all models
         const allModels = results.flat();
-        
+
         // Add provider prefix to model IDs to ensure uniqueness
         return allModels.map(model => ({
           ...model,
@@ -669,7 +766,7 @@ export class ModelService {
    */
   getCurrentAvailableModels(): ModelOption[] {
     const settings = this.settingsService.getSettings();
-    
+
     if (settings.ollama.enabled && settings.ollama.baseUrl) {
       return this.getCurrentOllamaModels();
     } else if (settings.googleGemini.enabled && settings.googleGemini.apiKey) {
@@ -679,7 +776,7 @@ export class ModelService {
     } else if (settings.replicate.enabled && settings.replicate.apiKey) {
       return this.getCurrentReplicateModels();
     }
-    
+
     return [];
   }
 
@@ -689,7 +786,7 @@ export class ModelService {
   getCurrentCombinedModels(): ModelOption[] {
     const settings = this.settingsService.getSettings();
     const allModels: ModelOption[] = [];
-    
+
     if (settings.openRouter.enabled && settings.openRouter.apiKey) {
       const openRouterModels = this.getCurrentOpenRouterModels().map(model => ({
         ...model,
@@ -697,7 +794,7 @@ export class ModelService {
       }));
       allModels.push(...openRouterModels);
     }
-    
+
     if (settings.googleGemini.enabled && settings.googleGemini.apiKey) {
       const geminiModels = this.getCurrentGeminiModels().map(model => ({
         ...model,
@@ -705,7 +802,7 @@ export class ModelService {
       }));
       allModels.push(...geminiModels);
     }
-    
+
     if (settings.replicate.enabled && settings.replicate.apiKey) {
       const replicateModels = this.getCurrentReplicateModels().map(model => ({
         ...model,
@@ -713,7 +810,7 @@ export class ModelService {
       }));
       allModels.push(...replicateModels);
     }
-    
+
     if (settings.ollama.enabled && settings.ollama.baseUrl) {
       const ollamaModels = this.getCurrentOllamaModels().map(model => ({
         ...model,
