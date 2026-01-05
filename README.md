@@ -270,6 +270,42 @@ volumes:
 4. **Verify persistence:** Check that `./data/couchdb-data` contains files after first run
 5. **Use the built-in backup feature:** Go to Settings → Backup & Restore to create downloadable backups
 
+## 🐳 Podman & Kubernetes Deployment
+
+For users preferring Podman Desktop or Kubernetes:
+
+### 1. Templated Deployment (Recommended)
+This method uses environment variables to generate a clean manifest.
+
+1.  **Prepare Environment**:
+    ```bash
+    cp .env.pod.test .env.pod
+    # Edit .env.pod with your settings (API keys, ports, etc.)
+    ```
+2.  **Generate Manifest**:
+    ```bash
+    # Requires envsubst (standard on most Linux/WSL)
+    set -a; source .env.pod; set +a; envsubst < pod-creativewriter.yaml.template > pod-creativewriter.yaml
+    ```
+3.  **Run with Podman**:
+    ```bash
+    # Note loopback flag for host-side API access
+    podman play kube --network slirp4netns:allow_host_loopback=true pod-creativewriter.yaml
+    ```
+
+### 🛠️ Quadlet (Systemd Integration)
+Run CreativeWriter as a managed systemd service in Podman.
+
+1.  **Generate YAML**: Follow the steps above to create `pod-creativewriter.yaml`.
+2.  **Copy Files**: Place the Quadlet files in your systemd directory.
+    - User mode: `~/.config/containers/systemd/`
+    - System mode: `/etc/containers/systemd/`
+3.  **Enable Service**:
+    ```bash
+    systemctl --user daemon-reload
+    systemctl --user enable --now creativewriter.service
+    ```
+
 ## 📝 Usage Tips
 
 1. **Start with Story Structure**: Define your acts and chapters before diving into scenes

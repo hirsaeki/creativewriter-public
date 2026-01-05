@@ -1,0 +1,16 @@
+[Unit]
+Description=CreativeWriter Pod Deployment (Kubernetes YAML via Quadlet)
+After=network-online.target
+
+[Kube]
+Yaml=pod-creativewriter.yaml
+# Reference the network defined in creativewriter.network
+Network=creativewriter.network
+# Map the host port
+PublishPort=3080:8080
+# Note: To use environment variables, ensure you have processed 
+# pod-creativewriter.yaml.template into pod-creativewriter.yaml 
+# using envsubst before starting the service.
+
+[Install]
+WantedBy=default.target

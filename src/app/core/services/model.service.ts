@@ -429,9 +429,9 @@ export class ModelService {
     else if (Array.isArray(response)) {
       rawModels = response;
     }
-    // Fallback?
-    else if (response?.data) {
-      rawModels = Array.isArray(response.data) ? response.data : [response.data];
+
+    if (!rawModels || rawModels.length === 0) {
+      return this.getPredefinedClaudeModels();
     }
 
     return rawModels
@@ -445,31 +445,46 @@ export class ModelService {
         provider: 'claude' as const
       }))
       .sort((a, b) => {
-        // Sort by model generation and tier (newer first, then by tier)
-        const getModelPriority = (id: string) => {
-          const lowerName = id.toLowerCase();
-          if (lowerName.includes('claude-4') || lowerName.includes('sonnet-4') || lowerName.includes('opus-4')) {
-            if (lowerName.includes('opus')) return 1; // Opus 4 first
-            if (lowerName.includes('sonnet')) return 2; // Sonnet 4 second
-            return 3; // Other Claude 4 models
-          } else if (lowerName.includes('claude-3')) {
-            if (lowerName.includes('opus')) return 4; // Claude 3 Opus
-            if (lowerName.includes('sonnet')) return 5; // Claude 3 Sonnet
-            if (lowerName.includes('haiku')) return 6; // Claude 3 Haiku
-            return 7; // Other Claude 3 models
-          }
-          return 10; // Older models
-        };
-
-        const priorityA = getModelPriority(a.id);
-        const priorityB = getModelPriority(b.id);
-
-        if (priorityA !== priorityB) {
-          return priorityA - priorityB;
-        }
-
+        const order = ['opus', 'sonnet', 'haiku'];
+        const aIndex = order.findIndex(o => a.id.includes(o));
+        const bIndex = order.findIndex(o => b.id.includes(o));
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+        if (aIndex !== -1) return -1;
+        if (bIndex !== -1) return 1;
         return a.label.localeCompare(b.label);
       });
+  }
+
+  private getPredefinedClaudeModels(): ModelOption[] {
+    return [
+      {
+        id: 'claude-3-5-sonnet-20241022',
+        label: 'Claude 3.5 Sonnet',
+        description: 'Most intelligent model to date',
+        costInputEur: '2.76 €',
+        costOutputEur: '13.80 €',
+        contextLength: 2000000,
+        provider: 'claude'
+      },
+      {
+        id: 'claude-3-5-haiku-20241022',
+        label: 'Claude 3.5 Haiku',
+        description: 'Fastest reasoning model',
+        costInputEur: '0.23 €',
+        costOutputEur: '1.15 €',
+        contextLength: 2000000,
+        provider: 'claude'
+      },
+      {
+        id: 'claude-3-opus-20240229',
+        label: 'Claude 3 Opus',
+        description: 'Powerful model for highly complex tasks',
+        costInputEur: '13.80 €',
+        costOutputEur: '69.00 €',
+        contextLength: 2000000,
+        provider: 'claude'
+      }
+    ];
   }
 
   private transformOpenAICompatibleModels(response: OpenAICompatibleModelsResponse): ModelOption[] {

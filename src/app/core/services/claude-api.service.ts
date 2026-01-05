@@ -56,6 +56,7 @@ export class ClaudeApiService {
   private settingsService = inject(SettingsService);
   private aiLogger = inject(AIRequestLoggerService);
 
+  private readonly API_BASE_URL = '/api/anthropic/v1';
   private readonly API_URL: string;
   private readonly MODELS_URL: string;
   private readonly API_VERSION = '2023-06-01';
@@ -66,8 +67,8 @@ export class ClaudeApiService {
   constructor() {
     // Use proxy in development, direct API in production
     if (this.isDevelopment) {
-      this.API_URL = '/api/anthropic/v1/messages';
-      this.MODELS_URL = '/api/anthropic/v1/models';
+      this.API_URL = `${this.API_BASE_URL}/messages`;
+      this.MODELS_URL = `${this.API_BASE_URL}/models`;
     } else {
       this.API_URL = 'https://api.anthropic.com/v1/messages';
       this.MODELS_URL = 'https://api.anthropic.com/v1/models';

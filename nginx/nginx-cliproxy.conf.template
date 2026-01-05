@@ -11,11 +11,49 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # CouchDB API and Fauxton UI
+    location /_db/ {
+        client_max_body_size 100M;
+        client_body_buffer_size 16M;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_request_buffering off;
+
+        # Talk to CouchDB on localhost within the same pod
+        proxy_pass http://localhost:5984;
+        rewrite ^/_db/(.*)$ /$1 break;
+        
+        proxy_redirect off;
+        proxy_buffering off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Authorization $http_authorization;
+        proxy_pass_header Authorization;
+        
+        # CORS headers
+        add_header Access-Control-Allow-Origin $http_origin always;
+        add_header Access-Control-Allow-Credentials true always;
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Accept, Authorization, Content-Type, Origin, X-Requested-With" always;
+        
+        if ($request_method = 'OPTIONS') {
+            add_header Access-Control-Allow-Origin $http_origin;
+            add_header Access-Control-Allow-Credentials true;
+            add_header Access-Control-Allow-Methods 'GET, POST, PUT, DELETE, OPTIONS';
+            add_header Access-Control-Allow-Headers 'Accept, Authorization, Content-Type, Origin, X-Requested-With';
+            add_header Content-Type 'text/plain charset=UTF-8';
+            add_header Content-Length 0;
+            return 204;
+        }
+    }
+
     # Gemini Proxy via CLIProxyAPI
     location /api/gemini/ {
         # Rewrite: /api/gemini/models/gemini-pro:generateContent -> /v1beta/models/gemini-pro:generateContent
         rewrite ^/api/gemini/(.*)$ /v1beta/$1 break;
-        proxy_pass http://localhost:8317;
+        proxy_pass ${PROXY_UPSTREAM_URL};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -23,7 +61,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         
         # Replace PROXYPW_HERE with your actual CLIProxyAPI password
-        proxy_set_header Authorization "Bearer PROXYPW_HERE";
+        proxy_set_header Authorization "Bearer ${PROXY_PASSWORD}";
         
         # SSE Streaming settings
         proxy_buffering off;
@@ -51,14 +89,14 @@ server {
     location /api/anthropic/ {
         # Rewrite: /api/anthropic/v1/messages -> /v1/messages
         rewrite ^/api/anthropic/(.*)$ /$1 break;
-        proxy_pass http://localhost:8317;
+        proxy_pass ${PROXY_UPSTREAM_URL};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         
-        proxy_set_header Authorization "Bearer PROXYPW_HERE";
+        proxy_set_header Authorization "Bearer ${PROXY_PASSWORD}";
         
         proxy_buffering off;
         proxy_cache off;
@@ -79,5 +117,11 @@ server {
             add_header Content-Length 0;
             return 204;
         }
+    }
+
+    # Health check endpoint
+    location /health {
+        access_log off;
+        return 200 'OK';
     }
 }

@@ -1,0 +1,110 @@
+# Parameterized Pod manifest for CreativeWriter
+# Generate the final YAML with:
+# set -a; source .env.pod; set +a; envsubst < pod-creativewriter.yaml.template > pod-creativewriter.yaml
+# Then run: podman play kube --network slirp4netns:allow_host_loopback=true pod-creativewriter.yaml
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: creativewriter-secrets
+type: Opaque
+stringData:
+  PROXY_PASSWORD: "${PROXY_PASSWORD}"
+  COUCHDB_USER: "${COUCHDB_USER}"
+  COUCHDB_PASSWORD: "${COUCHDB_PASSWORD}"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: creativewriter-config
+data:
+  PROXY_UPSTREAM_URL: "${PROXY_UPSTREAM_URL}"
+  TZ: "${TZ}"
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: creativewriter
+  labels:
+    app: creativewriter
+spec:
+  hostAliases:
+    - ip: "10.0.2.2"
+      hostnames:
+        - "host.containers.internal"
+  containers:
+    - name: frontend
+      image: "${GHCR_IMAGE_FRONTEND}"
+      ports:
+        - containerPort: 8080
+          hostPort: ${HOST_PORT}
+      env:
+        - name: PROXY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: creativewriter-secrets
+              key: PROXY_PASSWORD
+        - name: PROXY_UPSTREAM_URL
+          valueFrom:
+            configMapKeyRef:
+              name: creativewriter-config
+              key: PROXY_UPSTREAM_URL
+      volumeMounts:
+        - name: couchdb-config
+          mountPath: /opt/couchdb/etc/local.d/local.ini
+          subPath: local.ini
+    
+    - name: couchdb
+      image: couchdb:3.3
+      env:
+        - name: COUCHDB_USER
+          valueFrom:
+            secretKeyRef:
+              name: creativewriter-secrets
+              key: COUCHDB_USER
+        - name: COUCHDB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: creativewriter-secrets
+              key: COUCHDB_PASSWORD
+        - name: ERL_FLAGS
+          value: "-setcookie couchdb_secret"
+      volumeMounts:
+        - name: couchdb-data
+          mountPath: /opt/couchdb/data
+        - name: couchdb-config
+          mountPath: /opt/couchdb/etc/local.d/local.ini
+          subPath: local.ini
+    
+    - name: snapshot-service
+      image: "${GHCR_IMAGE_SNAPSHOT}"
+      env:
+        - name: COUCHDB_HOST
+          value: "localhost"
+        - name: COUCHDB_PORT
+          value: "5984"
+        - name: COUCHDB_USER
+          valueFrom:
+            secretKeyRef:
+              name: creativewriter-secrets
+              key: COUCHDB_USER
+        - name: COUCHDB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: creativewriter-secrets
+              key: COUCHDB_PASSWORD
+        - name: DATABASE_PATTERN
+          value: "creative-writer-stories"
+  
+  volumes:
+    - name: couchdb-data
+      hostPath:
+        path: "${DATA_PATH}/couchdb-data"
+        type: DirectoryOrCreate
+    - name: couchdb-config
+      hostPath:
+        path: "${CONFIG_PATH}/local.ini"
+        type: File
