@@ -289,22 +289,38 @@ This method uses environment variables to generate a clean manifest.
     ```
 3.  **Run with Podman**:
     ```bash
-    # Note loopback flag for host-side API access
-    podman play kube --network slirp4netns:allow_host_loopback=true pod-creativewriter.yaml
+    # With pasta network for host connectivity
+    podman play kube --network pasta:--map-gw pod-creativewriter.yaml
     ```
 
+> [!NOTE]
+> **Nginx configuration**: Unlike the Pod manifest, the Nginx template (`nginx-cliproxy.conf.template`) is built into the image and processed **automatically** by the container at startup using the environment variables defined in the Pod manifest. No manual step is required for the Nginx template.
+
 ### 🛠️ Quadlet (Systemd Integration)
-Run CreativeWriter as a managed systemd service in Podman.
+Run CreativeWriter as a managed systemd service in Podman with pasta network for host connectivity.
 
 1.  **Generate YAML**: Follow the steps above to create `pod-creativewriter.yaml`.
 2.  **Copy Files**: Place the Quadlet files in your systemd directory.
     - User mode: `~/.config/containers/systemd/`
     - System mode: `/etc/containers/systemd/`
+    ```bash
+    # Example for user mode
+    cp quadlet/creativewriter.kube ~/.config/containers/systemd/
+    cp quadlet/creativewriter.network ~/.config/containers/systemd/
+    cp pod-creativewriter.yaml ~/.config/containers/systemd/
+    ```
+    > [!TIP]
+    > **Customizing Quadlet files**: If you need to change settings like port numbers, edit the Quadlet files directly after copying. For example, edit `creativewriter.kube` to change `PublishPort=3080:8080` to your desired port.
 3.  **Enable Service**:
     ```bash
     systemctl --user daemon-reload
     systemctl --user enable --now creativewriter.service
     ```
+
+> [!NOTE]
+> **Pasta Network**: The Quadlet configuration uses the pasta network driver with `--map-gw` option. This makes the host accessible to the container via the default gateway IP, enabling nginx to proxy requests to services running on the host (e.g., CLIProxyAPI on port 8317).
+
+## 📦 Docker Images
 
 ## 📝 Usage Tips
 

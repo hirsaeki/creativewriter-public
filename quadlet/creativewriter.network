@@ -1,3 +1,4 @@
 [Network]
 Label=app=creativewriter
-Options=allow_host_loopback=true
+Driver=pasta
+Options=--map-gw

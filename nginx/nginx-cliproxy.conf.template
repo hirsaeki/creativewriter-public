@@ -1,5 +1,12 @@
-# Nginx Config for CLIProxyAPI Routing
-# Save this as nginx/nginx-cliproxy.conf or incorporate into nginx.conf
+# Nginx Config for CLIProxyAPI Routing (Pasta Network Edition)
+# This config uses upstream to dynamically resolve the pasta gateway IP
+
+# Upstream definition: resolve pasta gateway IP at runtime
+upstream host_cliproxy {
+    # The pasta network makes the host accessible via the default gateway IP
+    # This will be dynamically resolved using a resolver or set in entrypoint
+    server ${PROXY_UPSTREAM_HOST}:${PROXY_UPSTREAM_PORT};
+}
 
 server {
     listen 8080;
@@ -49,18 +56,18 @@ server {
         }
     }
 
-    # Gemini Proxy via CLIProxyAPI
+    # Gemini Proxy via CLIProxyAPI on host
     location /api/gemini/ {
         # Rewrite: /api/gemini/models/gemini-pro:generateContent -> /v1beta/models/gemini-pro:generateContent
         rewrite ^/api/gemini/(.*)$ /v1beta/$1 break;
-        proxy_pass ${PROXY_UPSTREAM_URL};
+        proxy_pass http://host_cliproxy;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         
-        # Replace PROXYPW_HERE with your actual CLIProxyAPI password
+        # Replace with your actual CLIProxyAPI password
         proxy_set_header Authorization "Bearer ${PROXY_PASSWORD}";
         
         # SSE Streaming settings
@@ -85,11 +92,11 @@ server {
         }
     }
 
-    # Anthropic Proxy via CLIProxyAPI
+    # Anthropic Proxy via CLIProxyAPI on host
     location /api/anthropic/ {
         # Rewrite: /api/anthropic/v1/messages -> /v1/messages
         rewrite ^/api/anthropic/(.*)$ /$1 break;
-        proxy_pass ${PROXY_UPSTREAM_URL};
+        proxy_pass http://host_cliproxy;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

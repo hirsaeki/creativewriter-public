@@ -20,7 +20,7 @@ kind: ConfigMap
 metadata:
   name: creativewriter-config
 data:
-  PROXY_UPSTREAM_URL: "${PROXY_UPSTREAM_URL}"
+  PROXY_UPSTREAM_PORT: "${PROXY_UPSTREAM_PORT}"
   TZ: "${TZ}"
 
 ---
@@ -38,20 +38,17 @@ spec:
   containers:
     - name: frontend
       image: "${GHCR_IMAGE_FRONTEND}"
-      ports:
-        - containerPort: 8080
-          hostPort: ${HOST_PORT}
       env:
         - name: PROXY_PASSWORD
           valueFrom:
             secretKeyRef:
               name: creativewriter-secrets
               key: PROXY_PASSWORD
-        - name: PROXY_UPSTREAM_URL
+        - name: PROXY_UPSTREAM_PORT
           valueFrom:
             configMapKeyRef:
               name: creativewriter-config
-              key: PROXY_UPSTREAM_URL
+              key: PROXY_UPSTREAM_PORT
       volumeMounts:
         - name: couchdb-config
           mountPath: /opt/couchdb/etc/local.d/local.ini
