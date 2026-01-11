@@ -1,0 +1,3 @@
+# This file ensures the custom/ directory exists and is tracked by Git.
+# It also ensures the fork history diverges from upstream, making fast-forward
+# merges impossible and allowing .gitattributes merge=ours strategy to work.

@@ -1,0 +1,6 @@
+# Protect custom directory from upstream merge
+src/app/custom/** merge=ours
+
+# Protect fork-specific configuration files
+CLAUDE.local.md merge=ours
+AGENTS.md merge=ours
