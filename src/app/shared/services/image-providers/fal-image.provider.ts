@@ -295,7 +295,7 @@ export class FalImageProvider implements IImageProvider {
     // Default capabilities
     const defaultCapabilities: ImageModelCapabilities = {
       supportsAspectRatio: true,
-      supportsNegativePrompt: false,
+      supportsNegativePrompt: true,
       supportsMultipleImages: true,
       supportsSeed: true,
       supportsGuidanceScale: true,
@@ -331,7 +331,7 @@ export class FalImageProvider implements IImageProvider {
   private getDefaultCapabilities(modelId: string): ImageModelCapabilities {
     const defaults: ImageModelCapabilities = {
       supportsAspectRatio: true,
-      supportsNegativePrompt: false,
+      supportsNegativePrompt: true,
       supportsMultipleImages: true,
       supportsSeed: true,
       supportsGuidanceScale: true,

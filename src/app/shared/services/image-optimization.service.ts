@@ -30,7 +30,10 @@ export class ImageOptimizationService {
   private supportedFormats = new Set<string>();
   private formatCheckCache = new Map<string, boolean>();
   private imageLoadCache = new Map<string, ImageLoadResult>();
-  
+
+  // LRU cache configuration - limit cache size to prevent memory leaks
+  private readonly MAX_CACHE_SIZE = 100;
+
   constructor() {
     this.detectSupportedFormats();
   }
@@ -63,9 +66,13 @@ export class ImageOptimizationService {
    * Preload critical images for better performance
    */
   preloadImage(src: string): Promise<ImageLoadResult> {
-    // Check cache first
+    // Check cache first - move to end to mark as recently used (LRU)
     if (this.imageLoadCache.has(src)) {
-      return Promise.resolve(this.imageLoadCache.get(src)!);
+      const cachedResult = this.imageLoadCache.get(src)!;
+      // Move to end of map to mark as most recently used
+      this.imageLoadCache.delete(src);
+      this.imageLoadCache.set(src, cachedResult);
+      return Promise.resolve(cachedResult);
     }
 
     const startTime = performance.now();
@@ -82,12 +89,12 @@ export class ImageOptimizationService {
           loadTime,
           size: this.estimateImageSize(img)
         };
-        
-        // Cache the result
-        this.imageLoadCache.set(src, result);
+
+        // Cache the result with LRU eviction
+        this.setCacheEntry(src, result);
         resolve(result);
       };
-      
+
       const handleError = () => {
         const loadTime = performance.now() - startTime;
         const result: ImageLoadResult = {
@@ -96,9 +103,9 @@ export class ImageOptimizationService {
           format: this.getImageFormat(src),
           loadTime
         };
-        
-        // Cache the error result too (with shorter TTL in real implementation)
-        this.imageLoadCache.set(src, result);
+
+        // Cache the error result too with LRU eviction
+        this.setCacheEntry(src, result);
         resolve(result);
       };
       
@@ -185,6 +192,28 @@ export class ImageOptimizationService {
   clearCache(): void {
     this.imageLoadCache.clear();
     this.formatCheckCache.clear();
+  }
+
+  /**
+   * Set cache entry with LRU eviction to prevent memory leaks
+   */
+  private setCacheEntry(src: string, result: ImageLoadResult): void {
+    // If entry already exists, delete it first to update its position (most recently used)
+    if (this.imageLoadCache.has(src)) {
+      this.imageLoadCache.delete(src);
+    }
+
+    // Evict oldest entries if cache is at capacity
+    while (this.imageLoadCache.size >= this.MAX_CACHE_SIZE) {
+      const oldestKey = this.imageLoadCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.imageLoadCache.delete(oldestKey);
+      } else {
+        break;
+      }
+    }
+
+    this.imageLoadCache.set(src, result);
   }
 
   private detectSupportedFormats(): void {

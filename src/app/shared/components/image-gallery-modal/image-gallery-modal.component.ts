@@ -56,12 +56,18 @@ export class ImageGalleryModalComponent implements OnDestroy {
   currentIndex = 0;
   private slideChangeHandler?: () => void;
   private eventsInitialized = false;
+  private rafId: number | null = null;
 
   constructor() {
     addIcons({ close, downloadOutline, chevronBack, chevronForward });
   }
 
   ngOnDestroy(): void {
+    // Cancel any pending requestAnimationFrame
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
     this.removeEventListeners();
   }
 
@@ -118,11 +124,13 @@ export class ImageGalleryModalComponent implements OnDestroy {
     const swiperEl = this.swiperRef?.nativeElement;
 
     if (swiperEl?.swiper) {
+      this.rafId = null; // Clear RAF ID on success
       swiperEl.swiper.slideTo(this.initialIndex, 0);
       this.setupSwiperEvents();
     } else if (attempts < maxAttempts) {
       // Use requestAnimationFrame for better performance than setTimeout
-      requestAnimationFrame(() => {
+      // Store the RAF ID so we can cancel it on component destruction
+      this.rafId = requestAnimationFrame(() => {
         this.initializeSwiperWithRetry(attempts + 1);
       });
     }

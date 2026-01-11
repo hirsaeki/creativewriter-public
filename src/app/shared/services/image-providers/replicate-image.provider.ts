@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { firstValueFrom, interval, takeWhile, switchMap } from 'rxjs';
+import { firstValueFrom, interval, takeWhile, switchMap, take } from 'rxjs';
 import { SettingsService } from '../../../core/services/settings.service';
 import {
   IImageProvider,
@@ -42,6 +42,10 @@ export class ReplicateImageProvider implements IImageProvider {
   readonly displayName = 'Replicate';
 
   private readonly PROXY_URL = '/api/replicate';
+
+  // Polling configuration - max 3 minutes (90 polls at 2s interval)
+  private readonly POLL_INTERVAL_MS = 2000;
+  private readonly MAX_POLL_ATTEMPTS = 90;
 
   // Cache for loaded models
   private modelsCache: ImageGenerationModel[] = [];
@@ -205,12 +209,16 @@ export class ReplicateImageProvider implements IImageProvider {
 
   private async pollPrediction(predictionId: string, headers: HttpHeaders): Promise<ReplicatePredictionResponse> {
     return new Promise((resolve, reject) => {
-      const subscription = interval(2000).pipe(
+      let lastResponse: ReplicatePredictionResponse | null = null;
+
+      const subscription = interval(this.POLL_INTERVAL_MS).pipe(
+        take(this.MAX_POLL_ATTEMPTS), // Prevent infinite polling - max 3 minutes
         switchMap(() => this.http.get<ReplicatePredictionResponse>(
           `${this.PROXY_URL}/predictions/${predictionId}`,
           { headers }
         )),
         takeWhile(response => {
+          lastResponse = response;
           return response.status === 'starting' || response.status === 'processing';
         }, true)
       ).subscribe({
@@ -223,6 +231,12 @@ export class ReplicateImageProvider implements IImageProvider {
         error: err => {
           subscription.unsubscribe();
           reject(err);
+        },
+        complete: () => {
+          // If we hit max attempts without resolution, reject with timeout error
+          if (lastResponse && (lastResponse.status === 'starting' || lastResponse.status === 'processing')) {
+            reject(new Error('Image generation timed out after 3 minutes'));
+          }
         }
       });
     });

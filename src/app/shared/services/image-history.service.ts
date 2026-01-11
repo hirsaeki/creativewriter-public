@@ -8,6 +8,9 @@ import {
   ImageProvider
 } from './image-providers/image-provider.interface';
 
+/** Stored settings for last prompt - uses the same interface as generation request */
+type PersistedSettings = Partial<ImageGenerationRequest>;
+
 @Injectable({
   providedIn: 'root'
 })
@@ -167,20 +170,22 @@ export class ImageHistoryService {
   }
 
   /**
-   * Save last used prompt and settings
+   * Save last used prompt and settings.
+   * Uses the same ImageGenerationRequest interface for type safety.
    */
-  saveLastPrompt(modelId: string, parameters: Record<string, unknown>): void {
+  saveLastPrompt(modelId: string, settings: PersistedSettings): void {
     try {
-      localStorage.setItem(this.LAST_PROMPT_KEY, JSON.stringify({ modelId, parameters }));
+      localStorage.setItem(this.LAST_PROMPT_KEY, JSON.stringify({ modelId, settings }));
     } catch (error) {
       console.warn('Failed to save last prompt to localStorage:', error);
     }
   }
 
   /**
-   * Get last used prompt and settings
+   * Get last used prompt and settings.
+   * Returns settings using the same ImageGenerationRequest interface.
    */
-  getLastPrompt(): { modelId: string; parameters: Record<string, unknown> } | null {
+  getLastPrompt(): { modelId: string; settings: PersistedSettings } | null {
     try {
       const saved = localStorage.getItem(this.LAST_PROMPT_KEY);
       if (saved) {

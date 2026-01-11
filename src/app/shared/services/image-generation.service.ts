@@ -261,16 +261,18 @@ export class ImageGenerationService {
   }
 
   /**
-   * Save last used prompt and settings
+   * Save last used prompt and settings.
+   * Uses Partial<ImageGenerationRequest> for type safety.
    */
-  saveLastPrompt(modelId: string, parameters: Record<string, unknown>): void {
-    this.historyService.saveLastPrompt(modelId, parameters);
+  saveLastPrompt(modelId: string, settings: Partial<ImageGenerationRequest>): void {
+    this.historyService.saveLastPrompt(modelId, settings);
   }
 
   /**
-   * Get last used prompt and settings
+   * Get last used prompt and settings.
+   * Returns settings using the same ImageGenerationRequest interface.
    */
-  getLastPrompt(): { modelId: string; parameters: Record<string, unknown> } | null {
+  getLastPrompt(): { modelId: string; settings: Partial<ImageGenerationRequest> } | null {
     return this.historyService.getLastPrompt();
   }
 

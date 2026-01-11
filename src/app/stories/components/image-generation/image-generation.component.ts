@@ -106,6 +106,7 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
   galleryPrompt = '';
 
   private subscription = new Subscription();
+  private settingsInitialized = false;
 
   constructor() {
     addIcons({
@@ -130,7 +131,11 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
       this.imageGenService.models$.subscribe(models => {
         this.allModels = models;
         this.filterModelsByProvider();
-        this.initializeFromLastPrompt();
+        // Only initialize from saved settings once to avoid overwriting user changes
+        if (!this.settingsInitialized) {
+          this.initializeFromLastPrompt();
+          this.settingsInitialized = true;
+        }
       })
     );
 
@@ -242,13 +247,18 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
         this.selectModel(model);
       }
 
-      // Restore parameters
-      if (lastPrompt.parameters) {
-        this.prompt = (lastPrompt.parameters['prompt'] as string) || '';
-        this.negativePrompt = (lastPrompt.parameters['negativePrompt'] as string) || '';
-        if (lastPrompt.parameters['aspectRatio']) {
-          this.selectedAspectRatio = lastPrompt.parameters['aspectRatio'] as string;
-        }
+      // Restore all settings from the saved request
+      const s = lastPrompt.settings;
+      if (s) {
+        if (s.prompt !== undefined) this.prompt = s.prompt;
+        if (s.negativePrompt !== undefined) this.negativePrompt = s.negativePrompt;
+        if (s.aspectRatio !== undefined) this.selectedAspectRatio = s.aspectRatio;
+        if (s.numImages !== undefined) this.numImages = s.numImages;
+        if (s.seed !== undefined) this.seed = s.seed;
+        if (s.guidanceScale !== undefined) this.guidanceScale = s.guidanceScale;
+        if (s.inferenceSteps !== undefined) this.inferenceSteps = s.inferenceSteps;
+        if (s.enableSafetyChecker !== undefined) this.enableSafetyChecker = s.enableSafetyChecker;
+        if (s.safetyTolerance !== undefined) this.safetyTolerance = s.safetyTolerance;
       }
     } else if (this.filteredModels.length > 0 && !this.selectedModel) {
       this.selectModel(this.filteredModels[0]);
@@ -256,37 +266,34 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
   }
 
   // Generation methods
-  async generateImage(): Promise<void> {
-    if (!this.selectedModel || !this.prompt.trim() || this.isGenerating) {
-      return;
-    }
 
-    // Build request
+  /**
+   * Build a complete ImageGenerationRequest from current component state.
+   * This ensures all settings are captured in one place.
+   */
+  private buildRequest(): ImageGenerationRequest {
     const request: ImageGenerationRequest = {
-      modelId: this.selectedModel.id,
+      modelId: this.selectedModel!.id,
       prompt: this.prompt.trim(),
       aspectRatio: this.selectedAspectRatio,
       numImages: this.numImages
     };
 
     // Add optional parameters based on model capabilities
-    if (this.selectedModel.capabilities.supportsNegativePrompt && this.negativePrompt.trim()) {
+    if (this.selectedModel!.capabilities.supportsNegativePrompt && this.negativePrompt.trim()) {
       request.negativePrompt = this.negativePrompt.trim();
     }
-
-    if (this.selectedModel.capabilities.supportsSeed && this.seed !== undefined) {
+    if (this.selectedModel!.capabilities.supportsSeed && this.seed !== undefined) {
       request.seed = this.seed;
     }
-
-    if (this.selectedModel.capabilities.supportsGuidanceScale) {
+    if (this.selectedModel!.capabilities.supportsGuidanceScale) {
       request.guidanceScale = this.guidanceScale;
     }
-
-    if (this.selectedModel.capabilities.supportsInferenceSteps) {
+    if (this.selectedModel!.capabilities.supportsInferenceSteps) {
       request.inferenceSteps = this.inferenceSteps;
     }
 
-    // Safety settings (fal.ai only)
+    // Safety settings (always include for fal provider)
     if (this.selectedProvider === 'fal') {
       request.enableSafetyChecker = this.enableSafetyChecker;
       if (this.enableSafetyChecker) {
@@ -294,12 +301,19 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
       }
     }
 
-    // Save for next time
-    this.imageGenService.saveLastPrompt(this.selectedModel.id, {
-      prompt: this.prompt,
-      negativePrompt: this.negativePrompt,
-      aspectRatio: this.selectedAspectRatio
-    });
+    return request;
+  }
+
+  async generateImage(): Promise<void> {
+    if (!this.selectedModel || !this.prompt.trim() || this.isGenerating) {
+      return;
+    }
+
+    // Build request (single source of truth for all settings)
+    const request = this.buildRequest();
+
+    // Save settings for next time (uses the same complete request object)
+    this.imageGenService.saveLastPrompt(this.selectedModel.id, request);
 
     // Generate
     this.subscription.add(

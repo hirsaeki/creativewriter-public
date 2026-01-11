@@ -162,7 +162,6 @@ export class OpenRouterImageProvider implements IImageProvider {
         if (b64Json) {
           images.push({
             url: `data:image/png;base64,${b64Json}`,
-            base64: b64Json,
             mimeType: 'image/png',
             index: imageIndex++
           });
@@ -193,11 +192,9 @@ export class OpenRouterImageProvider implements IImageProvider {
                   const parts = urlValue.split(',');
                   if (parts.length >= 2) {
                     const header = parts[0];
-                    const base64 = parts.slice(1).join(','); // Handle base64 with commas
                     const mimeType = header.match(/data:([^;]+)/)?.[1] || 'image/png';
                     images.push({
                       url: urlValue,
-                      base64,
                       mimeType,
                       index: imageIndex++
                     });
@@ -226,11 +223,9 @@ export class OpenRouterImageProvider implements IImageProvider {
                   const parts = urlValue.split(',');
                   if (parts.length >= 2) {
                     const header = parts[0];
-                    const base64 = parts.slice(1).join(','); // Handle base64 with commas
                     const mimeType = header.match(/data:([^;]+)/)?.[1] || 'image/png';
                     images.push({
                       url: urlValue,
-                      base64,
                       mimeType,
                       index: imageIndex++
                     });

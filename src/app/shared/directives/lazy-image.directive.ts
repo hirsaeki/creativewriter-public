@@ -9,6 +9,7 @@ export class LazyImageDirective implements OnInit, AfterViewInit, OnDestroy {
   private observer?: IntersectionObserver;
   private loaded = false;
   private error = false;
+  private tempImg: HTMLImageElement | null = null; // Track temp image for cleanup
 
   @Input('appLazyImage') lazySrc = '';
   @Input() lazyPlaceholder = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjZjNmM2YzIi8+CjxwYXRoIGQ9Im01IDVoMTR2MTRINXoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2NjYyIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxjaXJjbGUgY3g9IjkiIGN5PSI5IiByPSIyIiBmaWxsPSIjY2NjIi8+CjxwYXRoIGQ9Im05IDE3bDMtM0wxOSAxN0g5eiIgZmlsbD0iI2NjYyIvPgo8L3N2Zz4K';
@@ -31,6 +32,13 @@ export class LazyImageDirective implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.observer) {
       this.observer.disconnect();
+    }
+    // Clean up temp image to prevent memory leaks
+    if (this.tempImg) {
+      this.tempImg.onload = null;
+      this.tempImg.onerror = null;
+      this.tempImg.src = '';
+      this.tempImg = null;
     }
   }
 
@@ -69,24 +77,27 @@ export class LazyImageDirective implements OnInit, AfterViewInit, OnDestroy {
     if (this.loaded || this.error || !this.lazySrc) return;
 
     const img = this.elementRef.nativeElement as HTMLImageElement;
-    
-    // Create a new image to preload
-    const tempImg = new Image();
-    
-    tempImg.onload = () => {
+
+    // Create a new image to preload - store in class property for cleanup
+    this.tempImg = new Image();
+
+    this.tempImg.onload = () => {
       // Image loaded successfully
       img.src = this.lazySrc;
       img.classList.remove('lazy-loading');
       img.classList.add('lazy-loaded');
       this.loaded = true;
-      
+
       // Stop observing once loaded
       if (this.observer) {
         this.observer.unobserve(img);
       }
+
+      // Clean up temp image reference to prevent memory leak
+      this.cleanupTempImage();
     };
 
-    tempImg.onerror = () => {
+    this.tempImg.onerror = () => {
       // Error loading image
       if (this.lazyErrorSrc) {
         img.src = this.lazyErrorSrc;
@@ -94,14 +105,25 @@ export class LazyImageDirective implements OnInit, AfterViewInit, OnDestroy {
       img.classList.remove('lazy-loading');
       img.classList.add('lazy-error');
       this.error = true;
-      
+
       // Stop observing on error
       if (this.observer) {
         this.observer.unobserve(img);
       }
+
+      // Clean up temp image reference to prevent memory leak
+      this.cleanupTempImage();
     };
 
     // Start loading the actual image
-    tempImg.src = this.lazySrc;
+    this.tempImg.src = this.lazySrc;
+  }
+
+  private cleanupTempImage(): void {
+    if (this.tempImg) {
+      this.tempImg.onload = null;
+      this.tempImg.onerror = null;
+      this.tempImg = null;
+    }
   }
 }

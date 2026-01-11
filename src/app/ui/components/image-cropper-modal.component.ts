@@ -1,4 +1,4 @@
-import { Component, Input, ViewChild, inject, OnInit } from '@angular/core';
+import { Component, Input, ViewChild, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
@@ -221,7 +221,7 @@ import { ImageCropperComponent, ImageCroppedEvent, ImageTransform, LoadedImage }
     }
   `]
 })
-export class ImageCropperModalComponent implements OnInit {
+export class ImageCropperModalComponent implements OnInit, OnDestroy {
   @Input() imageBase64!: string;
   @Input() initialAspectRatio: number = 3/4; // Default portrait aspect ratio
   @ViewChild(ImageCropperComponent) imageCropper!: ImageCropperComponent;
@@ -233,7 +233,7 @@ export class ImageCropperModalComponent implements OnInit {
   isReady = false;
   showCropper = false;
   isMobile = false;
-  
+
   // Image size tracking
   originalImageSize = { bytes: 0, kb: 0, mb: 0 };
   croppedImageSize = { bytes: 0, kb: 0, mb: 0 };
@@ -241,6 +241,10 @@ export class ImageCropperModalComponent implements OnInit {
 
   private modalCtrl = inject(ModalController);
   private platform = inject(Platform);
+
+  // Cleanup tracking to prevent memory leaks
+  private showCropperTimeout: ReturnType<typeof setTimeout> | null = null;
+  private isDestroyed = false;
 
   constructor() {
     addIcons({ closeOutline, checkmarkOutline, cropOutline });
@@ -282,15 +286,26 @@ export class ImageCropperModalComponent implements OnInit {
   ngOnInit() {
     this.aspectRatio = this.initialAspectRatio;
     this.isMobile = this.platform.is('mobile') || this.platform.is('tablet');
-    
+
     // Calculate original image size
     this.originalImageSize = this.calculateBase64ImageSize(this.imageBase64);
     console.log('Original image size calculated:', this.originalImageSize);
-    
+
     // Show cropper after a short delay to ensure proper initialization
-    setTimeout(() => {
-      this.showCropper = true;
+    // Store timeout reference for cleanup
+    this.showCropperTimeout = setTimeout(() => {
+      if (!this.isDestroyed) {
+        this.showCropper = true;
+      }
     }, 100);
+  }
+
+  ngOnDestroy() {
+    this.isDestroyed = true;
+    if (this.showCropperTimeout) {
+      clearTimeout(this.showCropperTimeout);
+      this.showCropperTimeout = null;
+    }
   }
 
   imageCropped(event: ImageCroppedEvent) {
@@ -303,6 +318,8 @@ export class ImageCropperModalComponent implements OnInit {
       // Convert blob to base64 for compatibility with image-upload component
       const reader = new FileReader();
       reader.onload = () => {
+        // Guard against component destruction during async read
+        if (this.isDestroyed) return;
         this.croppedImage = reader.result as string;
         this.updateCroppedImageSize(this.croppedImage);
       };
@@ -366,6 +383,8 @@ export class ImageCropperModalComponent implements OnInit {
           // Convert blob to base64 for compatibility
           const reader = new FileReader();
           reader.onload = () => {
+            // Guard against component destruction during async read
+            if (this.isDestroyed) return;
             this.croppedImage = reader.result as string;
             this.updateCroppedImageSize(this.croppedImage);
             this.modalCtrl.dismiss({
