@@ -1,0 +1,80 @@
+# Fork Maintenance Rules (Overwrite Upstream)
+
+## Core Principles for Forking
+- **Extension over Modification**: Do NOT modify existing upstream files unless absolutely necessary for bug fixes.
+- **Isolation**: All custom logic MUST reside in the `src/app/custom/` directory (or equivalent isolated module).
+- **Wrapper Pattern**: Instead of changing function `A` in `file.ts`, create `file_custom.ts`, import `A`, and wrap it in a new function.
+
+## Coding Style for Conflict Avoidance
+- **Inheritance**: If a class behavior needs changing, extend the class in a new file rather than editing the original class.
+- **Configuration**: Use configuration files or dependency injection to swap implementations, avoiding hard-coded changes in upstream files.
+- **No Deletions**: Do not delete or rename upstream functions/variables as other upstream parts may depend on them in future updates.
+
+## File Placement
+- New features -> `src/app/custom/features/`
+- Overrides -> `src/app/custom/overrides/`
+- Tests for custom code -> colocate as `*.spec.ts` files (e.g., `src/app/custom/features/my-feature/my-feature.service.spec.ts`)
+
+## Angular Integration
+- Create `src/app/custom/custom.module.ts` to encapsulate all custom functionality
+- Use Angular's Dependency Injection to swap upstream implementations:
+  ```typescript
+  // In custom.module.ts
+  providers: [
+    { provide: UpstreamService, useClass: CustomService }
+  ]
+  ```
+- For lazy loading, register custom routes in `custom-routing.module.ts`
+- Avoid modifying `app.routes.ts` directly; instead, import custom routes dynamically
+
+## Upstream Sync Protection
+This fork uses `sync-upstream.yml` to automatically sync with the upstream repository.
+
+**Protected files/directories** (defined in `.gitattributes` with `merge=ours`):
+- `src/app/custom/**` - All custom code
+- `CLAUDE.local.md` - This file
+
+**How it works**:
+- `sync-upstream.yml` が毎日JST 03:00に自動実行
+- `git config --local merge.ours.driver true` で merge=ours 戦略を有効化
+- コンフリクト発生時、保護対象ファイルはローカル版が維持される
+- `src/app/custom/.gitkeep` により履歴が分岐し、fast-forward mergeを防止
+
+**Limitations**:
+- `merge=ours` はfast-forward merge時には発動しない（.gitkeepで対策済み）
+- upstreamが保護パスに**新規ファイル**を追加した場合、ローカルに同名ファイルがなければ取り込まれる（これは意図通り）
+- 削除操作の競合は別の挙動になる可能性がある
+
+**Best practices**:
+- Never place custom code outside `src/app/custom/`
+- If you must modify an upstream file, document it in Knowledge Index below
+- Consider creating wrapper components/services instead of direct modifications
+
+## Knowledge Index (Refer to these files when working on related tasks)
+
+### Reverse Proxy Settings (実装中)
+- **Status**: 方針変更後、未着手
+- **Handover**: `docs/reverse-proxy-implementation-handover.md` - 引継資料（必読）
+- **Spec**: `docs/reverse-proxy-settings.md` - 設計仕様書
+- **Implementation Location**: `src/app/custom/` 配下に作成予定
+- **Reference (upstream, DO NOT MODIFY)**:
+  - `src/app/core/services/claude-api.service.ts`
+  - `src/app/core/services/openrouter-api.service.ts`
+  - `src/app/core/services/google-gemini-api.service.ts`
+  - `src/app/core/services/ollama-api.service.ts`
+  - `src/app/core/services/openai-compatible-api.service.ts`
+
+### Upstream Sync Workflow (実装完了)
+- **Status**: 完了
+- **Files**:
+  - `.github/workflows/sync-upstream.yml` - 同期ワークフロー本体
+  - `.gitattributes` - 保護対象パスの定義
+  - `src/app/custom/.gitkeep` - 履歴分岐用プレースホルダー
+- **Key Implementation**:
+  - `merge.ours.driver true` を設定してmerge=ours戦略を有効化
+  - 毎日JST 03:00に自動実行（手動実行も可能）
+- **Protected Paths**:
+  - `src/app/custom/**`
+  - `CLAUDE.local.md`
+  - `AGENTS.md`
+

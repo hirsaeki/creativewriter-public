@@ -12,7 +12,7 @@ import {
   arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline,
   cloudOutline, archiveOutline, chatbubbleOutline, sparklesOutline, bug, star,
   starOutline, createOutline, documentTextOutline, syncOutline, chatbubblesOutline,
-  warningOutline, checkmarkCircleOutline
+  warningOutline, checkmarkCircleOutline, shieldCheckmarkOutline
 } from 'ionicons/icons';
 import { SettingsService } from '../core/services/settings.service';
 import { ModelService } from '../core/services/model.service';
@@ -30,6 +30,7 @@ import { SceneGenerationSettingsComponent } from '../ui/settings/scene-generatio
 import { PremiumSettingsComponent } from '../ui/settings/premium-settings.component';
 import { ModelFavoritesSettingsComponent } from '../ui/settings/model-favorites-settings/model-favorites-settings.component';
 import { AppHeaderComponent, HeaderAction } from '../ui/components/app-header.component';
+import { ProxySettingsComponent } from '../custom/components/proxy-settings/proxy-settings.component';
 
 @Component({
   selector: 'app-settings',
@@ -40,7 +41,7 @@ import { AppHeaderComponent, HeaderAction } from '../ui/components/app-header.co
     IonAccordion, IonAccordionGroup,
     SettingsTabsComponent, SettingsContentComponent, DatabaseMaintenanceComponent,
     ApiSettingsComponent, UiSettingsComponent, PromptsSettingsComponent, SceneGenerationSettingsComponent,
-    PremiumSettingsComponent, ModelFavoritesSettingsComponent, AppHeaderComponent
+    PremiumSettingsComponent, ModelFavoritesSettingsComponent, AppHeaderComponent, ProxySettingsComponent
   ],
   templateUrl: './settings.component.html',
   styleUrls: ['./settings.component.scss']
@@ -90,6 +91,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
     { value: 'appearance', icon: 'color-palette-outline', label: 'Appearance' },
     { value: 'ai-prompts', icon: 'chatbubble-outline', label: 'AI Prompts' },
     { value: 'scene-generation', icon: 'sparkles-outline', label: 'Scene Generation' },
+    { value: 'proxy', icon: 'shield-checkmark-outline', label: 'Proxy' },
     { value: 'premium', icon: 'star', label: 'Premium' },
     { value: 'backup', icon: 'archive-outline', label: 'Backup & Restore' }
   ];
@@ -101,7 +103,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
       arrowBack, statsChart, warning, checkmarkCircle, colorPaletteOutline,
       cloudOutline, archiveOutline, chatbubbleOutline, sparklesOutline, bug, star,
       starOutline, createOutline, documentTextOutline, syncOutline, chatbubblesOutline,
-      warningOutline, checkmarkCircleOutline
+      warningOutline, checkmarkCircleOutline, shieldCheckmarkOutline
     });
     // Initialize header actions
     this.updateHeaderActions();

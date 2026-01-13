@@ -1,10 +1,11 @@
-import { ApplicationConfig, ErrorHandler, provideBrowserGlobalErrorListeners, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig, ErrorHandler, importProvidersFrom, provideBrowserGlobalErrorListeners, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideIonicAngular } from '@ionic/angular/standalone';
 
 import { routes } from './app.routes';
 import { GlobalErrorHandlerService } from './core/services/global-error-handler.service';
+import { CustomModule } from './custom/custom.module';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -15,6 +16,7 @@ export const appConfig: ApplicationConfig = {
     provideIonicAngular({
       // Auto-detect platform: iOS in Safari, MD in Chrome/others
     }),
-    { provide: ErrorHandler, useClass: GlobalErrorHandlerService }
+    { provide: ErrorHandler, useClass: GlobalErrorHandlerService },
+    importProvidersFrom(CustomModule)
   ]
 };

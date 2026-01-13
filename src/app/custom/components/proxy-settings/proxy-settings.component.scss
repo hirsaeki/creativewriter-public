@@ -1,0 +1,68 @@
+.proxy-settings {
+  padding: 16px;
+
+  .tab-header {
+    margin-bottom: 24px;
+
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 8px 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+
+      ion-icon {
+        font-size: 1.4rem;
+        color: var(--ion-color-primary);
+      }
+    }
+
+    p {
+      margin: 0;
+      color: var(--ion-color-medium);
+      font-size: 0.9rem;
+    }
+  }
+
+  ion-card {
+    margin-bottom: 16px;
+
+    ion-card-header {
+      padding-bottom: 8px;
+
+      ion-card-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 1.1rem;
+
+        ion-icon {
+          font-size: 1.2rem;
+          color: var(--ion-color-primary);
+        }
+      }
+    }
+
+    ion-card-content {
+      ion-item {
+        --padding-start: 0;
+        --inner-padding-end: 0;
+      }
+
+      ion-note {
+        display: block;
+        margin-top: 12px;
+        padding: 8px 12px;
+        background: var(--ion-color-light);
+        border-radius: 8px;
+        font-size: 0.85rem;
+      }
+    }
+  }
+
+  .reset-section {
+    margin-top: 24px;
+    text-align: center;
+  }
+}

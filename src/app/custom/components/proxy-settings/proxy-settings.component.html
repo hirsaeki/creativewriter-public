@@ -1,0 +1,201 @@
+<div class="proxy-settings">
+  <div class="tab-header">
+    <h2>
+      <ion-icon name="shield-checkmark-outline"></ion-icon>
+      Reverse Proxy Settings
+    </h2>
+    <p>Configure reverse proxy endpoints for API providers. Useful for self-hosted proxies or enterprise environments.</p>
+  </div>
+
+  <!-- Claude Proxy -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        <ion-icon name="server-outline"></ion-icon>
+        Claude API Proxy
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-item lines="none">
+        <ion-toggle
+          [(ngModel)]="getProxyConfig('claude').enabled"
+          (ionChange)="onToggleChange('claude')">
+          Enable Proxy
+        </ion-toggle>
+      </ion-item>
+
+      <ion-item *ngIf="getProxyConfig('claude').enabled">
+        <ion-input
+          label="Proxy URL"
+          labelPlacement="stacked"
+          placeholder="https://your-proxy.example.com"
+          [(ngModel)]="getProxyConfig('claude').url"
+          (ionInput)="onSettingsChange()">
+        </ion-input>
+      </ion-item>
+
+      <ion-item *ngIf="getProxyConfig('claude').enabled">
+        <ion-input
+          label="Auth Token (optional)"
+          labelPlacement="stacked"
+          type="password"
+          placeholder="Bearer token for proxy authentication"
+          [(ngModel)]="getProxyConfig('claude').authToken"
+          (ionInput)="onSettingsChange()">
+        </ion-input>
+      </ion-item>
+
+      <ion-note *ngIf="getProxyConfig('claude').enabled" color="medium">
+        The proxy should forward requests to https://api.anthropic.com
+      </ion-note>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- OpenRouter Proxy -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        <ion-icon name="server-outline"></ion-icon>
+        OpenRouter API Proxy
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-item lines="none">
+        <ion-toggle
+          [(ngModel)]="getProxyConfig('openRouter').enabled"
+          (ionChange)="onToggleChange('openRouter')">
+          Enable Proxy
+        </ion-toggle>
+      </ion-item>
+
+      <ion-item *ngIf="getProxyConfig('openRouter').enabled">
+        <ion-input
+          label="Proxy URL"
+          labelPlacement="stacked"
+          placeholder="https://your-proxy.example.com"
+          [(ngModel)]="getProxyConfig('openRouter').url"
+          (ionInput)="onSettingsChange()">
+        </ion-input>
+      </ion-item>
+
+      <ion-item *ngIf="getProxyConfig('openRouter').enabled">
+        <ion-input
+          label="Auth Token (optional)"
+          labelPlacement="stacked"
+          type="password"
+          placeholder="Bearer token for proxy authentication"
+          [(ngModel)]="getProxyConfig('openRouter').authToken"
+          (ionInput)="onSettingsChange()">
+        </ion-input>
+      </ion-item>
+
+      <ion-note *ngIf="getProxyConfig('openRouter').enabled" color="medium">
+        The proxy should forward requests to https://openrouter.ai
+      </ion-note>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Google Gemini Proxy -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        <ion-icon name="server-outline"></ion-icon>
+        Google Gemini API Proxy
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-item lines="none">
+        <ion-toggle
+          [(ngModel)]="getProxyConfig('googleGemini').enabled"
+          (ionChange)="onToggleChange('googleGemini')">
+          Enable Proxy
+        </ion-toggle>
+      </ion-item>
+
+      <ion-item *ngIf="getProxyConfig('googleGemini').enabled">
+        <ion-input
+          label="Proxy URL"
+          labelPlacement="stacked"
+          placeholder="https://your-proxy.example.com"
+          [(ngModel)]="getProxyConfig('googleGemini').url"
+          (ionInput)="onSettingsChange()">
+        </ion-input>
+      </ion-item>
+
+      <ion-item *ngIf="getProxyConfig('googleGemini').enabled">
+        <ion-input
+          label="Auth Token (optional)"
+          labelPlacement="stacked"
+          type="password"
+          placeholder="Bearer token for proxy authentication"
+          [(ngModel)]="getProxyConfig('googleGemini').authToken"
+          (ionInput)="onSettingsChange()">
+        </ion-input>
+      </ion-item>
+
+      <ion-note *ngIf="getProxyConfig('googleGemini').enabled" color="medium">
+        The proxy should forward requests to https://generativelanguage.googleapis.com
+      </ion-note>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Ollama Auth -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        <ion-icon name="key-outline"></ion-icon>
+        Ollama Authentication
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-item>
+        <ion-input
+          label="Auth Token (optional)"
+          labelPlacement="stacked"
+          type="password"
+          placeholder="Bearer token for Ollama server"
+          [(ngModel)]="settings.ollama!.authToken"
+          (ionInput)="onSettingsChange()">
+        </ion-input>
+      </ion-item>
+
+      <ion-note color="medium">
+        Add authentication if your Ollama server is behind a reverse proxy with auth
+      </ion-note>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- OpenAI Compatible Auth -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        <ion-icon name="key-outline"></ion-icon>
+        OpenAI-Compatible Authentication
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-item>
+        <ion-input
+          label="Auth Token (optional)"
+          labelPlacement="stacked"
+          type="password"
+          placeholder="Bearer token for OpenAI-compatible server"
+          [(ngModel)]="settings.openAICompatible!.authToken"
+          (ionInput)="onSettingsChange()">
+        </ion-input>
+      </ion-item>
+
+      <ion-note color="medium">
+        Add authentication if your OpenAI-compatible server requires Bearer token
+      </ion-note>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Reset Button -->
+  <div class="reset-section">
+    <ion-button fill="outline" color="medium" (click)="resetSettings()">
+      <ion-icon name="refresh-outline" slot="start"></ion-icon>
+      Reset Proxy Settings
+    </ion-button>
+  </div>
+</div>

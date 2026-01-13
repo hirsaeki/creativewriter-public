@@ -168,6 +168,13 @@
           </app-scene-generation-settings>
         </div>
 
+        <!-- Proxy Tab -->
+        <div *ngSwitchCase="'proxy'">
+          <app-proxy-settings
+            (settingsChange)="onSettingsChange()">
+          </app-proxy-settings>
+        </div>
+
         <!-- Premium Tab -->
         <div *ngSwitchCase="'premium'">
           <app-premium-settings
