@@ -1,7 +1,7 @@
 # リバースプロキシ設定機能 - 実装引継資料
 
 ## ステータス
-**実装中 - 方針変更後、未着手**
+**✅ コア実装完了**
 
 ## 目的
 各AIプロバイダー（Claude, OpenRouter, Gemini, Ollama, OpenAI互換）にリバースプロキシを設定できるオプションを追加する。Bearer認証をサポート。
@@ -16,6 +16,31 @@
 ### 2. フォーク運用ルール策定
 - `CLAUDE.local.md` - フォークメンテナンスルール
 - `.gitattributes` - マージ保護設定
+
+### 3. カスタムモジュール構造作成 ✅
+```
+src/app/custom/
+├── models/
+│   └── proxy-settings.interface.ts
+├── services/
+│   ├── proxy-settings.service.ts      ✅ 設定管理
+│   ├── claude-api-proxy.service.ts    ✅ Claude API プロキシ対応
+│   ├── openrouter-api-proxy.service.ts ✅ OpenRouter プロキシ対応
+│   ├── gemini-api-proxy.service.ts    ✅ Gemini プロキシ対応
+│   ├── ollama-api-proxy.service.ts    ✅ Ollama 認証対応
+│   └── openai-api-proxy.service.ts    ✅ OpenAI互換 認証対応
+├── components/
+│   └── proxy-settings/                ✅ 設定UI
+└── custom.module.ts                   ✅ DI設定
+```
+
+### 4. DI設定完了 ✅
+- `custom.module.ts`で親クラスをプロキシサービスに差し替え
+- `app.config.ts`でCustomModuleをインポート
+
+### 5. 設定UI統合 ✅
+- 設定画面に「Proxy」タブを追加
+- 各プロバイダーのプロキシURL/認証トークン設定が可能
 
 ---
 
@@ -35,93 +60,19 @@ upstreamファイルを直接修正：
 
 ---
 
-## 次にやるべきこと
+## 残りの作業（オプション）
 
-### Phase 1: ディレクトリ構造作成
-```
-src/app/custom/
-├── models/
-│   └── proxy-settings.interface.ts
-├── services/
-│   ├── proxy-settings.service.ts
-│   ├── claude-api-proxy.service.ts
-│   ├── openrouter-api-proxy.service.ts
-│   ├── gemini-api-proxy.service.ts
-│   ├── ollama-api-proxy.service.ts
-│   └── openai-api-proxy.service.ts
-├── components/
-│   └── proxy-settings/
-│       ├── proxy-settings.component.ts
-│       ├── proxy-settings.component.html
-│       └── proxy-settings.component.scss
-└── custom.module.ts
-```
+### テスト接続機能
+- 各プロキシサービスに`testProxyConnection()`メソッドを追加
+- UIに「Test Connection」ボタンを追加
+- 接続成功/失敗のフィードバック表示
 
-### Phase 2: 型定義
-`proxy-settings.interface.ts`:
-```typescript
-export interface ReverseProxyConfig {
-  enabled: boolean;
-  url: string;
-  authToken?: string;
-}
+### 単体テスト
+- `proxy-settings.service.spec.ts`
+- 各プロキシサービスのspec.tsファイル
 
-export interface ProxySettings {
-  claude?: ReverseProxyConfig;
-  openRouter?: ReverseProxyConfig;
-  googleGemini?: ReverseProxyConfig;
-  ollama?: { authToken?: string };  // baseUrlは既存設定を使用
-  openAICompatible?: { authToken?: string };
-}
-```
-
-### Phase 3: プロキシ設定サービス
-`proxy-settings.service.ts`:
-- 独自のlocalStorageキー（`creative-writer-proxy-settings`）を使用
-- upstreamの設定とは分離
-
-### Phase 4: APIサービスの拡張
-各APIサービスを継承し、プロキシ対応をオーバーライド：
-
-```typescript
-// 例: claude-api-proxy.service.ts
-@Injectable()
-export class ClaudeApiProxyService extends ClaudeApiService {
-  constructor(
-    http: HttpClient,
-    settingsService: SettingsService,
-    private proxySettingsService: ProxySettingsService
-  ) {
-    super(http, settingsService);
-  }
-
-  // getApiUrl等をオーバーライド
-}
-```
-
-### Phase 5: DI設定
-`custom.module.ts`:
-```typescript
-@NgModule({
-  providers: [
-    { provide: ClaudeApiService, useClass: ClaudeApiProxyService },
-    { provide: OpenRouterApiService, useClass: OpenRouterApiProxyService },
-    // ...
-  ]
-})
-export class CustomModule {}
-```
-
-### Phase 6: UI追加
-設定画面にプロキシ設定コンポーネントを追加。
-既存の`api-settings.component`を拡張するか、別タブとして追加。
-
-### Phase 7: 検証
-```bash
-npm run build
-npm test -- --no-watch
-npm run lint
-```
+### E2Eテスト
+- 実際のプロキシサーバーを用意してテスト
 
 ---
 
