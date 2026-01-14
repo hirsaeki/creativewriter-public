@@ -57,6 +57,35 @@
         background: var(--ion-color-light);
         border-radius: 8px;
         font-size: 0.85rem;
+
+        &.validation-error {
+          background: var(--ion-color-danger-tint);
+          color: var(--ion-color-danger-shade);
+          margin-top: 4px;
+          padding: 4px 12px;
+        }
+      }
+
+      .test-connection-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 16px;
+
+        ion-button {
+          --padding-start: 12px;
+          --padding-end: 12px;
+
+          ion-spinner {
+            width: 16px;
+            height: 16px;
+            margin-left: 8px;
+          }
+        }
+
+        .test-result-icon {
+          font-size: 1.5rem;
+        }
       }
     }
   }

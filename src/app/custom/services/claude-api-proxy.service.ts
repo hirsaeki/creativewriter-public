@@ -1,10 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, Subject, from, map, catchError, takeUntil, tap } from 'rxjs';
+import { Observable, Subject, from, of, map, catchError, takeUntil, tap, throwError } from 'rxjs';
 import { ClaudeApiService, ClaudeRequest, ClaudeResponse, ClaudeModelsResponse } from '../../core/services/claude-api.service';
 import { ProxySettingsService } from './proxy-settings.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { AIRequestLoggerService } from '../../core/services/ai-request-logger.service';
+import { ReverseProxyConfig } from '../models/proxy-settings.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -41,9 +42,19 @@ export class ClaudeApiProxyService extends ClaudeApiService {
     const proxyConfig = this.proxySettingsService.getClaudeProxyConfig();
     const headers = { ...baseHeaders };
     if (proxyConfig?.authToken) {
-      headers['X-Proxy-Auth'] = `Bearer ${proxyConfig.authToken}`;
+      const headerName = this.getAuthHeaderName(proxyConfig);
+      headers[headerName] = `Bearer ${proxyConfig.authToken}`;
     }
     return headers;
+  }
+
+  /**
+   * Returns the appropriate auth header name based on the proxy configuration.
+   * - 'authorization' (default): Uses 'Authorization' header for transparent proxies
+   * - 'x-proxy-auth': Uses 'X-Proxy-Auth' header for explicit proxies
+   */
+  private getAuthHeaderName(proxyConfig: ReverseProxyConfig): string {
+    return proxyConfig.authHeaderType === 'x-proxy-auth' ? 'X-Proxy-Auth' : 'Authorization';
   }
 
   private isProxyEnabled(): boolean {
@@ -93,12 +104,12 @@ export class ClaudeApiProxyService extends ClaudeApiService {
     const startTime = Date.now();
 
     if (!settings.claude.enabled || !settings.claude.apiKey) {
-      throw new Error('Claude API is not enabled or API key is missing');
+      return throwError(() => new Error('Claude API is not enabled or API key is missing'));
     }
 
     const model = options.model || settings.claude.model;
     if (!model) {
-      throw new Error('No AI model selected');
+      return throwError(() => new Error('No AI model selected'));
     }
 
     const maxTokens = options.maxTokens || 4096;
@@ -187,12 +198,12 @@ export class ClaudeApiProxyService extends ClaudeApiService {
     const settings = this.proxySettings.getSettings();
 
     if (!settings.claude.enabled || !settings.claude.apiKey) {
-      throw new Error('Claude API is not enabled or API key is missing');
+      return throwError(() => new Error('Claude API is not enabled or API key is missing'));
     }
 
     const model = options.model || settings.claude.model;
     if (!model) {
-      throw new Error('No AI model selected');
+      return throwError(() => new Error('No AI model selected'));
     }
 
     const maxTokens = options.maxTokens || 4096;
@@ -239,11 +250,22 @@ export class ClaudeApiProxyService extends ClaudeApiService {
     return new Observable<string>(observer => {
       const startTime = Date.now();
       let accumulatedText = '';
+      let aborted = false;
+
+      const abortController = new AbortController();
+
+      const abortSubscription = abortSubject.subscribe(() => {
+        aborted = true;
+        abortController.abort();
+        observer.complete();
+        this.cleanupProxy(requestId);
+      });
 
       fetch(apiUrl, {
         method: 'POST',
         headers: fetchHeaders,
-        body: JSON.stringify(request)
+        body: JSON.stringify(request),
+        signal: abortController.signal
       }).then(async response => {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -297,20 +319,22 @@ export class ClaudeApiProxyService extends ClaudeApiService {
         this.proxyAiLogger.logSuccess(logId, accumulatedText, duration);
 
         observer.complete();
+        this.cleanupProxy(requestId);
+        abortSubscription.unsubscribe();
       }).catch(error => {
+        if (aborted) return;
+
         const duration = Date.now() - startTime;
         this.proxyAiLogger.logError(logId, error.message || 'Unknown error', duration);
         observer.error(error);
-      }).finally(() => {
         this.cleanupProxy(requestId);
-      });
-
-      const subscription = abortSubject.subscribe(() => {
-        observer.complete();
+        abortSubscription.unsubscribe();
       });
 
       return () => {
-        subscription.unsubscribe();
+        aborted = true;
+        abortController.abort();
+        abortSubscription.unsubscribe();
         this.cleanupProxy(requestId);
       };
     }).pipe(takeUntil(abortSubject));
@@ -334,7 +358,7 @@ export class ClaudeApiProxyService extends ClaudeApiService {
     const settings = this.proxySettings.getSettings();
 
     if (!settings.claude.enabled || !settings.claude.apiKey) {
-      throw new Error('Claude API is not enabled or API key is missing');
+      return throwError(() => new Error('Claude API is not enabled or API key is missing'));
     }
 
     const modelsUrl = this.buildProxyModelsUrl();
@@ -386,6 +410,37 @@ export class ClaudeApiProxyService extends ClaudeApiService {
     return this.proxyHttp.post<ClaudeResponse>(apiUrl, testRequest, { headers }).pipe(
       map(() => true),
       catchError(() => from(Promise.resolve(false)))
+    );
+  }
+
+  /**
+   * Tests if the proxy server itself is reachable.
+   * This method sends a lightweight HEAD request to the proxy URL
+   * to verify connectivity without consuming API resources.
+   * @returns Observable<boolean> - true if proxy is reachable, false otherwise
+   */
+  testProxyConnection(): Observable<boolean> {
+    const proxyConfig = this.proxySettingsService.getClaudeProxyConfig();
+
+    // If proxy is not enabled or URL is missing, return false
+    if (!proxyConfig?.enabled || !proxyConfig.url) {
+      return of(false);
+    }
+
+    const baseUrl = proxyConfig.url.endsWith('/') ? proxyConfig.url.slice(0, -1) : proxyConfig.url;
+
+    const headers: Record<string, string> = {};
+    if (proxyConfig.authToken) {
+      const headerName = this.getAuthHeaderName(proxyConfig);
+      headers[headerName] = `Bearer ${proxyConfig.authToken}`;
+    }
+
+    return this.proxyHttp.head(baseUrl, {
+      headers: new HttpHeaders(headers),
+      observe: 'response'
+    }).pipe(
+      map(() => true),
+      catchError(() => of(false))
     );
   }
 }

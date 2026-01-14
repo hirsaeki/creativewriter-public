@@ -1,10 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, Subject, tap, takeUntil } from 'rxjs';
+import { Observable, Subject, tap, takeUntil, of, map, catchError, throwError } from 'rxjs';
 import { OpenRouterApiService, OpenRouterRequest, OpenRouterResponse } from '../../core/services/openrouter-api.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { AIRequestLoggerService } from '../../core/services/ai-request-logger.service';
 import { ProxySettingsService } from './proxy-settings.service';
+import { ReverseProxyConfig } from '../models/proxy-settings.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -31,9 +32,19 @@ export class OpenRouterApiProxyService extends OpenRouterApiService {
   private getProxyAuthHeaders(): Record<string, string> {
     const proxyConfig = this.proxySettingsService.getOpenRouterProxyConfig();
     if (proxyConfig?.authToken) {
-      return { 'X-Proxy-Auth': `Bearer ${proxyConfig.authToken}` };
+      const headerName = this.getAuthHeaderName(proxyConfig);
+      return { [headerName]: `Bearer ${proxyConfig.authToken}` };
     }
     return {};
+  }
+
+  /**
+   * Returns the appropriate auth header name based on the proxy configuration.
+   * - 'authorization' (default): Uses 'Authorization' header for transparent proxies
+   * - 'x-proxy-auth': Uses 'X-Proxy-Auth' header for explicit proxies
+   */
+  private getAuthHeaderName(proxyConfig: ReverseProxyConfig): string {
+    return proxyConfig.authHeaderType === 'x-proxy-auth' ? 'X-Proxy-Auth' : 'Authorization';
   }
 
   private generateProxyRequestId(): string {
@@ -84,12 +95,12 @@ export class OpenRouterApiProxyService extends OpenRouterApiService {
     const proxyUrl = this.getProxyUrl();
 
     if (!settings.openRouter.enabled || !settings.openRouter.apiKey) {
-      throw new Error('OpenRouter API ist nicht aktiviert oder API-Key fehlt');
+      return throwError(() => new Error('OpenRouter API is not enabled or API key is missing'));
     }
 
     const model = options.model || settings.openRouter.model;
     if (!model) {
-      throw new Error('No AI model selected');
+      return throwError(() => new Error('No AI model selected'));
     }
 
     const maxTokens = options.maxTokens || 500;
@@ -198,12 +209,12 @@ export class OpenRouterApiProxyService extends OpenRouterApiService {
     const proxyUrl = this.getProxyUrl();
 
     if (!settings.openRouter.enabled || !settings.openRouter.apiKey) {
-      throw new Error('OpenRouter API ist nicht aktiviert oder API-Key fehlt');
+      return throwError(() => new Error('OpenRouter API is not enabled or API key is missing'));
     }
 
     const model = options.model || settings.openRouter.model;
     if (!model) {
-      throw new Error('No AI model selected');
+      return throwError(() => new Error('No AI model selected'));
     }
 
     const maxTokens = options.maxTokens || 500;
@@ -350,6 +361,35 @@ export class OpenRouterApiProxyService extends OpenRouterApiService {
       };
     }).pipe(
       takeUntil(abortSubject)
+    );
+  }
+
+  /**
+   * Tests if the proxy connection is working properly.
+   * Sends a HEAD request to verify proxy server connectivity without making actual API calls.
+   * @returns Observable<boolean> - true if successful, false if failed
+   */
+  testProxyConnection(): Observable<boolean> {
+    const proxyConfig = this.proxySettingsService.getOpenRouterProxyConfig();
+
+    // If proxy is not enabled or URL is not set, return false
+    if (!proxyConfig?.enabled || !proxyConfig.url) {
+      return of(false);
+    }
+
+    const proxyUrl = this.getProxyUrl();
+
+    // Only use proxy auth headers - no OpenRouter API key needed for connectivity check
+    const headers = new HttpHeaders({
+      ...this.getProxyAuthHeaders()
+    });
+
+    return this.proxyHttp.head(proxyUrl, {
+      headers,
+      observe: 'response'
+    }).pipe(
+      map(() => true),
+      catchError(() => of(false))
     );
   }
 }

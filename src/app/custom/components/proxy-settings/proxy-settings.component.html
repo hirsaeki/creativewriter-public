@@ -18,36 +18,75 @@
     <ion-card-content>
       <ion-item lines="none">
         <ion-toggle
-          [(ngModel)]="getProxyConfig('claude').enabled"
+          [(ngModel)]="claudeConfig.enabled"
           (ionChange)="onToggleChange('claude')">
           Enable Proxy
         </ion-toggle>
       </ion-item>
 
-      <ion-item *ngIf="getProxyConfig('claude').enabled">
+      <ion-item *ngIf="claudeConfig.enabled">
         <ion-input
           label="Proxy URL"
           labelPlacement="stacked"
           placeholder="https://your-proxy.example.com"
-          [(ngModel)]="getProxyConfig('claude').url"
-          (ionInput)="onSettingsChange()">
+          [(ngModel)]="claudeConfig.url"
+          (ionInput)="onUrlChange('claude')"
+          [class.ion-invalid]="claudeUrlError">
         </ion-input>
       </ion-item>
+      <ion-note *ngIf="claudeConfig.enabled && claudeUrlError" color="danger" class="validation-error">
+        {{ claudeUrlError }}
+      </ion-note>
 
-      <ion-item *ngIf="getProxyConfig('claude').enabled">
+      <ion-item *ngIf="claudeConfig.enabled">
         <ion-input
           label="Auth Token (optional)"
           labelPlacement="stacked"
           type="password"
           placeholder="Bearer token for proxy authentication"
-          [(ngModel)]="getProxyConfig('claude').authToken"
+          [(ngModel)]="claudeConfig.authToken"
           (ionInput)="onSettingsChange()">
         </ion-input>
       </ion-item>
 
-      <ion-note *ngIf="getProxyConfig('claude').enabled" color="medium">
+      <ion-item *ngIf="claudeConfig.enabled && claudeConfig.authToken">
+        <ion-select
+          label="Auth Header Type"
+          labelPlacement="stacked"
+          [(ngModel)]="claudeConfig.authHeaderType"
+          (ionChange)="onSettingsChange()">
+          <ion-select-option value="authorization">Authorization (Transparent Proxy)</ion-select-option>
+          <ion-select-option value="x-proxy-auth">X-Proxy-Auth (Explicit Proxy)</ion-select-option>
+        </ion-select>
+      </ion-item>
+
+      <ion-note *ngIf="claudeConfig.enabled" color="medium">
         The proxy should forward requests to https://api.anthropic.com
       </ion-note>
+
+      <div class="test-connection-row" *ngIf="canTestClaude">
+        <ion-button
+          fill="outline"
+          size="small"
+          (click)="testConnection('claude')"
+          [disabled]="isTestingProvider('claude')">
+          <ion-icon name="cloud-outline" slot="start"></ion-icon>
+          <ion-spinner *ngIf="isTestingProvider('claude')" name="crescent" slot="end"></ion-spinner>
+          Test Connection
+        </ion-button>
+        <ion-icon
+          *ngIf="claudeTestResult === 'success'"
+          name="checkmark-circle-outline"
+          color="success"
+          class="test-result-icon">
+        </ion-icon>
+        <ion-icon
+          *ngIf="claudeTestResult === 'error'"
+          name="close-circle-outline"
+          color="danger"
+          class="test-result-icon">
+        </ion-icon>
+      </div>
     </ion-card-content>
   </ion-card>
 
@@ -62,36 +101,75 @@
     <ion-card-content>
       <ion-item lines="none">
         <ion-toggle
-          [(ngModel)]="getProxyConfig('openRouter').enabled"
+          [(ngModel)]="openRouterConfig.enabled"
           (ionChange)="onToggleChange('openRouter')">
           Enable Proxy
         </ion-toggle>
       </ion-item>
 
-      <ion-item *ngIf="getProxyConfig('openRouter').enabled">
+      <ion-item *ngIf="openRouterConfig.enabled">
         <ion-input
           label="Proxy URL"
           labelPlacement="stacked"
           placeholder="https://your-proxy.example.com"
-          [(ngModel)]="getProxyConfig('openRouter').url"
-          (ionInput)="onSettingsChange()">
+          [(ngModel)]="openRouterConfig.url"
+          (ionInput)="onUrlChange('openRouter')"
+          [class.ion-invalid]="openRouterUrlError">
         </ion-input>
       </ion-item>
+      <ion-note *ngIf="openRouterConfig.enabled && openRouterUrlError" color="danger" class="validation-error">
+        {{ openRouterUrlError }}
+      </ion-note>
 
-      <ion-item *ngIf="getProxyConfig('openRouter').enabled">
+      <ion-item *ngIf="openRouterConfig.enabled">
         <ion-input
           label="Auth Token (optional)"
           labelPlacement="stacked"
           type="password"
           placeholder="Bearer token for proxy authentication"
-          [(ngModel)]="getProxyConfig('openRouter').authToken"
+          [(ngModel)]="openRouterConfig.authToken"
           (ionInput)="onSettingsChange()">
         </ion-input>
       </ion-item>
 
-      <ion-note *ngIf="getProxyConfig('openRouter').enabled" color="medium">
+      <ion-item *ngIf="openRouterConfig.enabled && openRouterConfig.authToken">
+        <ion-select
+          label="Auth Header Type"
+          labelPlacement="stacked"
+          [(ngModel)]="openRouterConfig.authHeaderType"
+          (ionChange)="onSettingsChange()">
+          <ion-select-option value="authorization">Authorization (Transparent Proxy)</ion-select-option>
+          <ion-select-option value="x-proxy-auth">X-Proxy-Auth (Explicit Proxy)</ion-select-option>
+        </ion-select>
+      </ion-item>
+
+      <ion-note *ngIf="openRouterConfig.enabled" color="medium">
         The proxy should forward requests to https://openrouter.ai
       </ion-note>
+
+      <div class="test-connection-row" *ngIf="canTestOpenRouter">
+        <ion-button
+          fill="outline"
+          size="small"
+          (click)="testConnection('openRouter')"
+          [disabled]="isTestingProvider('openRouter')">
+          <ion-icon name="cloud-outline" slot="start"></ion-icon>
+          <ion-spinner *ngIf="isTestingProvider('openRouter')" name="crescent" slot="end"></ion-spinner>
+          Test Connection
+        </ion-button>
+        <ion-icon
+          *ngIf="openRouterTestResult === 'success'"
+          name="checkmark-circle-outline"
+          color="success"
+          class="test-result-icon">
+        </ion-icon>
+        <ion-icon
+          *ngIf="openRouterTestResult === 'error'"
+          name="close-circle-outline"
+          color="danger"
+          class="test-result-icon">
+        </ion-icon>
+      </div>
     </ion-card-content>
   </ion-card>
 
@@ -106,36 +184,75 @@
     <ion-card-content>
       <ion-item lines="none">
         <ion-toggle
-          [(ngModel)]="getProxyConfig('googleGemini').enabled"
+          [(ngModel)]="googleGeminiConfig.enabled"
           (ionChange)="onToggleChange('googleGemini')">
           Enable Proxy
         </ion-toggle>
       </ion-item>
 
-      <ion-item *ngIf="getProxyConfig('googleGemini').enabled">
+      <ion-item *ngIf="googleGeminiConfig.enabled">
         <ion-input
           label="Proxy URL"
           labelPlacement="stacked"
           placeholder="https://your-proxy.example.com"
-          [(ngModel)]="getProxyConfig('googleGemini').url"
-          (ionInput)="onSettingsChange()">
+          [(ngModel)]="googleGeminiConfig.url"
+          (ionInput)="onUrlChange('googleGemini')"
+          [class.ion-invalid]="googleGeminiUrlError">
         </ion-input>
       </ion-item>
+      <ion-note *ngIf="googleGeminiConfig.enabled && googleGeminiUrlError" color="danger" class="validation-error">
+        {{ googleGeminiUrlError }}
+      </ion-note>
 
-      <ion-item *ngIf="getProxyConfig('googleGemini').enabled">
+      <ion-item *ngIf="googleGeminiConfig.enabled">
         <ion-input
           label="Auth Token (optional)"
           labelPlacement="stacked"
           type="password"
           placeholder="Bearer token for proxy authentication"
-          [(ngModel)]="getProxyConfig('googleGemini').authToken"
+          [(ngModel)]="googleGeminiConfig.authToken"
           (ionInput)="onSettingsChange()">
         </ion-input>
       </ion-item>
 
-      <ion-note *ngIf="getProxyConfig('googleGemini').enabled" color="medium">
+      <ion-item *ngIf="googleGeminiConfig.enabled && googleGeminiConfig.authToken">
+        <ion-select
+          label="Auth Header Type"
+          labelPlacement="stacked"
+          [(ngModel)]="googleGeminiConfig.authHeaderType"
+          (ionChange)="onSettingsChange()">
+          <ion-select-option value="authorization">Authorization (Transparent Proxy)</ion-select-option>
+          <ion-select-option value="x-proxy-auth">X-Proxy-Auth (Explicit Proxy)</ion-select-option>
+        </ion-select>
+      </ion-item>
+
+      <ion-note *ngIf="googleGeminiConfig.enabled" color="medium">
         The proxy should forward requests to https://generativelanguage.googleapis.com
       </ion-note>
+
+      <div class="test-connection-row" *ngIf="canTestGoogleGemini">
+        <ion-button
+          fill="outline"
+          size="small"
+          (click)="testConnection('googleGemini')"
+          [disabled]="isTestingProvider('googleGemini')">
+          <ion-icon name="cloud-outline" slot="start"></ion-icon>
+          <ion-spinner *ngIf="isTestingProvider('googleGemini')" name="crescent" slot="end"></ion-spinner>
+          Test Connection
+        </ion-button>
+        <ion-icon
+          *ngIf="googleGeminiTestResult === 'success'"
+          name="checkmark-circle-outline"
+          color="success"
+          class="test-result-icon">
+        </ion-icon>
+        <ion-icon
+          *ngIf="googleGeminiTestResult === 'error'"
+          name="close-circle-outline"
+          color="danger"
+          class="test-result-icon">
+        </ion-icon>
+      </div>
     </ion-card-content>
   </ion-card>
 

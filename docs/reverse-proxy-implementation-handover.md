@@ -1,10 +1,27 @@
 # リバースプロキシ設定機能 - 実装引継資料
 
 ## ステータス
-**✅ コア実装完了**
+**⚠️ 機能実装完了、レビュー指摘未対応、未コミット**
 
 ## 目的
 各AIプロバイダー（Claude, OpenRouter, Gemini, Ollama, OpenAI互換）にリバースプロキシを設定できるオプションを追加する。Bearer認証をサポート。
+
+---
+
+## 現在の状況（2026-01-14更新）
+
+### 未コミットの変更あり
+以下のファイルに未コミットの変更があります：
+- `src/app/custom/models/proxy-settings.interface.ts`
+- `src/app/custom/components/proxy-settings/proxy-settings.component.*`
+- `src/app/custom/services/claude-api-proxy.service.ts`
+- `src/app/custom/services/gemini-api-proxy.service.ts`
+- `src/app/custom/services/openrouter-api-proxy.service.ts`
+
+### ビルド・Lint状態
+- ✅ `npm run build` 成功
+- ✅ `npm run lint` エラーなし（既存警告1件のみ）
+- ⚠️ `npm test` Chromeがない環境のためスキップ
 
 ---
 
@@ -21,7 +38,7 @@
 ```
 src/app/custom/
 ├── models/
-│   └── proxy-settings.interface.ts
+│   └── proxy-settings.interface.ts    ✅ AuthHeaderType追加済み
 ├── services/
 │   ├── proxy-settings.service.ts      ✅ 設定管理
 │   ├── claude-api-proxy.service.ts    ✅ Claude API プロキシ対応
@@ -30,7 +47,7 @@ src/app/custom/
 │   ├── ollama-api-proxy.service.ts    ✅ Ollama 認証対応
 │   └── openai-api-proxy.service.ts    ✅ OpenAI互換 認証対応
 ├── components/
-│   └── proxy-settings/                ✅ 設定UI
+│   └── proxy-settings/                ✅ 設定UI（Test Connection含む）
 └── custom.module.ts                   ✅ DI設定
 ```
 
@@ -41,6 +58,34 @@ src/app/custom/
 ### 5. 設定UI統合 ✅
 - 設定画面に「Proxy」タブを追加
 - 各プロバイダーのプロキシURL/認証トークン設定が可能
+
+### 6. テスト接続機能 ✅ NEW
+- 各プロキシサービスに`testProxyConnection()`メソッド追加
+- UIに「Test Connection」ボタン追加
+- 成功/失敗のアイコン表示
+
+### 7. 認証ヘッダータイプ選択機能 ✅ NEW
+- `AuthHeaderType` 型追加（`'authorization' | 'x-proxy-auth'`）
+- UIでプロバイダーごとにヘッダータイプを選択可能
+- 透過型プロキシ（Authorization）と明示的プロキシ（X-Proxy-Auth）に対応
+
+---
+
+## レビュー指摘事項（未対応）
+
+### 🔴 高優先度
+| # | 問題 | ファイル | 詳細 |
+|---|------|---------|------|
+| 1 | console.log残存 | gemini-api-proxy.service.ts | デバッグログ10箇所以上 |
+| 2 | テンプレート内関数呼び出し | proxy-settings.component.html | `getProxyConfig()`が毎Change Detectionで再実行 |
+| 3 | 同期的throw | 複数サービス | Observable外でthrow → Observable契約違反 |
+
+### 🟡 中優先度
+| # | 問題 | ファイル | 詳細 |
+|---|------|---------|------|
+| 4 | authHeaderTypeデフォルト値 | proxy-settings.interface.ts | UIと実装の不整合 |
+| 5 | ドイツ語エラーメッセージ | openrouter-api-proxy.service.ts | 英語に統一すべき |
+| 6 | URLバリデーション未実装 | proxy-settings.component.html | http://やjavascript:も許可 |
 
 ---
 
@@ -60,18 +105,16 @@ upstreamファイルを直接修正：
 
 ---
 
-## 残りの作業（オプション）
+## 次のステップ提案
 
-### テスト接続機能
-- 各プロキシサービスに`testProxyConnection()`メソッドを追加
-- UIに「Test Connection」ボタンを追加
-- 接続成功/失敗のフィードバック表示
+### 1. レビュー指摘対応（推奨）
+高優先度の3件を修正してからコミット
 
-### 単体テスト
+### 2. 単体テスト（オプション）
 - `proxy-settings.service.spec.ts`
 - 各プロキシサービスのspec.tsファイル
 
-### E2Eテスト
+### 3. E2Eテスト（オプション）
 - 実際のプロキシサーバーを用意してテスト
 
 ---

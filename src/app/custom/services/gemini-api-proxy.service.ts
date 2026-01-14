@@ -1,10 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, Subject, takeUntil, tap } from 'rxjs';
+import { Observable, Subject, takeUntil, tap, of, map, catchError, throwError } from 'rxjs';
 import { GoogleGeminiApiService, GoogleGeminiRequest, GoogleGeminiResponse } from '../../core/services/google-gemini-api.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { AIRequestLoggerService } from '../../core/services/ai-request-logger.service';
 import { ProxySettingsService } from './proxy-settings.service';
+import { ReverseProxyConfig } from '../models/proxy-settings.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -38,12 +39,12 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
     const startTime = Date.now();
 
     if (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) {
-      throw new Error('Google Gemini API is not enabled or API key is missing');
+      return throwError(() => new Error('Google Gemini API is not enabled or API key is missing'));
     }
 
     const model = options.model || settings.googleGemini.model;
     if (!model) {
-      throw new Error('No AI model selected');
+      return throwError(() => new Error('No AI model selected'));
     }
 
     const maxTokens = options.maxTokens || 500;
@@ -63,7 +64,8 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
     };
 
     if (proxyConfig.authToken) {
-      headersObj['X-Proxy-Auth'] = `Bearer ${proxyConfig.authToken}`;
+      const headerName = this.getAuthHeaderName(proxyConfig);
+      headersObj[headerName] = `Bearer ${proxyConfig.authToken}`;
     }
 
     const headers = new HttpHeaders(headersObj);
@@ -118,25 +120,12 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
 
     this.proxyRequestMetadata.set(requestId, { logId, startTime });
 
-    console.log('🔍 Gemini Proxy API Debug:', {
-      model: model,
-      maxOutputTokens: maxTokens,
-      proxyUrl: url,
-      proxyEnabled: true
-    });
-
     return this.proxyHttp.post<GoogleGeminiResponse>(url, request, { headers }).pipe(
       takeUntil(abortSubject),
       tap({
         next: (response) => {
           const duration = Date.now() - startTime;
           const content = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-          console.log('🔍 Gemini Proxy Response Debug:', {
-            duration: duration + 'ms',
-            contentLength: content.length,
-            proxyEnabled: true
-          });
 
           this.proxyAiLogger.logSuccess(logId, content, duration, {
             httpStatus: 200,
@@ -151,7 +140,6 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
         },
         error: (error) => {
           const duration = Date.now() - startTime;
-          console.error('🔍 Gemini Proxy API Error:', error);
           this.proxyAiLogger.logError(logId, error.message || 'Unknown error', duration, {
             httpStatus: error.status || 0
           });
@@ -180,12 +168,12 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
     const startTime = Date.now();
 
     if (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) {
-      throw new Error('Google Gemini API is not enabled or API key is missing');
+      return throwError(() => new Error('Google Gemini API is not enabled or API key is missing'));
     }
 
     const model = options.model || settings.googleGemini.model;
     if (!model) {
-      throw new Error('No AI model selected');
+      return throwError(() => new Error('No AI model selected'));
     }
 
     const maxTokens = options.maxTokens || 500;
@@ -246,13 +234,6 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
 
     this.proxyRequestMetadata.set(requestId, { logId, startTime });
 
-    console.log('🔍 Gemini Proxy Streaming API Debug:', {
-      model: model,
-      maxOutputTokens: maxTokens,
-      proxyUrl: url,
-      proxyEnabled: true
-    });
-
     return new Observable<string>(observer => {
       let accumulatedContent = '';
       let buffer = '';
@@ -281,7 +262,8 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
       };
 
       if (proxyConfig.authToken) {
-        fetchHeaders['X-Proxy-Auth'] = `Bearer ${proxyConfig.authToken}`;
+        const headerName = this.getAuthHeaderName(proxyConfig);
+        fetchHeaders[headerName] = `Bearer ${proxyConfig.authToken}`;
       }
 
       fetch(url, {
@@ -290,23 +272,14 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
         body: JSON.stringify(request),
         signal: abortController.signal
       }).then(response => {
-        console.log('🔍 Gemini Proxy Streaming Response:', {
-          status: response.status,
-          ok: response.ok,
-          statusText: response.statusText
-        });
-
         if (!response.ok) {
           return response.text().then(errorText => {
-            console.error('🔍 Gemini Proxy Error Response Body:', errorText);
             throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
           });
         }
 
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
-          console.log('🔍 Gemini Proxy: JSON response, falling back to simulated streaming');
-
           return response.json().then(data => {
             let fullText = '';
             if (Array.isArray(data)) {
@@ -365,10 +338,6 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
             if (aborted || done) {
               if (done && !aborted) {
                 const duration = Date.now() - startTime;
-                console.log('🔍 Gemini Proxy Streaming Complete:', {
-                  duration: duration + 'ms',
-                  totalContentLength: accumulatedContent.length
-                });
 
                 observer.complete();
                 this.proxyAiLogger.logSuccess(logId, accumulatedContent, duration, {
@@ -402,8 +371,8 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
                     accumulatedContent += newText;
                     observer.next(newText);
                   }
-                } catch (e) {
-                  console.warn('🔍 Gemini Proxy Parse Error:', e, 'Data:', data);
+                } catch {
+                  // Parse error - data may be incomplete or malformed
                 }
               }
             }
@@ -417,7 +386,6 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
         if (aborted) return;
 
         const duration = Date.now() - startTime;
-        console.error('🔍 Gemini Proxy Streaming API Error:', error);
 
         observer.error(error);
         this.proxyAiLogger.logError(logId, error.message || 'Unknown error', duration, {
@@ -474,6 +442,15 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
     return 'gemini_proxy_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
   }
 
+  /**
+   * Returns the appropriate auth header name based on the proxy configuration.
+   * - 'authorization' (default): Uses 'Authorization' header for transparent proxies
+   * - 'x-proxy-auth': Uses 'X-Proxy-Auth' header for explicit proxies
+   */
+  private getAuthHeaderName(proxyConfig: ReverseProxyConfig): string {
+    return proxyConfig.authHeaderType === 'x-proxy-auth' ? 'X-Proxy-Auth' : 'Authorization';
+  }
+
   private cleanupProxyRequest(requestId: string): void {
     const abortSubject = this.proxyAbortSubjects.get(requestId);
     if (abortSubject) {
@@ -481,5 +458,49 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
       this.proxyAbortSubjects.delete(requestId);
     }
     this.proxyRequestMetadata.delete(requestId);
+  }
+
+  /**
+   * Test proxy connection by sending a lightweight request to the proxy URL.
+   * Returns Observable<boolean> - true if connection succeeds, false otherwise.
+   * Does not throw errors.
+   */
+  testProxyConnection(): Observable<boolean> {
+    const proxyConfig = this.proxySettingsService.getGoogleGeminiProxyConfig();
+
+    // If proxy is not enabled or URL is missing, return false
+    if (!proxyConfig?.enabled || !proxyConfig.url) {
+      return of(false);
+    }
+
+    const proxyUrl = proxyConfig.url.endsWith('/')
+      ? proxyConfig.url.slice(0, -1)
+      : proxyConfig.url;
+
+    // Use models endpoint for a lightweight GET request to test connectivity
+    const testUrl = `${proxyUrl}/models`;
+
+    const headersObj: Record<string, string> = {
+      'User-Agent': 'NovelCrafter/1.0',
+      'X-Client-Name': 'NovelCrafter',
+      'X-Client-Version': '1.0'
+    };
+
+    // Note: API key is intentionally NOT sent during proxy connection test
+    // to prevent potential API key leakage to malicious proxy URLs.
+    // The proxy connection test only verifies connectivity, not API functionality.
+
+    // Add proxy auth token if configured (consistent with other methods)
+    if (proxyConfig.authToken) {
+      const headerName = this.getAuthHeaderName(proxyConfig);
+      headersObj[headerName] = `Bearer ${proxyConfig.authToken}`;
+    }
+
+    const headers = new HttpHeaders(headersObj);
+
+    return this.proxyHttp.get(testUrl, { headers, observe: 'response' }).pipe(
+      map(response => response.status >= 200 && response.status < 400),
+      catchError(() => of(false))
+    );
   }
 }
