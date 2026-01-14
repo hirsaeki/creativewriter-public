@@ -111,3 +111,40 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
   - `CLAUDE.local.md`
   - `AGENTS.md`
 
+---
+
+## Tips & Reminders
+
+### ローカルテスト環境
+- **Karma テスト**: Windows環境ではEdgeを使用
+  ```cmd
+  set CHROME_BIN=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe&& npm test -- --no-watch
+  ```
+
+### Podman テスト手順（Windows）
+`podman.exe` 経由でPod構成をローカルテスト可能：
+```cmd
+# Pod作成（ポート13080で公開）
+podman pod create --name test-cw -p 13080:80
+
+# コンテナ起動
+podman run -d --pod test-cw --name test-couchdb -e COUCHDB_USER=admin -e COUCHDB_PASSWORD=password ghcr.io/marcodroll/creativewriter-public-couchdb:latest
+podman run -d --pod test-cw --name test-replicate -e PORT=3001 ghcr.io/marcodroll/creativewriter-public-proxy:latest
+podman run -d --pod test-cw --name test-gemini -e PORT=3002 ghcr.io/marcodroll/creativewriter-public-gemini-proxy:latest
+podman run -d --pod test-cw --name test-nginx -v "$(pwd)/deploy/podman-quadlet/nginx.conf:/etc/nginx/nginx.conf:ro" ghcr.io/marcodroll/creativewriter-public:latest
+
+# 疎通確認
+curl http://127.0.0.1:13080/health
+curl http://127.0.0.1:13080/_db/_up
+curl http://127.0.0.1:13080/api/replicate/test
+curl http://127.0.0.1:13080/api/gemini/test
+
+# クリーンアップ
+podman pod rm -f test-cw
+```
+
+### nginx.conf差し替えの仕組み
+- `creativewriter`イメージは元々nginxベース（静的配信用）
+- Quadletでは`Volume=`で統合nginx.confをマウントし、reverse proxy機能を追加
+- イメージ再ビルド不要で動作変更可能
+
