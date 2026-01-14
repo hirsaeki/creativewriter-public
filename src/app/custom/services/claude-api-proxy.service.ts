@@ -20,22 +20,21 @@ export class ClaudeApiProxyService extends ClaudeApiService {
   private proxyAbortSubjects = new Map<string, Subject<void>>();
   private proxyRequestMetadata = new Map<string, { logId: string; startTime: number }>();
 
-  private buildProxyApiUrl(): string {
+  private buildProxyUrl(path: string): string {
     const proxyConfig = this.proxySettingsService.getClaudeProxyConfig();
     if (proxyConfig?.url) {
       const baseUrl = proxyConfig.url.endsWith('/') ? proxyConfig.url.slice(0, -1) : proxyConfig.url;
-      return `${baseUrl}/v1/messages`;
+      return `${baseUrl}${path}`;
     }
     return '';
   }
 
+  private buildProxyApiUrl(): string {
+    return this.buildProxyUrl('/v1/messages');
+  }
+
   private buildProxyModelsUrl(): string {
-    const proxyConfig = this.proxySettingsService.getClaudeProxyConfig();
-    if (proxyConfig?.url) {
-      const baseUrl = proxyConfig.url.endsWith('/') ? proxyConfig.url.slice(0, -1) : proxyConfig.url;
-      return `${baseUrl}/v1/models`;
-    }
-    return '';
+    return this.buildProxyUrl('/v1/models');
   }
 
   private buildProxyHeaders(baseHeaders: Record<string, string>): Record<string, string> {
@@ -44,6 +43,22 @@ export class ClaudeApiProxyService extends ClaudeApiService {
     if (proxyConfig?.authToken) {
       const headerName = this.getAuthHeaderName(proxyConfig);
       headers[headerName] = `Bearer ${proxyConfig.authToken}`;
+    }
+    return headers;
+  }
+
+  /**
+   * Builds common API headers with optional Content-Type.
+   * @param apiKey - The Claude API key
+   * @param includeContentType - Whether to include Content-Type header (default: true)
+   */
+  private buildCommonHeaders(apiKey: string, includeContentType = true): Record<string, string> {
+    const headers: Record<string, string> = {
+      'X-API-Key': apiKey,
+      'anthropic-version': this.PROXY_API_VERSION
+    };
+    if (includeContentType) {
+      headers['Content-Type'] = 'application/json';
     }
     return headers;
   }
@@ -124,13 +139,7 @@ export class ClaudeApiProxyService extends ClaudeApiService {
       prompt: prompt
     });
 
-    const baseHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-API-Key': settings.claude.apiKey,
-      'anthropic-version': this.PROXY_API_VERSION
-    };
-
-    const headerOptions = this.buildProxyHeaders(baseHeaders);
+    const headerOptions = this.buildProxyHeaders(this.buildCommonHeaders(settings.claude.apiKey));
     const headers = new HttpHeaders(headerOptions);
 
     const messages = this.convertMessagesToClaudeFormatForProxy(options.messages, prompt);
@@ -177,7 +186,7 @@ export class ClaudeApiProxyService extends ClaudeApiService {
           this.proxyAiLogger.logError(metadata.logId, error.message || 'Unknown error', duration);
         }
         this.cleanupProxy(requestId);
-        throw error;
+        return throwError(() => error);
       })
     );
   }
@@ -239,13 +248,7 @@ export class ClaudeApiProxyService extends ClaudeApiService {
     const abortSubject = new Subject<void>();
     this.proxyAbortSubjects.set(requestId, abortSubject);
 
-    const baseHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-API-Key': settings.claude.apiKey,
-      'anthropic-version': this.PROXY_API_VERSION
-    };
-
-    const fetchHeaders = this.buildProxyHeaders(baseHeaders);
+    const fetchHeaders = this.buildProxyHeaders(this.buildCommonHeaders(settings.claude.apiKey));
 
     return new Observable<string>(observer => {
       const startTime = Date.now();
@@ -307,8 +310,8 @@ export class ClaudeApiProxyService extends ClaudeApiService {
                     observer.next(chunk);
                   }
                 }
-              } catch (e) {
-                console.error('Failed to parse SSE data:', e);
+              } catch {
+                // SSE parse errors are non-fatal; skip malformed chunks
               }
             }
           }
@@ -363,20 +366,10 @@ export class ClaudeApiProxyService extends ClaudeApiService {
 
     const modelsUrl = this.buildProxyModelsUrl();
 
-    const baseHeaders: Record<string, string> = {
-      'X-API-Key': settings.claude.apiKey,
-      'anthropic-version': this.PROXY_API_VERSION
-    };
-
-    const headerOptions = this.buildProxyHeaders(baseHeaders);
+    const headerOptions = this.buildProxyHeaders(this.buildCommonHeaders(settings.claude.apiKey, false));
     const headers = new HttpHeaders(headerOptions);
 
-    return this.proxyHttp.get<ClaudeModelsResponse>(modelsUrl, { headers }).pipe(
-      catchError(error => {
-        console.error('Failed to load Claude models via proxy:', error);
-        throw error;
-      })
-    );
+    return this.proxyHttp.get<ClaudeModelsResponse>(modelsUrl, { headers });
   }
 
   override testConnection(): Observable<boolean> {
@@ -392,13 +385,7 @@ export class ClaudeApiProxyService extends ClaudeApiService {
 
     const apiUrl = this.buildProxyApiUrl();
 
-    const baseHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-API-Key': settings.claude.apiKey,
-      'anthropic-version': this.PROXY_API_VERSION
-    };
-
-    const headerOptions = this.buildProxyHeaders(baseHeaders);
+    const headerOptions = this.buildProxyHeaders(this.buildCommonHeaders(settings.claude.apiKey));
     const headers = new HttpHeaders(headerOptions);
 
     const testRequest: ClaudeRequest = {

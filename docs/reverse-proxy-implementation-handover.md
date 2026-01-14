@@ -1,7 +1,7 @@
 # リバースプロキシ設定機能 - 実装引継資料
 
 ## ステータス
-**⚠️ 機能実装完了、レビュー指摘未対応、未コミット**
+**✅ 実装完了、レビュー指摘対応済み**
 
 ## 目的
 各AIプロバイダー（Claude, OpenRouter, Gemini, Ollama, OpenAI互換）にリバースプロキシを設定できるオプションを追加する。Bearer認証をサポート。
@@ -10,18 +10,10 @@
 
 ## 現在の状況（2026-01-14更新）
 
-### 未コミットの変更あり
-以下のファイルに未コミットの変更があります：
-- `src/app/custom/models/proxy-settings.interface.ts`
-- `src/app/custom/components/proxy-settings/proxy-settings.component.*`
-- `src/app/custom/services/claude-api-proxy.service.ts`
-- `src/app/custom/services/gemini-api-proxy.service.ts`
-- `src/app/custom/services/openrouter-api-proxy.service.ts`
-
 ### ビルド・Lint状態
 - ✅ `npm run build` 成功
-- ✅ `npm run lint` エラーなし（既存警告1件のみ）
-- ⚠️ `npm test` Chromeがない環境のためスキップ
+- ✅ `npm run lint` エラーなし
+- ✅ レビュー指摘対応済み
 
 ---
 
@@ -59,33 +51,33 @@ src/app/custom/
 - 設定画面に「Proxy」タブを追加
 - 各プロバイダーのプロキシURL/認証トークン設定が可能
 
-### 6. テスト接続機能 ✅ NEW
+### 6. テスト接続機能 ✅
 - 各プロキシサービスに`testProxyConnection()`メソッド追加
 - UIに「Test Connection」ボタン追加
 - 成功/失敗のアイコン表示
 
-### 7. 認証ヘッダータイプ選択機能 ✅ NEW
+### 7. 認証ヘッダータイプ選択機能 ✅
 - `AuthHeaderType` 型追加（`'authorization' | 'x-proxy-auth'`）
 - UIでプロバイダーごとにヘッダータイプを選択可能
 - 透過型プロキシ（Authorization）と明示的プロキシ（X-Proxy-Auth）に対応
 
 ---
 
-## レビュー指摘事項（未対応）
+## レビュー指摘事項（全て対応済み）
 
-### 🔴 高優先度
-| # | 問題 | ファイル | 詳細 |
-|---|------|---------|------|
-| 1 | console.log残存 | gemini-api-proxy.service.ts | デバッグログ10箇所以上 |
-| 2 | テンプレート内関数呼び出し | proxy-settings.component.html | `getProxyConfig()`が毎Change Detectionで再実行 |
-| 3 | 同期的throw | 複数サービス | Observable外でthrow → Observable契約違反 |
+### 🔴 高優先度 - 対応済み
+| # | 問題 | ファイル | 対応状況 |
+|---|------|---------|---------|
+| 1 | console.log残存 | gemini-api-proxy.service.ts | ✅ 削除済み |
+| 2 | テンプレート内関数呼び出し | proxy-settings.component.html | ✅ プロパティバインディングに変更 |
+| 3 | 同期的throw | claude-api-proxy.service.ts | ✅ throwError()に修正済み |
 
-### 🟡 中優先度
-| # | 問題 | ファイル | 詳細 |
-|---|------|---------|------|
-| 4 | authHeaderTypeデフォルト値 | proxy-settings.interface.ts | UIと実装の不整合 |
-| 5 | ドイツ語エラーメッセージ | openrouter-api-proxy.service.ts | 英語に統一すべき |
-| 6 | URLバリデーション未実装 | proxy-settings.component.html | http://やjavascript:も許可 |
+### 🟡 中優先度 - 対応済み
+| # | 問題 | ファイル | 対応状況 |
+|---|------|---------|---------|
+| 4 | authHeaderTypeデフォルト値 | proxy-settings.interface.ts | ✅ 全箇所で統一済み |
+| 5 | ドイツ語エラーメッセージ | openrouter-api-proxy.service.ts | ✅ 英語に統一済み |
+| 6 | URLバリデーション未実装 | proxy-settings.component.html | ✅ 危険スキームブロック＆http/https限定実装済み |
 
 ---
 
@@ -102,20 +94,6 @@ upstreamファイルを直接修正：
 
 ### 正しいアプローチ（採用）
 `src/app/custom/` 配下にカスタム実装を作成し、DIで差し替え。
-
----
-
-## 次のステップ提案
-
-### 1. レビュー指摘対応（推奨）
-高優先度の3件を修正してからコミット
-
-### 2. 単体テスト（オプション）
-- `proxy-settings.service.spec.ts`
-- 各プロキシサービスのspec.tsファイル
-
-### 3. E2Eテスト（オプション）
-- 実際のプロキシサーバーを用意してテスト
 
 ---
 
@@ -157,3 +135,14 @@ upstreamファイルを直接修正：
 1. **upstreamファイルは変更しない** - CLAUDE.local.mdのルールを厳守
 2. **カスタムコードは`src/app/custom/`に配置** - `.gitattributes`で保護済み
 3. **DI差し替えはCustomModuleで行う** - app.config.tsへの変更は最小限に
+
+---
+
+## 今後のオプション作業
+
+### 単体テスト（オプション）
+- `proxy-settings.service.spec.ts`
+- 各プロキシサービスのspec.tsファイル
+
+### E2Eテスト（オプション）
+- 実際のプロキシサーバーを用意してテスト

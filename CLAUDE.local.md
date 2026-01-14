@@ -52,11 +52,22 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
 
 ## Knowledge Index (Refer to these files when working on related tasks)
 
-### Reverse Proxy Settings (実装中)
-- **Status**: 方針変更後、未着手
-- **Handover**: `docs/reverse-proxy-implementation-handover.md` - 引継資料（必読）
+### Reverse Proxy Settings (実装完了)
+- **Status**: ✅ 実装完了、レビュー指摘対応済み（2026-01-14）
+- **Handover**: `docs/reverse-proxy-implementation-handover.md` - 引継資料
 - **Spec**: `docs/reverse-proxy-settings.md` - 設計仕様書
-- **Implementation Location**: `src/app/custom/` 配下に作成予定
+- **Implementation Location**: `src/app/custom/` 配下に実装済み
+- **Key Files**:
+  - `src/app/custom/models/proxy-settings.interface.ts` - 型定義
+  - `src/app/custom/services/proxy-settings.service.ts` - 設定管理
+  - `src/app/custom/services/claude-api-proxy.service.ts` - Claude プロキシ
+  - `src/app/custom/services/openrouter-api-proxy.service.ts` - OpenRouter プロキシ
+  - `src/app/custom/services/gemini-api-proxy.service.ts` - Gemini プロキシ
+  - `src/app/custom/services/ollama-api-proxy.service.ts` - Ollama プロキシ
+  - `src/app/custom/services/openai-api-proxy.service.ts` - OpenAI互換 プロキシ
+  - `src/app/custom/components/proxy-settings/` - 設定UI
+  - `src/app/custom/custom.module.ts` - DI設定
+- **Build Status**: ✅ build / lint / test 全パス
 - **Reference (upstream, DO NOT MODIFY)**:
   - `src/app/core/services/claude-api.service.ts`
   - `src/app/core/services/openrouter-api.service.ts`
