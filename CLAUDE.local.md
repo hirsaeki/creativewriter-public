@@ -75,6 +75,28 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
   - `src/app/core/services/ollama-api.service.ts`
   - `src/app/core/services/openai-compatible-api.service.ts`
 
+### Podman/Quadlet Deployment (実装完了)
+- **Status**: ✅ 実装完了（2026-01-15）
+- **Handover**: `docs/podman-quadlet-handover.md` - 設計方針書
+- **Documentation**: `docs/podman-quadlet.md` - 配置・起動手順
+- **Implementation Location**: `deploy/podman-quadlet/` 配下
+- **Key Files**:
+  - `deploy/podman-quadlet/nginx.conf` - 統合nginx設定（静的配信+リバースプロキシ）
+  - `deploy/podman-quadlet/creativewriter@.pod` - Podテンプレート（ポート可変）
+  - `deploy/podman-quadlet/creativewriter.container` - メインnginxコンテナ
+  - `deploy/podman-quadlet/couchdb.container` - CouchDBコンテナ
+  - `deploy/podman-quadlet/replicate-proxy.container` - Replicate/fal.aiプロキシ
+  - `deploy/podman-quadlet/gemini-proxy.container` - Geminiプロキシ（SSE対応）
+  - `deploy/podman-quadlet/snapshot-service.container` - スナップショットサービス
+  - `deploy/podman-quadlet/creativewriter-stack@.target` - 一括起動ターゲット
+  - `deploy/podman-quadlet/creativewriter.env.example` - 環境変数テンプレート
+- **Build Status**: ✅ build / lint / test 全パス
+- **Design Decisions**:
+  - reverse proxyコンテナを廃止し、単一nginxに統合（Pod内ポート競合回避）
+  - `^~` prefix locationでAPI優先度を確保（SPA try_filesとの競合防止）
+  - Gemini SSE対応（proxy_buffering off, 3600s timeout）
+  - 環境変数は `~/.config/creativewriter/creativewriter.env` で一元管理
+
 ### Upstream Sync Workflow (実装完了)
 - **Status**: 完了
 - **Files**:

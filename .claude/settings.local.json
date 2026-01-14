@@ -1,4 +1,20 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run lint:*)",
+      "Bash(git pull:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(CHROME_BIN=\"/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\" npm test:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "context7"
+  ],
   "disabledMcpjsonServers": [
     "context7"
   ]

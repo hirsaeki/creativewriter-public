@@ -1,0 +1,11 @@
+[Unit]
+Description=CreativeWriter Web/Nginx
+
+[Container]
+Image=ghcr.io/marcodroll/creativewriter-public:latest
+Pod=creativewriter@%i.pod
+Volume=%h/.config/creativewriter/nginx.conf:/etc/nginx/nginx.conf:ro,Z
+EnvironmentFile=%h/.config/creativewriter/creativewriter.env
+
+[Service]
+Restart=always

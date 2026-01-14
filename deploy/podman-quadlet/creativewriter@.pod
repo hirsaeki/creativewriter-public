@@ -1,0 +1,5 @@
+[Unit]
+Description=CreativeWriter Pod (%i)
+
+[Pod]
+PublishPort=%i:80

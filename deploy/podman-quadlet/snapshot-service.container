@@ -1,0 +1,14 @@
+[Unit]
+Description=CreativeWriter Snapshot Service
+
+[Container]
+Image=ghcr.io/marcodroll/creativewriter-public-snapshot-service:latest
+Pod=creativewriter@%i.pod
+Environment=COUCHDB_HOST=localhost
+Environment=COUCHDB_PORT=5984
+Environment=DATABASE_PATTERN=creative-writer-stories
+EnvironmentFile=%h/.config/creativewriter/creativewriter.env
+Volume=%h/.local/share/creativewriter/log/snapshot-service:/var/log/snapshot-service:Z
+
+[Service]
+Restart=always

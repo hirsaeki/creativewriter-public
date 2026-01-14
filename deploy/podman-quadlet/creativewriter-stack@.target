@@ -1,0 +1,10 @@
+[Unit]
+Description=CreativeWriter Stack (%i)
+Wants=creativewriter@%i.pod.service
+Wants=creativewriter.service
+Wants=couchdb.service
+Wants=replicate-proxy.service
+Wants=gemini-proxy.service
+Wants=snapshot-service.service
+After=creativewriter@%i.pod.service
+After=couchdb.service

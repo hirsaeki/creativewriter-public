@@ -1,0 +1,11 @@
+[Unit]
+Description=CreativeWriter Replicate Proxy
+
+[Container]
+Image=ghcr.io/marcodroll/creativewriter-public-proxy:latest
+Pod=creativewriter@%i.pod
+Environment=PORT=3001
+EnvironmentFile=%h/.config/creativewriter/creativewriter.env
+
+[Service]
+Restart=always

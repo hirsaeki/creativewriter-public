@@ -1,0 +1,11 @@
+[Unit]
+Description=CreativeWriter Gemini Proxy
+
+[Container]
+Image=ghcr.io/marcodroll/creativewriter-public-gemini-proxy:latest
+Pod=creativewriter@%i.pod
+Environment=PORT=3002
+EnvironmentFile=%h/.config/creativewriter/creativewriter.env
+
+[Service]
+Restart=always
