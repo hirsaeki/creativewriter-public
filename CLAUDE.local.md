@@ -105,6 +105,7 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
   - `src/app/custom/.gitkeep` - 履歴分岐用プレースホルダー
 - **Key Implementation**:
   - `merge.ours.driver true` を設定してmerge=ours戦略を有効化
+  - `-X ours` オプションでmodify/deleteコンフリクトも自動解決
   - 毎日JST 03:00に自動実行（手動実行も可能）
 - **Protected Paths**:
   - `src/app/custom/**`

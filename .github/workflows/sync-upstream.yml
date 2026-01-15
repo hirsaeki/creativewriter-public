@@ -92,7 +92,8 @@ jobs:
           git config --local merge.ours.driver true
 
           if ! git merge --ff-only "upstream/${TARGET_BRANCH}"; then
-            git merge --no-edit "upstream/${TARGET_BRANCH}"
+            # -X ours: resolve conflicts (including modify/delete) by keeping local version
+            git merge --no-edit -X ours "upstream/${TARGET_BRANCH}"
           fi
 
           git push origin "$TARGET_BRANCH"
