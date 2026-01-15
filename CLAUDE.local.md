@@ -52,85 +52,41 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
 
 ## Knowledge Index (Refer to these files when working on related tasks)
 
-### Reverse Proxy Settings (実装完了)
-- **Status**: ✅ 実装完了、レビュー指摘対応済み（2026-01-14）
-- **Handover**: `docs/reverse-proxy-implementation-handover.md` - 引継資料
-- **Spec**: `docs/reverse-proxy-settings.md` - 設計仕様書
-- **Implementation Location**: `src/app/custom/` 配下に実装済み
-- **Key Files**:
-  - `src/app/custom/models/proxy-settings.interface.ts` - 型定義
-  - `src/app/custom/services/proxy-settings.service.ts` - 設定管理
-  - `src/app/custom/services/claude-api-proxy.service.ts` - Claude プロキシ
-  - `src/app/custom/services/openrouter-api-proxy.service.ts` - OpenRouter プロキシ
-  - `src/app/custom/services/gemini-api-proxy.service.ts` - Gemini プロキシ
-  - `src/app/custom/services/ollama-api-proxy.service.ts` - Ollama プロキシ
-  - `src/app/custom/services/openai-api-proxy.service.ts` - OpenAI互換 プロキシ
-  - `src/app/custom/components/proxy-settings/` - 設定UI
-  - `src/app/custom/custom.module.ts` - DI設定
-- **Build Status**: ✅ build / lint / test 全パス
-- **Reference (upstream, DO NOT MODIFY)**:
-  - `src/app/core/services/claude-api.service.ts`
-  - `src/app/core/services/openrouter-api.service.ts`
-  - `src/app/core/services/google-gemini-api.service.ts`
-  - `src/app/core/services/ollama-api.service.ts`
-  - `src/app/core/services/openai-compatible-api.service.ts`
+### Implemented / Done
+- `docs/done/README.md` - 実装完了メモ（Reverse Proxy / Quadlet / Sync workflow / Fork release 等）
+- `docs/deployment-guide.md` - デプロイ方法選択ガイド（Docker Compose / Podman Quadlet / Unraid 比較）
+- `deploy/podman-quadlet/README.md` - Quadletファイル構成説明 + アーキテクチャ図
 
-### Podman/Quadlet Deployment (実装完了)
-- **Status**: ✅ 実装完了（2026-01-15）
-- **Handover**: `docs/podman-quadlet-handover.md` - 設計方針書
-- **Documentation**: `docs/podman-quadlet.md` - 配置・起動手順
-- **Implementation Location**: `deploy/podman-quadlet/` 配下
-- **Key Files**:
-  - `deploy/podman-quadlet/nginx.conf` - 統合nginx設定（静的配信+リバースプロキシ）
-  - `deploy/podman-quadlet/creativewriter@.pod` - Podテンプレート（ポート可変）
-  - `deploy/podman-quadlet/creativewriter.container` - メインnginxコンテナ
-  - `deploy/podman-quadlet/couchdb.container` - CouchDBコンテナ
-  - `deploy/podman-quadlet/replicate-proxy.container` - Replicate/fal.aiプロキシ
-  - `deploy/podman-quadlet/gemini-proxy.container` - Geminiプロキシ（SSE対応）
-  - `deploy/podman-quadlet/snapshot-service.container` - スナップショットサービス
-  - `deploy/podman-quadlet/creativewriter-stack@.target` - 一括起動ターゲット
-  - `deploy/podman-quadlet/creativewriter.env.example` - 環境変数テンプレート
-- **Build Status**: ✅ build / lint / test 全パス
-- **Design Decisions**:
-  - reverse proxyコンテナを廃止し、単一nginxに統合（Pod内ポート競合回避）
-  - `^~` prefix locationでAPI優先度を確保（SPA try_filesとの競合防止）
-  - Gemini SSE対応（proxy_buffering off, 3600s timeout）
-  - 環境変数は `~/.config/creativewriter/creativewriter.env` で一元管理
+### Handoffs / Plans
+- `docs/runtime-i18n-handoff-ja.md` - runtime i18n（`ja` + `en` fallback、`custom`中心、ルート差し込み方針）
 
-### Upstream Sync Workflow (実装完了)
-- **Status**: 完了
-- **Files**:
-  - `.github/workflows/sync-upstream.yml` - 同期ワークフロー本体
-  - `.gitattributes` - 保護対象パスの定義
-  - `src/app/custom/.gitkeep` - 履歴分岐用プレースホルダー
-- **Key Implementation**:
-  - `merge.ours.driver true` を設定してmerge=ours戦略を有効化
-  - `-X ours` オプションでmodify/deleteコンフリクトも自動解決
-  - 毎日JST 03:00に自動実行（手動実行も可能）
-- **Protected Paths**:
-  - `src/app/custom/**`
-  - `CLAUDE.local.md`
-  - `AGENTS.md`
-  - `.github/workflows/docker-build.yml`
-  - `.github/workflows/create-release.yml`
+### i18n 実装完了・次ステップ（2026-01-15）
 
-### Fork Docker Release Workflow (実装完了)
-- **Status**: ✅ 実装完了（2026-01-15）
-- **Purpose**: フォーク用のDockerイメージをghcr.io/hirsaeki/にプッシュ
-- **Key Files**:
-  - `.github/workflows/docker-build.yml` - Dockerビルド・プッシュ（フォーク用に調整済み）
-  - `.github/workflows/create-release.yml` - タグプッシュで自動リリース作成
-- **Flow**:
-  1. `git tag v2.0.0-fork.YYYYMMDDHHMM && git push --tags`
-  2. `create-release.yml` がGitHub Releaseを自動作成（`-fork`等含むタグはprerelease）
-  3. Release公開で `docker-build.yml` がトリガー
-  4. マルチプラットフォーム（amd64/arm64）イメージをghcr.ioにプッシュ
-- **Changes from Upstream**:
-  - `BASE_IMAGE_NAME`: ハードコード → `${{ github.repository }}` で動的化
-  - OCI ラベル: source/url/vendor/title を GitHub コンテキスト変数で動的化
-  - Cloudflareキャッシュパージジョブ: 削除（フォーク不要）
-- **Image Registry**: `ghcr.io/hirsaeki/creativewriter-public[-suffix]:tag`
-- **Protected**: `.gitattributes` で `merge=ours` 設定済み（upstream syncで上書きされない）
+**実装済み:**
+- `src/app/custom/i18n/` - I18nService（Signal-based）、cwT Pipe、en/ja辞書
+- `src/app/custom/features/language/` - 言語設定画面（`/settings/language`）
+- `src/app/custom/routing/` - APP_INITIALIZERによるルート差し込み
+- `src/app/custom/components/proxy-settings/` - i18n対応済み、言語設定への導線追加
+
+**動作確認方法:**
+1. `npm start` でアプリ起動
+2. `/settings` → Proxyタブ → 「Language Settings」カードをクリック
+3. `/settings/language` で `ja`/`en` 切替を確認
+4. リロード後も言語が保持されることを確認
+
+**次ステップ（優先度順）:**
+1. **`app.config.ts`の保護検討**: `.gitattributes`に`src/app/app.config.ts merge=ours`追加
+   - 現状`CustomModule`のimportがupstream syncでコンフリクトする可能性あり
+2. **翻訳範囲拡張（オプション）**:
+   - DI差し替えサービスへの翻訳追加（`DialogService`, `GlobalErrorHandlerService`, `MemoryWarningService`）
+   - custom以外の画面は翻訳混在OK（fork方針として許容）
+3. **Impure Pipe最適化（低優先度）**:
+   - 現状`pure: false`で毎CD実行。パフォーマンス問題が出たらSignal-based directiveへ移行検討
+
+**注意点:**
+- SSRガード済み（`localStorage`/`document`アクセスはtry-catch）
+- upstreamの`app.routes.ts`は未変更（`Router.resetConfig()`で動的注入）
+- 翻訳キー追加時は`en.ts`を先に編集→`ja.ts`で型エラーが出るので漏れなし
 
 ---
 
@@ -168,4 +124,3 @@ podman pod rm -f test-cw
 - `creativewriter`イメージは元々nginxベース（静的配信用）
 - Quadletでは`Volume=`で統合nginx.confをマウントし、reverse proxy機能を追加
 - イメージ再ビルド不要で動作変更可能
-
