@@ -111,6 +111,26 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
   - `src/app/custom/**`
   - `CLAUDE.local.md`
   - `AGENTS.md`
+  - `.github/workflows/docker-build.yml`
+  - `.github/workflows/create-release.yml`
+
+### Fork Docker Release Workflow (実装完了)
+- **Status**: ✅ 実装完了（2026-01-15）
+- **Purpose**: フォーク用のDockerイメージをghcr.io/hirsaeki/にプッシュ
+- **Key Files**:
+  - `.github/workflows/docker-build.yml` - Dockerビルド・プッシュ（フォーク用に調整済み）
+  - `.github/workflows/create-release.yml` - タグプッシュで自動リリース作成
+- **Flow**:
+  1. `git tag v2.0.0-fork.YYYYMMDDHHMM && git push --tags`
+  2. `create-release.yml` がGitHub Releaseを自動作成（`-fork`等含むタグはprerelease）
+  3. Release公開で `docker-build.yml` がトリガー
+  4. マルチプラットフォーム（amd64/arm64）イメージをghcr.ioにプッシュ
+- **Changes from Upstream**:
+  - `BASE_IMAGE_NAME`: ハードコード → `${{ github.repository }}` で動的化
+  - OCI ラベル: source/url/vendor/title を GitHub コンテキスト変数で動的化
+  - Cloudflareキャッシュパージジョブ: 削除（フォーク不要）
+- **Image Registry**: `ghcr.io/hirsaeki/creativewriter-public[-suffix]:tag`
+- **Protected**: `.gitattributes` で `merge=ours` 設定済み（upstream syncで上書きされない）
 
 ---
 
