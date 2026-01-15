@@ -26,6 +26,7 @@ A powerful, AI-enhanced creative writing application that helps authors craft co
 - [🏗️ Architecture](#️-architecture)
 - [🚀 Getting Started](#-getting-started)
 - [🐳 Docker Deployment](#-docker-deployment)
+- [🦭 Podman Deployment](#-podman-deployment)
 - [📦 Docker Images](#-docker-images)
 - [🛠️ Development](#️-development)
 - [📝 Usage Tips](#-usage-tips)
@@ -270,6 +271,39 @@ volumes:
 4. **Verify persistence:** Check that `./data/couchdb-data` contains files after first run
 5. **Use the built-in backup feature:** Go to Settings → Backup & Restore to create downloadable backups
 
+## 🦭 Podman Deployment
+
+For users who prefer **Podman** over Docker, CreativeWriter supports deployment using **Podman Quadlet** with systemd integration.
+
+### Key Differences from Docker Compose
+
+| Aspect | Docker Compose | Podman Quadlet |
+|--------|----------------|----------------|
+| **Networking** | Bridge network between containers | Single Pod with shared localhost |
+| **Service Management** | `docker compose up/down` | `systemctl --user start/stop` |
+| **Auto-start** | Requires daemon or restart policy | Native systemd service management |
+| **Privileges** | Typically requires root | Fully rootless |
+| **Port Configuration** | Edit compose file | Template units (`@PORT.target`) |
+
+### Benefits
+
+- **Rootless**: No root privileges required
+- **Systemd integration**: Standard service management, auto-restart, and boot persistence
+- **Single Pod architecture**: All containers share localhost, simplifying inter-service communication
+- **Parameterized ports**: Run multiple instances on different ports using systemd template units
+
+### Prerequisites
+
+- Podman 4.4+ with Quadlet support
+- systemd (user session)
+- User lingering enabled: `loginctl enable-linger $USER`
+
+### Documentation
+
+For complete installation and configuration instructions, see **[docs/podman-quadlet.md](docs/podman-quadlet.md)**.
+
+For a comparison of all deployment methods (Docker Compose, Podman, Unraid), see the **[Deployment Options Guide](docs/deployment-guide.md)**.
+
 ## 📝 Usage Tips
 
 1. **Start with Story Structure**: Define your acts and chapters before diving into scenes
@@ -296,6 +330,17 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Developed using AI-powered pair programming with [Claude Code](https://claude.ai/code) (paid subscription)
 - Significant human expertise and effort guiding the AI development
 - Community contributors and testers
+
+## 📚 Documentation
+
+Detailed guides and reference documentation:
+
+| Document | Description |
+|----------|-------------|
+| [Deployment Options Guide](docs/deployment-guide.md) | Compare Docker Compose, Podman Quadlet, and Unraid deployment methods |
+| [Podman Quadlet Guide](docs/podman-quadlet.md) | Detailed Podman/systemd deployment instructions |
+| [Unraid Installation](docs/unraid/README.md) | Step-by-step Unraid deployment guide |
+| [Reverse Proxy Settings](docs/reverse-proxy-settings.md) | API proxy configuration reference |
 
 ## 🔗 Links
 
