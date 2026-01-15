@@ -4,3 +4,6 @@ src/app/custom/** merge=ours
 # Protect fork-specific configuration files
 CLAUDE.local.md merge=ours
 AGENTS.md merge=ours
+
+# Protect fork-specific workflow (docker image push target)
+.github/workflows/docker-build.yml merge=ours
