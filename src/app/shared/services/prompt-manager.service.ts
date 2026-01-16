@@ -326,44 +326,39 @@ export class PromptManagerService {
     const story = await this.storyService.getStory(currentStoryId);
     if (!story || !story.chapters) return '';
 
-    let xml = '<storySoFar>\n';
-    
-    // Group chapters by acts (for now, all in act 1)
-    xml += '  <act number="1">\n';
-    
+    let xml = '<act number="1">\n';
+
     const sortedChapters = [...story.chapters].sort((a, b) => a.order - b.order);
-    
+
     for (const chapter of sortedChapters) {
       if (!chapter.scenes || chapter.scenes.length === 0) continue;
-      
-      xml += `    <chapter title="${this.escapeXml(chapter.title)}" number="${chapter.order}">\n`;
-      
+
+      xml += `  <chapter title="${this.escapeXml(chapter.title)}" number="${chapter.order}">\n`;
+
       const sortedScenes = [...chapter.scenes].sort((a, b) => a.order - b.order);
-      
+
       for (const scene of sortedScenes) {
         // Stop before the target scene
         if (scene.id === targetSceneId) {
-          xml += '    </chapter>\n';
-          xml += '  </act>\n';
-          xml += '</storySoFar>';
+          xml += '  </chapter>\n';
+          xml += '</act>';
           return xml;
         }
-        
-        xml += `      <scene title="${this.escapeXml(scene.title)}" number="${scene.order}">`;
-        
+
+        xml += `    <scene title="${this.escapeXml(scene.title)}" number="${scene.order}">`;
+
         // Use summary if available, otherwise use full text
         const content = scene.summary || this.extractFullTextFromScene(scene);
         xml += this.escapeXml(content);
-        
+
         xml += '</scene>\n';
       }
-      
-      xml += '    </chapter>\n';
+
+      xml += '  </chapter>\n';
     }
-    
-    xml += '  </act>\n';
-    xml += '</storySoFar>';
-    
+
+    xml += '</act>';
+
     return xml;
   }
 

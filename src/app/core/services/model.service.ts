@@ -9,6 +9,7 @@ import {
   OpenRouterModel,
   ReplicateModel
 } from '../models/model.interface';
+import { supportsReasoning, REASONING_SUFFIX } from '../models/reasoning.config';
 import { SettingsService } from './settings.service';
 import { OllamaApiService, OllamaModelsResponse } from './ollama-api.service';
 import { ClaudeApiService, ClaudeModel } from './claude-api.service';
@@ -240,44 +241,74 @@ export class ModelService {
   }
 
   private transformOpenRouterModels(models: OpenRouterModel[]): ModelOption[] {
-    
+
     // No filtering - show ALL models, let user search/filter in UI
-    return models
-      .map(model => {
-        const promptCostUsd = parseFloat(model.pricing.prompt || '0');
-        const completionCostUsd = parseFloat(model.pricing.completion || '0');
-        
-        return {
-          id: model.id,
-          label: model.name,
-          description: model.description,
-          costInputEur: promptCostUsd > 0 ? this.formatCostInEur(promptCostUsd * 1000000) : 'N/A', // Per 1M tokens
-          costOutputEur: completionCostUsd > 0 ? this.formatCostInEur(completionCostUsd * 1000000) : 'N/A', // Per 1M tokens
-          contextLength: model.context_length || 0,
-          provider: 'openrouter' as const
-        };
-      })
-      .sort((a, b) => {
-        // Sort by popularity/brand first, then alphabetically
-        const getPopularityScore = (label: string) => {
-          const lowerLabel = label.toLowerCase();
-          if (lowerLabel.includes('claude')) return 1;
-          if (lowerLabel.includes('gpt-4')) return 2;
-          if (lowerLabel.includes('gpt-3.5')) return 3;
-          if (lowerLabel.includes('gemini')) return 4;
-          if (lowerLabel.includes('llama')) return 5;
-          return 10;
-        };
-        
-        const scoreA = getPopularityScore(a.label);
-        const scoreB = getPopularityScore(b.label);
-        
-        if (scoreA !== scoreB) {
-          return scoreA - scoreB;
-        }
-        
-        return a.label.localeCompare(b.label);
-      });
+    const baseModels: ModelOption[] = models.map(model => {
+      const promptCostUsd = parseFloat(model.pricing.prompt || '0');
+      const completionCostUsd = parseFloat(model.pricing.completion || '0');
+      const hasReasoning = supportsReasoning(model.id);
+
+      return {
+        id: model.id,
+        label: model.name,
+        description: model.description,
+        costInputEur: promptCostUsd > 0 ? this.formatCostInEur(promptCostUsd * 1000000) : 'N/A', // Per 1M tokens
+        costOutputEur: completionCostUsd > 0 ? this.formatCostInEur(completionCostUsd * 1000000) : 'N/A', // Per 1M tokens
+        contextLength: model.context_length || 0,
+        provider: 'openrouter' as const,
+        supportsReasoning: hasReasoning,
+        isReasoningVariant: false
+      };
+    });
+
+    // Generate reasoning variants for capable models
+    const reasoningVariants: ModelOption[] = baseModels
+      .filter(model => model.supportsReasoning)
+      .map(model => ({
+        ...model,
+        id: `${model.id}${REASONING_SUFFIX}`,
+        label: `${model.label} (Reasoning)`,
+        description: model.description
+          ? `${model.description} - Extended reasoning mode.`
+          : 'Extended reasoning mode for complex tasks.',
+        supportsReasoning: false,  // This IS the reasoning mode, not a model that supports it
+        isReasoningVariant: true,
+        baseModelId: model.id
+      }));
+
+    // Combine base models with reasoning variants
+    const allModels = [...baseModels, ...reasoningVariants];
+
+    return allModels.sort((a, b) => {
+      // Sort by popularity/brand first, then alphabetically
+      const getPopularityScore = (label: string) => {
+        const lowerLabel = label.toLowerCase();
+        if (lowerLabel.includes('claude')) return 1;
+        if (lowerLabel.includes('gpt-4')) return 2;
+        if (lowerLabel.includes('gpt-3.5')) return 3;
+        if (lowerLabel.includes('gemini')) return 4;
+        if (lowerLabel.includes('llama')) return 5;
+        return 10;
+      };
+
+      // Get base model ID for sorting (reasoning variants stay with their base)
+      const baseIdA = a.baseModelId || a.id;
+      const baseIdB = b.baseModelId || b.id;
+
+      // If same base model, put reasoning variant after base
+      if (baseIdA === baseIdB) {
+        return a.isReasoningVariant ? 1 : -1;
+      }
+
+      const scoreA = getPopularityScore(a.label);
+      const scoreB = getPopularityScore(b.label);
+
+      if (scoreA !== scoreB) {
+        return scoreA - scoreB;
+      }
+
+      return a.label.localeCompare(b.label);
+    });
   }
 
   private transformReplicateModels(models: ReplicateModel[]): ModelOption[] {

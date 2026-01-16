@@ -91,198 +91,209 @@ export function parseTemplateToSections(template: string): BeatTemplateSections 
 }
 
 /**
- * Build a complete XML template string from BeatTemplateSections
+ * Convert plain text lines to Markdown list format
  */
-export function sectionsToTemplate(sections: BeatTemplateSections, systemMessage?: string): string {
-  const escapedSystemMessage = systemMessage || '{systemMessage}';
-
-  return `<messages>
-<message role="system">${escapedSystemMessage}</message>
-<message role="user">${sections.userMessagePreamble}
-
-<story_title>{storyTitle}</story_title>
-
-<glossary>
-{codexEntries}
-</glossary>
-
-<story_context>
-{storySoFar}
-</story_context>
-
-<current_scene>
-{sceneFullText}
-</current_scene>
-
-<beat_generation_task>
-  <objective>
-    ${sections.objective}
-  </objective>
-
-  <narrative_parameters>
-    ${sections.narrativeParameters}
-  </narrative_parameters>
-
-  <staging_notes>
-    <instruction>${sections.stagingNotes}</instruction>
-    {stagingNotes}
-  </staging_notes>
-
-  <beat_requirements>
-    ${sections.beatRequirements}
-  </beat_requirements>
-
-  <style_guidance>
-    ${sections.styleGuidance}
-  </style_guidance>
-
-  <constraints>
-    ${sections.constraints}
-  </constraints>
-
-  <rules>{rules}</rules>
-
-  <output_format>
-    ${sections.outputFormat}
-  </output_format>
-</beat_generation_task>
-
-${sections.generatePrompt}</message>
-</messages>`;
+function formatAsList(text: string): string {
+  return text.split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .map(line => `- ${line}`)
+    .join('\n');
 }
 
 /**
- * Build a complete XML template string from SceneBeatTemplateSections
+ * Build a complete Markdown template string from BeatTemplateSections
+ * Uses ---SYSTEM--- and ---USER--- delimiters for message role separation
+ */
+export function sectionsToTemplate(sections: BeatTemplateSections, systemMessage?: string): string {
+  const sysMsg = systemMessage || '{systemMessage}';
+
+  return `---SYSTEM---
+${sysMsg}
+
+---USER---
+${sections.userMessagePreamble}
+
+## Story Title
+{storyTitle}
+
+## Glossary
+{codexEntries}
+
+## Story So Far
+{storySoFar}
+
+## Current Scene
+{sceneFullText}
+
+---
+
+# Beat Generation Task
+
+## Objective
+${sections.objective}
+
+## Narrative Parameters
+${formatAsList(sections.narrativeParameters)}
+
+## Staging Notes
+${sections.stagingNotes}
+
+{stagingNotes}
+
+## Beat Requirements
+${sections.beatRequirements}
+
+## Style Guidance
+${formatAsList(sections.styleGuidance)}
+
+## Constraints
+${formatAsList(sections.constraints)}
+
+## Rules
+{rules}
+
+## Output Format
+${sections.outputFormat}
+
+---
+
+${sections.generatePrompt}`;
+}
+
+/**
+ * Build a complete Markdown template string from SceneBeatTemplateSections
  * Includes focus_areas and optional bridging_context
+ * Uses ---SYSTEM--- and ---USER--- delimiters for message role separation
  */
 export function sceneBeatSectionsToTemplate(
   sections: SceneBeatTemplateSections,
   systemMessage?: string,
   textAfterBeat?: string
 ): string {
-  const escapedSystemMessage = systemMessage || '{systemMessage}';
+  const sysMsg = systemMessage || '{systemMessage}';
 
   // Build bridging context if textAfterBeat is provided
   let bridgingSection = '';
   if (textAfterBeat && textAfterBeat.trim().length > 0) {
     bridgingSection = `
-  <bridging_context>
-    <instruction>${sections.bridgingInstructions}</instruction>
-    <text_after_beat>${escapeXml(textAfterBeat.trim())}</text_after_beat>
-  </bridging_context>`;
+
+## Bridging Context
+${sections.bridgingInstructions}
+
+**Text that follows:**
+${escapeXml(textAfterBeat.trim())}`;
   }
 
-  return `<messages>
-<message role="system">${escapedSystemMessage}</message>
-<message role="user">${sections.userMessagePreamble}
+  return `---SYSTEM---
+${sysMsg}
 
-<story_title>{storyTitle}</story_title>
+---USER---
+${sections.userMessagePreamble}
 
-<glossary>
+## Story Title
+{storyTitle}
+
+## Glossary
 {codexEntries}
-</glossary>
 
-<story_context>
+## Story So Far
 {storySoFar}
-</story_context>
 
-<current_scene>
+## Current Scene
 {sceneFullText}
-</current_scene>
 
-<beat_generation_task>
-  <objective>
-    ${sections.objective}
-  </objective>
+---
 
-  <narrative_parameters>
-    ${sections.narrativeParameters}
-  </narrative_parameters>
+# Scene Beat Generation Task
 
-  <staging_notes>
-    <instruction>${sections.stagingNotes}</instruction>
-    {stagingNotes}
-  </staging_notes>
+## Objective
+${sections.objective}
 
-  <focus_areas>
-    ${sections.focusAreas}
-  </focus_areas>
+## Narrative Parameters
+${formatAsList(sections.narrativeParameters)}
 
-  <beat_requirements>
-    ${sections.beatRequirements}
-  </beat_requirements>
+## Staging Notes
+${sections.stagingNotes}
+
+{stagingNotes}
+
+## Focus Areas
+${formatAsList(sections.focusAreas)}
+
+## Beat Requirements
+${sections.beatRequirements}
 ${bridgingSection}
-  <style_guidance>
-    ${sections.styleGuidance}
-  </style_guidance>
 
-  <constraints>
-    ${sections.constraints}
-  </constraints>
+## Style Guidance
+${formatAsList(sections.styleGuidance)}
 
-  <rules>{rules}</rules>
+## Constraints
+${formatAsList(sections.constraints)}
 
-  <output_format>
-    ${sections.outputFormat}
-  </output_format>
-</beat_generation_task>
+## Rules
+{rules}
 
-${sections.generatePrompt}</message>
-</messages>`;
+## Output Format
+${sections.outputFormat}
+
+---
+
+${sections.generatePrompt}`;
 }
 
 /**
- * Build a complete XML template string from SceneFromOutlineTemplateSections
+ * Build a complete Markdown template string from SceneFromOutlineTemplateSections
  * Used for generating complete scenes from an outline description
+ * Uses ---SYSTEM--- and ---USER--- delimiters for message role separation
  */
 export function sceneFromOutlineSectionsToTemplate(
   sections: SceneFromOutlineTemplateSections,
   systemMessage?: string
 ): string {
-  const escapedSystemMessage = systemMessage || '{systemMessage}';
+  const sysMsg = systemMessage || '{systemMessage}';
 
-  return `<messages>
-<message role="system">${escapedSystemMessage}</message>
-<message role="user">${sections.userMessagePreamble}
+  return `---SYSTEM---
+${sysMsg}
 
-<story_title>{storyTitle}</story_title>
+---USER---
+${sections.userMessagePreamble}
 
-<glossary>
+## Story Title
+{storyTitle}
+
+## Glossary
 {codexEntries}
-</glossary>
 
-<story_context>
+## Story So Far
 {storySoFar}
-</story_context>
 
-<scene_generation_task>
-  <objective>
-    ${sections.objective}
-  </objective>
+---
 
-  <scene_outline>
-    ${sections.sceneOutline}
-  </scene_outline>
+# Scene Generation Task
 
-  <narrative_parameters>
-    ${sections.narrativeParameters}
-  </narrative_parameters>
+## Objective
+${sections.objective}
 
-  {languageInstruction}
+## Scene Outline
+${sections.sceneOutline}
 
-  <style_guidance>
-    ${sections.styleGuidance}
-  </style_guidance>
+## Narrative Parameters
+${formatAsList(sections.narrativeParameters)}
 
-  {customInstruction}
+{languageInstruction}
 
-  <output_format>
-    ${sections.outputFormat}
-  </output_format>
-</scene_generation_task>
+## Style Guidance
+${formatAsList(sections.styleGuidance)}
 
-${sections.generatePrompt}</message>
-</messages>`;
+{customInstruction}
+
+## Output Format
+${sections.outputFormat}
+
+---
+
+${sections.generatePrompt}`;
 }
 
 /**

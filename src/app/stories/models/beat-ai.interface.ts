@@ -30,6 +30,7 @@ export interface BeatAIGenerationEvent {
 export interface BeatAIPromptEvent {
   beatId: string;
   prompt?: string;
+  rewriteInstruction?: string;  // Rewrite instruction for AI (rewrite action only)
   action: 'generate' | 'deleteAfter' | 'regenerate' | 'rewrite';
   wordCount?: number;
   model?: string;

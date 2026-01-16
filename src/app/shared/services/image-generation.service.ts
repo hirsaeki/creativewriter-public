@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, BehaviorSubject, from, of } from 'rxjs';
-import { map, catchError, tap } from 'rxjs/operators';
+import { Observable, Subscription, from, of, throwError, EMPTY } from 'rxjs';
+import { catchError, tap, finalize } from 'rxjs/operators';
 import {
   ImageProvider,
   ImageGenerationModel,
@@ -33,9 +33,12 @@ export class ImageGenerationService {
   public modelsLoading$ = this.modelService.loading$;
   public modelsByProvider$ = this.modelService.modelsByProvider$;
 
-  // Active generation tracking
-  private generatingSubject = new BehaviorSubject<boolean>(false);
-  public generating$ = this.generatingSubject.asObservable();
+  // Concurrent generation tracking
+  private readonly MAX_CONCURRENT_GENERATIONS = 3;
+  private activeGenerations = new Map<string, Subscription>();
+
+  // Observable for count of currently processing jobs
+  public processingCount$ = this.historyService.processingCount$;
 
   constructor() {
     // Initialize models on service creation
@@ -43,128 +46,188 @@ export class ImageGenerationService {
   }
 
   /**
-   * Generate image(s) using the appropriate provider
+   * Generate image(s) using the appropriate provider.
+   * Runs in the background - returns immediately with the job reference.
+   * Supports up to MAX_CONCURRENT_GENERATIONS concurrent jobs.
    */
   generateImage(request: ImageGenerationRequest): Observable<ImageGenerationJob> {
+    // Check concurrency limit
+    if (this.activeGenerations.size >= this.MAX_CONCURRENT_GENERATIONS) {
+      return throwError(() => new Error(
+        `Maximum ${this.MAX_CONCURRENT_GENERATIONS} concurrent generations allowed. Please wait for one to complete.`
+      ));
+    }
+
     // Get the model to determine provider
     const model = this.modelService.getModel(request.modelId);
     if (!model) {
-      return of({
-        id: '',
-        modelId: request.modelId,
-        modelName: 'Unknown',
-        provider: 'openrouter' as ImageProvider,
-        prompt: request.prompt,
-        status: 'failed' as const,
-        createdAt: new Date(),
-        error: `Model ${request.modelId} not found`,
-        request
-      });
+      return throwError(() => new Error(`Model ${request.modelId} not found`));
     }
 
     // Get the appropriate provider
     const provider = this.getProviderForModel(model.provider);
     if (!provider) {
-      return of({
-        id: '',
-        modelId: request.modelId,
-        modelName: model.name,
-        provider: model.provider,
-        prompt: request.prompt,
-        status: 'failed' as const,
-        createdAt: new Date(),
-        error: `Provider ${model.provider} is not configured`,
-        request
-      });
+      return throwError(() => new Error(`Provider ${model.provider} is not configured`));
     }
 
-    // Create job in history
+    // Create job in history immediately (status: pending)
     const job = this.historyService.createJob(request, model.name, model.provider);
 
-    this.generatingSubject.next(true);
+    // Start background generation (fire-and-forget)
+    this.startBackgroundGeneration(job.id, request, provider);
 
-    // Execute generation
-    return from(provider.generate(request)).pipe(
+    // Return job reference immediately
+    return of(job);
+  }
+
+  /**
+   * Start background generation for a job.
+   * The subscription is tracked so it can be cancelled if needed.
+   */
+  private startBackgroundGeneration(
+    jobId: string,
+    request: ImageGenerationRequest,
+    provider: IImageProvider
+  ): void {
+    // Update status to processing
+    this.historyService.markProcessing(jobId);
+
+    // Start async generation
+    const subscription = from(provider.generate(request)).pipe(
       tap(result => {
-        // Update job with results
-        this.historyService.completeJob(job.id, result.images);
+        this.historyService.completeJob(jobId, result.images);
       }),
-      map(result => ({
-        ...job,
-        status: 'completed' as const,
-        completedAt: new Date(),
-        images: result.images
-      })),
       catchError(error => {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        this.historyService.failJob(job.id, errorMessage);
-        return of({
-          ...job,
-          status: 'failed' as const,
-          completedAt: new Date(),
-          error: errorMessage
-        });
+        const rawMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage = this.sanitizeErrorMessage(rawMessage);
+        this.historyService.failJob(jobId, errorMessage);
+        return EMPTY;
       }),
-      tap(() => {
-        this.generatingSubject.next(false);
+      finalize(() => {
+        this.activeGenerations.delete(jobId);
       })
-    );
+    ).subscribe();
+
+    // Track active generation
+    this.activeGenerations.set(jobId, subscription);
+  }
+
+  /**
+   * Cancel a running generation
+   */
+  cancelGeneration(jobId: string): void {
+    const subscription = this.activeGenerations.get(jobId);
+    if (subscription) {
+      subscription.unsubscribe();
+      this.activeGenerations.delete(jobId);
+      this.historyService.failJob(jobId, 'Cancelled by user');
+    }
   }
 
   /**
    * Regenerate using an existing job's request and append results to that job.
    * Removes seed from request to generate new variations instead of identical copies.
+   * Runs in the background - returns immediately with the job reference.
    */
   regenerateAndAppend(jobId: string): Observable<ImageGenerationJob> {
+    // Check concurrency limit
+    if (this.activeGenerations.size >= this.MAX_CONCURRENT_GENERATIONS) {
+      return throwError(() => new Error(
+        `Maximum ${this.MAX_CONCURRENT_GENERATIONS} concurrent generations allowed. Please wait for one to complete.`
+      ));
+    }
+
     const job = this.historyService.getJob(jobId);
     if (!job) {
-      return of({
-        id: '',
-        modelId: '',
-        modelName: 'Unknown',
-        provider: 'openrouter' as ImageProvider,
-        prompt: '',
-        status: 'failed' as const,
-        createdAt: new Date(),
-        error: 'Job not found',
-        request: { modelId: '', prompt: '' }
-      });
+      return throwError(() => new Error('Job not found'));
     }
 
     // Get the provider
     const provider = this.getProviderForModel(job.provider);
     if (!provider) {
-      return of({
-        ...job,
-        status: 'failed' as const,
-        error: `Provider ${job.provider} is not configured`
-      });
+      return throwError(() => new Error(`Provider ${job.provider} is not configured`));
     }
 
     // Clone request and remove seed to get new variations
-    const request: ImageGenerationRequest = { ...job.request };
-    delete request.seed;
+    const request: ImageGenerationRequest = { ...job.request, seed: undefined };
 
-    this.generatingSubject.next(true);
+    // Start background regeneration
+    this.startBackgroundRegeneration(jobId, request, provider);
 
-    return from(provider.generate(request)).pipe(
+    // Return current job reference immediately
+    return of(job);
+  }
+
+  /**
+   * Start background regeneration that appends to an existing job.
+   */
+  private startBackgroundRegeneration(
+    jobId: string,
+    request: ImageGenerationRequest,
+    provider: IImageProvider
+  ): void {
+    // Use a unique key for tracking this regeneration
+    const regenerationKey = `${jobId}_regen_${Date.now()}`;
+
+    const subscription = from(provider.generate(request)).pipe(
       tap(result => {
         // Append new images to existing job
         this.historyService.appendImagesToJob(jobId, result.images);
       }),
-      map(() => this.historyService.getJob(jobId)!),
       catchError(error => {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        // Don't modify the job on failure, just return error info
-        return of({
-          ...job,
-          error: errorMessage
-        });
+        console.error('Regeneration failed:', error);
+        return EMPTY;
       }),
-      tap(() => {
-        this.generatingSubject.next(false);
+      finalize(() => {
+        this.activeGenerations.delete(regenerationKey);
       })
-    );
+    ).subscribe();
+
+    // Track active regeneration
+    this.activeGenerations.set(regenerationKey, subscription);
+  }
+
+  private readonly MAX_ERROR_MESSAGE_LENGTH = 200;
+
+  /**
+   * Sanitize error messages to prevent HTML content from cluttering the UI.
+   * Extracts meaningful error info from HTML error pages (like Cloudflare 504).
+   */
+  private sanitizeErrorMessage(message: string): string {
+    // Check if message looks like HTML
+    if (message.includes('<!DOCTYPE') || message.includes('<html')) {
+      // Try to extract error code and message from common error page patterns
+      const titleMatch = message.match(/<title>([^<]+)<\/title>/i);
+      const h1Match = message.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+
+      // Extract HTTP status code if present (e.g., "Error code 504")
+      const codeMatch = message.match(/error\s*code\s*(\d{3})/i) ||
+                        message.match(/(\d{3}):\s*\w+/);
+
+      if (titleMatch || h1Match || codeMatch) {
+        const parts: string[] = [];
+        if (codeMatch) parts.push(`HTTP ${codeMatch[1]}`);
+        if (h1Match) parts.push(h1Match[1].trim());
+        else if (titleMatch) parts.push(titleMatch[1].trim());
+        // Filter empty strings and join
+        const result = parts.filter(p => p).join(' - ');
+        if (result) {
+          // Apply truncation to extracted content too
+          return result.length > this.MAX_ERROR_MESSAGE_LENGTH
+            ? result.substring(0, this.MAX_ERROR_MESSAGE_LENGTH) + '...'
+            : result;
+        }
+      }
+
+      return 'Server error (HTML response)';
+    }
+
+    // Truncate very long messages
+    if (message.length > this.MAX_ERROR_MESSAGE_LENGTH) {
+      return message.substring(0, this.MAX_ERROR_MESSAGE_LENGTH) + '...';
+    }
+
+    return message;
   }
 
   /**

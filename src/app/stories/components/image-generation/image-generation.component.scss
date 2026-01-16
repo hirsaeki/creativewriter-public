@@ -51,7 +51,8 @@ ion-content::part(background) {
   padding: 1rem;
   max-width: 1600px;
   margin: 0 auto;
-  padding-bottom: 4rem;
+  // Account for FAB + Android nav bar (FAB is 56px + margins)
+  padding-bottom: calc(var(--cw-space-xl) + env(safe-area-inset-bottom, 0px) + 48px);
 }
 
 // Two-column grid layout
@@ -179,6 +180,88 @@ ion-card-content {
     --border-radius: 8px;
     padding: 0;
     margin-bottom: 0.75rem;
+  }
+}
+
+// Collapsible model selector header
+.model-selector-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+  border-radius: var(--cw-radius-lg) var(--cw-radius-lg) 0 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .expand-icon {
+    color: var(--cw-text-muted);
+    font-size: 1.2rem;
+    transition: transform 0.2s ease;
+  }
+}
+
+// Selected model preview (collapsed state)
+.selected-model-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(71, 118, 230, 0.15);
+  border: 1px solid rgba(71, 118, 230, 0.3);
+  border-radius: var(--cw-radius-md);
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: rgba(71, 118, 230, 0.25);
+  }
+
+  &:focus {
+    outline: 2px solid rgba(71, 118, 230, 0.5);
+    outline-offset: 2px;
+  }
+
+  .model-info {
+    flex: 1;
+    min-width: 0;
+
+    h4 {
+      color: var(--cw-text-primary);
+      font-weight: 500;
+      margin: 0 0 0.25rem 0;
+      font-size: 0.95rem;
+    }
+
+    p {
+      color: var(--cw-text-muted);
+      font-size: 0.8rem;
+      margin: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  ion-button {
+    --color: var(--cw-text-muted);
+    flex-shrink: 0;
+  }
+}
+
+// Expanded model selector
+.model-selector-expanded {
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -364,22 +447,60 @@ ion-card-content {
   margin-top: 0.5rem;
 }
 
-// Generate button
-.generate-button {
-  margin-top: var(--cw-space-lg);
-  --background: var(--cw-gradient-brand);
-  --background-hover: linear-gradient(135deg, #5a86f0 0%, #9e64f9 100%);
-  --border-radius: var(--cw-radius-lg);
-  font-weight: var(--cw-font-weight-semibold);
-  letter-spacing: 0.3px;
-  height: 48px;
+// Generate FAB
+// Following app-wide pattern: base + safe-area + 48px for Android nav bar
+.generate-fab {
+  // Use bottom/right positioning (margin doesn't work correctly on fixed elements)
+  // Account for Android 3-button navigation bar + iOS safe area
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px) + 48px);
+  right: 16px;
+  z-index: 999;
 
-  ion-icon {
-    margin-right: var(--cw-space-sm);
+  ion-fab-button {
+    --background: var(--cw-gradient-brand);
+    --background-hover: var(--cw-gradient-brand-hover, linear-gradient(135deg, #5a86f0 0%, #9e64f9 100%));
+    --background-activated: var(--cw-gradient-brand-active, linear-gradient(135deg, #3a66d0 0%, #7e44d9 100%));
+    --box-shadow: var(--cw-shadow-lg);
+    width: 56px;
+    height: 56px;
+
+    ion-icon {
+      font-size: 1.5rem;
+    }
+
+    &[disabled] {
+      --background: var(--cw-bg-input);
+      opacity: 0.5;
+    }
   }
 
-  ion-spinner {
-    margin-right: var(--cw-space-sm);
+  // Processing count badge
+  .processing-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--cw-shadow-md);
+    z-index: 1;
+  }
+}
+
+// Responsive FAB sizing for smaller screens
+@media (max-width: 480px) {
+  .generate-fab ion-fab-button {
+    width: 48px;
+    height: 48px;
+
+    ion-icon {
+      font-size: 1.25rem;
+    }
   }
 }
 
@@ -610,7 +731,8 @@ ion-card-content {
 @media (max-width: 768px) {
   .main-container {
     padding: 0.75rem;
-    padding-bottom: 6rem;
+    // Account for FAB + Android nav bar
+    padding-bottom: calc(var(--cw-space-xl) + env(safe-area-inset-bottom, 0px) + 48px);
   }
 
   .provider-card {

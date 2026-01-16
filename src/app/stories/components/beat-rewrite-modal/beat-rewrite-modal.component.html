@@ -1,0 +1,66 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Rewrite Beat</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="dismiss()" aria-label="Close modal">
+        <ion-icon name="close" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <!-- Instruction Section -->
+  <div class="rewrite-instruction-section">
+    <label class="instruction-label" for="rewrite-instruction">Rewrite Instruction</label>
+    <ion-textarea
+      id="rewrite-instruction"
+      [(ngModel)]="instruction"
+      placeholder="e.g., 'Make it more dramatic', 'Add more sensory details', 'Change the pacing'"
+      [rows]="4"
+      class="instruction-textarea">
+    </ion-textarea>
+    <p class="instruction-hint">
+      Describe how you want the AI to rewrite the existing text.
+    </p>
+  </div>
+
+  <!-- Current Instruction Display (if exists and different) -->
+  <div class="stored-instruction-section" *ngIf="currentInstruction && currentInstruction !== instruction">
+    <div class="stored-label">
+      <ion-icon name="bookmark-outline"></ion-icon>
+      <span>Previously Used Instruction</span>
+    </div>
+    <p class="stored-text">{{ currentInstruction }}</p>
+  </div>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <div class="action-buttons">
+      <ion-button
+        expand="block"
+        fill="outline"
+        [disabled]="!instruction.trim()"
+        [attr.aria-disabled]="!instruction.trim()"
+        (click)="rewriteCurrent()">
+        <ion-icon name="refresh-outline" slot="start"></ion-icon>
+        Rewrite Current
+      </ion-button>
+      <ion-button
+        expand="block"
+        fill="solid"
+        color="primary"
+        [disabled]="!instruction.trim() || !hasOriginalText"
+        [attr.aria-disabled]="!instruction.trim() || !hasOriginalText"
+        (click)="rewriteOriginal()">
+        <ion-icon name="document-text-outline" slot="start"></ion-icon>
+        Rewrite Original
+      </ion-button>
+    </div>
+    <p class="action-descriptions">
+      <span><strong>Current:</strong> Apply instruction to current beat content</span>
+      <span><strong>Original:</strong> Apply instruction to the original stored text</span>
+    </p>
+  </ion-toolbar>
+</ion-footer>

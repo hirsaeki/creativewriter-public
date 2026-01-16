@@ -27,6 +27,7 @@ import { getProviderIcon as getIcon, getProviderTooltip as getTooltip } from '..
 import { PremiumRewriteService } from '../../../shared/services/premium-rewrite.service';
 import { DialogService } from '../../../core/services/dialog.service';
 import { SceneAIGenerationService } from '../../../shared/services/scene-ai-generation.service';
+import { BeatRewriteModalComponent } from '../beat-rewrite-modal/beat-rewrite-modal.component';
 
 interface SceneContext {
   chapterId: string;
@@ -443,7 +444,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
     // Determine the action and get existing text if needed
     let action: 'generate' | 'regenerate' | 'rewrite';
     let existingText: string | undefined;
-    let promptToUse = this.beatData.prompt; // Default to original prompt
+    let rewriteInstruction: string | undefined;
 
     if (this.beatData.lastAction === 'rewrite' && this.beatData.rewriteContext) {
       // This was a rewrite - regenerate as a rewrite
@@ -451,8 +452,8 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       // Try to get current text after beat, fallback to original stored text
       existingText = this.proseMirrorService.getTextAfterBeat(this.beatData.id)
                      || this.beatData.rewriteContext.originalText;
-      // Use the rewrite instruction, not the original prompt
-      promptToUse = this.beatData.rewriteContext.instruction;
+      // Pass the rewrite instruction separately
+      rewriteInstruction = this.beatData.rewriteContext.instruction;
     } else {
       // Regular regeneration - use original prompt
       action = 'regenerate';
@@ -460,7 +461,8 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.promptSubmit.emit({
       beatId: this.beatData.id,
-      prompt: promptToUse,
+      prompt: this.beatData.prompt,  // Always the original prompt
+      rewriteInstruction: rewriteInstruction,  // Only set for rewrite actions
       action: action,
       wordCount: this.getActualWordCount(),
       model: this.selectedModel,
@@ -471,6 +473,74 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       customContext: customContext,
       existingText: existingText,
       textAfterBeat: textAfterBeat,
+      stagingNotes: this.beatData.stagingNotes
+    });
+
+    this.contentUpdate.emit(this.beatData);
+  }
+
+  /**
+   * Regenerate from beat prompt (clears rewrite context, returns to standard generation)
+   */
+  async regenerateFromPrompt(): Promise<void> {
+    // Clear rewrite context - we're going back to standard generation
+    this.beatData.lastAction = 'generate';
+    this.beatData.rewriteContext = undefined;
+
+    // Use existing regenerateContent logic
+    await this.regenerateContent();
+  }
+
+  /**
+   * Execute rewrite - either from original or current content
+   * Called after modal dismisses with action
+   */
+  private async executeRewrite(
+    action: 'rewrite-current' | 'rewrite-original',
+    instruction: string,
+    currentText: string
+  ): Promise<void> {
+    // Determine which text to rewrite
+    const textToRewrite = action === 'rewrite-original' && this.beatData.rewriteContext?.originalText
+      ? this.beatData.rewriteContext.originalText
+      : currentText;
+
+    // Store/update rewrite context (persists instruction)
+    this.beatData.lastAction = 'rewrite';
+    this.beatData.rewriteContext = {
+      originalText: this.beatData.rewriteContext?.originalText || currentText,
+      instruction: instruction
+    };
+
+    // Start rewrite process
+    this.beatData.isGenerating = true;
+    this.cdr.markForCheck();
+    this.beatData.wordCount = this.getActualWordCount();
+    this.beatData.model = this.selectedModel;
+
+    // Persist the selected scenes and story outline setting
+    this.beatData.selectedScenes = this.selectedScenes.map(scene => ({
+      sceneId: scene.sceneId,
+      chapterId: scene.chapterId
+    }));
+    this.beatData.includeStoryOutline = this.includeStoryOutline;
+
+    // Build custom context from selected scenes
+    const customContext = await this.buildCustomContext();
+
+    this.promptSubmit.emit({
+      beatId: this.beatData.id,
+      prompt: this.beatData.prompt,
+      rewriteInstruction: instruction,
+      action: 'rewrite',
+      existingText: textToRewrite,
+      wordCount: this.getActualWordCount(),
+      model: this.selectedModel,
+      storyId: this.storyId,
+      chapterId: this.chapterId,
+      sceneId: this.sceneId,
+      beatType: this.beatData.beatType,
+      customContext: customContext,
       stagingNotes: this.beatData.stagingNotes
     });
 
@@ -562,6 +632,7 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /**
    * Rewrite the generated content with a custom rewrite prompt
+   * Opens modal with instruction input and rewrite options
    */
   async rewriteContent(): Promise<void> {
     // Premium gate check
@@ -583,86 +654,24 @@ export class BeatAIComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    // Show alert to get rewrite prompt
-    const alert = await this.alertController.create({
-      header: 'Rewrite Beat',
-      message: 'Provide instructions for how the AI should rewrite the existing text.',
-      inputs: [
-        {
-          name: 'rewritePrompt',
-          type: 'textarea',
-          placeholder: 'e.g., "Make it more dramatic", "Write from a different perspective", "Expand the details"'
-        }
-      ],
-      buttons: [
-        {
-          text: 'Cancel',
-          role: 'cancel'
-        },
-        {
-          text: 'Rewrite',
-          handler: async (data) => {
-            const rewritePrompt = data.rewritePrompt?.trim();
-
-            if (!rewritePrompt) {
-              // Show error if no prompt provided
-              const errorAlert = await this.alertController.create({
-                header: 'Prompt Required',
-                message: 'Please provide a rewrite prompt.',
-                buttons: ['OK']
-              });
-              await errorAlert.present();
-              return false; // Prevent alert from closing
-            }
-
-            // Store the rewrite context for regeneration
-            // IMPORTANT: Keep the original prompt intact, store rewrite instruction separately
-            this.beatData.lastAction = 'rewrite';
-            this.beatData.rewriteContext = {
-              originalText: existingText,
-              instruction: rewritePrompt
-            };
-            // DO NOT replace the original prompt - keep it for future regenerations
-
-            // Start rewrite process
-            this.beatData.isGenerating = true;
-            this.cdr.markForCheck(); // Trigger change detection to show animation
-            this.beatData.wordCount = this.getActualWordCount();
-            this.beatData.model = this.selectedModel;
-
-            // Persist the selected scenes and story outline setting
-            this.beatData.selectedScenes = this.selectedScenes.map(scene => ({
-              sceneId: scene.sceneId,
-              chapterId: scene.chapterId
-            }));
-            this.beatData.includeStoryOutline = this.includeStoryOutline;
-
-            // Build custom context from selected scenes
-            const customContext = await this.buildCustomContext();
-
-            this.promptSubmit.emit({
-              beatId: this.beatData.id,
-              prompt: rewritePrompt,
-              action: 'rewrite',
-              wordCount: this.getActualWordCount(),
-              model: this.selectedModel,
-              storyId: this.storyId,
-              chapterId: this.chapterId,
-              sceneId: this.sceneId,
-              beatType: this.beatData.beatType,
-              customContext: customContext,
-              existingText: existingText, // Pass the existing text to be rewritten
-              stagingNotes: this.beatData.stagingNotes
-            });
-
-            this.contentUpdate.emit(this.beatData);
-            return true;
-          }
-        }
-      ]
+    // Open rewrite modal
+    const modal = await this.modalController.create({
+      component: BeatRewriteModalComponent,
+      componentProps: {
+        beatId: this.beatData.id,
+        currentInstruction: this.beatData.rewriteContext?.instruction || '',
+        hasOriginalText: !!this.beatData.rewriteContext?.originalText
+      },
+      cssClass: 'beat-rewrite-modal'
     });
 
-    await alert.present();
+    await modal.present();
+
+    const { data } = await modal.onDidDismiss();
+    if (data?.action && data?.instruction &&
+        (data.action === 'rewrite-current' || data.action === 'rewrite-original')) {
+      await this.executeRewrite(data.action, data.instruction, existingText);
+    }
   }
 
   /**

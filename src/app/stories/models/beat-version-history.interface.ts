@@ -46,14 +46,17 @@ export interface BeatVersion {
   /** Whether story outline was included in context */
   includeStoryOutline?: boolean;
 
-  /** Action type: 'generate' (new content) or 'rewrite' (modified existing content) */
-  action?: 'generate' | 'rewrite';
+  /** Action type: 'generate' (new), 'regenerate' (redo), or 'rewrite' (modified existing) */
+  action?: 'generate' | 'regenerate' | 'rewrite';
 
   /** For rewrite actions: the original text that was rewritten */
   existingText?: string;
 
   /** Staging notes for physical/positional consistency */
   stagingNotes?: string;
+
+  /** For rewrite actions: the instruction used to rewrite */
+  rewriteInstruction?: string;
 }
 
 /**

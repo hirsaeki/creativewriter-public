@@ -105,4 +105,8 @@ export interface ModelOption {
   costOutputEur: string; // Formatted cost per 1M tokens in EUR
   contextLength: number;
   provider: 'openrouter' | 'replicate' | 'gemini' | 'ollama' | 'claude' | 'openaiCompatible';
+  // Reasoning support fields
+  supportsReasoning?: boolean;   // True if this model supports reasoning mode
+  isReasoningVariant?: boolean;  // True if this is the reasoning variant entry
+  baseModelId?: string;          // For reasoning variants, points to the base model ID
 }

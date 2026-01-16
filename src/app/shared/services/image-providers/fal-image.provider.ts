@@ -312,12 +312,75 @@ export class FalImageProvider implements IImageProvider {
 
     return {
       id: falModel.endpoint_id,
-      name: falModel.metadata.display_name,
+      name: this.deriveModelName(falModel),
       description: falModel.metadata.description || '',
       provider: 'fal',
       capabilities,
       thumbnail: falModel.metadata.thumbnail_url
     };
+  }
+
+  /**
+   * Derives the proper model name from API response.
+   * Falls back to extracting from endpoint_id when display_name appears to be just the creator name.
+   * This is needed because fal.ai's API sometimes returns creator names (e.g., "bytedance")
+   * instead of actual model names in the display_name field.
+   */
+  private deriveModelName(falModel: FalModelEntry): string {
+    const displayName = falModel.metadata?.display_name || '';
+    const endpointId = falModel.endpoint_id || '';
+
+    // If display_name is empty or missing, extract from endpoint_id
+    if (!displayName.trim()) {
+      const parts = endpointId.split('/');
+      if (parts.length > 1) {
+        return this.formatModelName(parts.slice(1).join('-'));
+      }
+      return endpointId || 'Unknown Model';
+    }
+
+    // Extract parts from endpoint_id (e.g., "bytedance-seed/seedream-4.5" -> ["bytedance-seed", "seedream-4.5"])
+    const parts = endpointId.split('/');
+    if (parts.length <= 1) {
+      // No organization prefix, use display_name as-is
+      return displayName;
+    }
+
+    const creatorRaw = parts[0] || '';
+    // Normalize for comparison: remove non-alphanumeric chars and lowercase
+    const creatorNormalized = creatorRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const displayNameNormalized = displayName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Check if display_name is likely just the creator/organization name
+    // Be conservative: only trigger if there's a strong match, not just partial overlap
+    const isCreatorName =
+      displayNameNormalized.length > 0 && (
+        // Exact match after normalization (e.g., "bytedance" matches "bytedance-seed")
+        creatorNormalized === displayNameNormalized ||
+        // Creator contains the display name exactly (e.g., creator "bytedance-seed" contains "bytedance")
+        (displayNameNormalized.length >= 5 && creatorNormalized.startsWith(displayNameNormalized))
+      );
+
+    if (isCreatorName) {
+      // Use the model path from endpoint_id, joined with hyphen for formatModelName to split
+      const modelPath = parts.slice(1).join('-');
+      return this.formatModelName(modelPath);
+    }
+
+    return displayName;
+  }
+
+  /**
+   * Formats a model name from endpoint path to Title Case.
+   * E.g., "seedream-4.5" -> "Seedream 4.5"
+   */
+  private formatModelName(name: string): string {
+    return name
+      .split(/[-_]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   getModel(modelId: string): ImageGenerationModel | undefined {

@@ -247,6 +247,34 @@
   color: var(--ion-color-success);
 }
 
+/* Rewrite Instruction Section (for rewrites) */
+.rewrite-instruction-section {
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: rgba(var(--ion-color-secondary-rgb), 0.05);
+  border-left: 3px solid var(--ion-color-secondary);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.rewrite-instruction-section strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--ion-color-secondary);
+  font-size: 0.8rem;
+}
+
+.rewrite-instruction-content {
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  color: var(--ion-text-color);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-style: italic;
+}
+
 /* Original Text Section (for rewrites) */
 .original-text-section {
   padding: 0.75rem;

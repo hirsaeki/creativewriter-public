@@ -221,6 +221,94 @@ describe('BeatVersionHistoryModalComponent', () => {
       });
     }));
 
+    it('should NOT pass restoredPrompt when restoring a rewrite version', fakeAsync(async () => {
+      const rewriteVersion: BeatVersion = {
+        versionId: 'v-rewrite-123',
+        content: '<p>Rewritten content</p>',
+        prompt: 'original prompt',
+        rewriteInstruction: 'make it shorter',
+        action: 'rewrite',
+        existingText: 'original text before rewrite',
+        model: 'claude-opus-4',
+        beatType: 'story',
+        wordCount: 400,
+        generatedAt: new Date('2024-01-15T12:00:00'),
+        characterCount: 80,
+        isCurrent: false
+      };
+
+      const historyWithRewrite: BeatVersionHistory = {
+        ...mockHistory,
+        versions: [rewriteVersion, mockVersion2]
+      };
+      mockBeatHistoryService.getHistory.and.returnValue(Promise.resolve(historyWithRewrite));
+
+      await component.loadHistory();
+      tick();
+
+      await component.restoreVersion(rewriteVersion);
+      tick();
+
+      await restoreHandler();
+      tick();
+
+      // For rewrite versions, restoredPrompt should be undefined
+      expect(mockModalController.dismiss).toHaveBeenCalledWith({
+        versionChanged: true,
+        restoredPrompt: undefined
+      });
+    }));
+
+    it('should pass restoredPrompt when restoring a generate version', fakeAsync(async () => {
+      const generateVersion: BeatVersion = {
+        versionId: 'v-generate-123',
+        content: '<p>Generated content</p>',
+        prompt: 'test generation prompt',
+        action: 'generate',
+        model: 'claude-opus-4',
+        beatType: 'story',
+        wordCount: 400,
+        generatedAt: new Date('2024-01-15T12:00:00'),
+        characterCount: 80,
+        isCurrent: false
+      };
+
+      const historyWithGenerate: BeatVersionHistory = {
+        ...mockHistory,
+        versions: [generateVersion, mockVersion2]
+      };
+      mockBeatHistoryService.getHistory.and.returnValue(Promise.resolve(historyWithGenerate));
+
+      await component.loadHistory();
+      tick();
+
+      await component.restoreVersion(generateVersion);
+      tick();
+
+      await restoreHandler();
+      tick();
+
+      expect(mockModalController.dismiss).toHaveBeenCalledWith({
+        versionChanged: true,
+        restoredPrompt: 'test generation prompt'
+      });
+    }));
+
+    it('should pass restoredPrompt when restoring version without action field (legacy)', fakeAsync(async () => {
+      // Legacy versions may not have an action field - mockVersion1 has no action
+      await component.restoreVersion(mockVersion1);
+      tick();
+
+      await restoreHandler();
+      tick();
+
+      // mockVersion1 has no action field, so it should pass the prompt
+      expect(mockModalController.dismiss).toHaveBeenCalledWith({
+        versionChanged: true,
+        restoredPrompt: 'First test prompt'
+      });
+    }));
+
     // Note: Error handling test removed due to complexity of testing async handlers
     // The error handling is verified manually and through integration tests
   });

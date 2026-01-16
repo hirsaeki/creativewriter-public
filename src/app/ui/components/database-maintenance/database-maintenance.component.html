@@ -720,5 +720,52 @@
       </div>
     </ion-accordion>
 
+    <!-- Developer Tools -->
+    <ion-accordion value="developer">
+      <ion-item slot="header" lines="full">
+        <ion-icon name="flask-outline" slot="start"></ion-icon>
+        <ion-label>
+          <h3>Developer Tools</h3>
+          <p>Testing and development utilities</p>
+        </ion-label>
+      </ion-item>
+      <div slot="content" class="accordion-content">
+        <ion-item lines="none" class="database-info">
+          <ion-icon name="information-circle-outline" slot="start" color="primary"></ion-icon>
+          <ion-label>
+            <h3>Test Data Generation</h3>
+            <p>Create sample stories with complete content for testing and development purposes.</p>
+          </ion-label>
+        </ion-item>
+
+        <div class="operation-section">
+          <h4>Create Test Story</h4>
+          <p class="section-description">
+            Generate a complete test story with 2 chapters, 6 scenes, beat inputs, and a fully populated codex including characters, locations, objects, and notes with custom fields.
+          </p>
+
+          <ion-button expand="block" color="tertiary" (click)="createTestStory()" [disabled]="isCreatingTestStory">
+            <ion-icon name="flask-outline" slot="start"></ion-icon>
+            <ion-spinner *ngIf="isCreatingTestStory" slot="start"></ion-spinner>
+            {{ isCreatingTestStory ? 'Creating...' : 'Create Test Story' }}
+          </ion-button>
+
+          <ion-progress-bar *ngIf="isCreatingTestStory" type="indeterminate" color="tertiary"></ion-progress-bar>
+        </div>
+
+        <div class="info-section">
+          <ion-icon name="information-circle-outline" color="primary"></ion-icon>
+          <ul>
+            <li>Creates a gothic mystery story called "Test Story - [timestamp]"</li>
+            <li>Includes 3 character entries with custom fields (age, occupation, etc.)</li>
+            <li>Includes 2 location entries with custom fields (era, atmosphere, etc.)</li>
+            <li>Includes 2 object entries with custom fields (origin, power, etc.)</li>
+            <li>Includes 1 notes entry with world-building rules</li>
+            <li>Each scene contains embedded beat inputs with sample content</li>
+          </ul>
+        </div>
+      </div>
+    </ion-accordion>
+
   </ion-accordion-group>
 </div>

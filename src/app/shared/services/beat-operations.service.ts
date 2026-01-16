@@ -292,6 +292,28 @@ export class BeatOperationsService {
 
     // Handle delete after beat action
     if (event.action === 'deleteAfter') {
+      // Save content to history BEFORE deleting so it can be recovered
+      if (event.storyId) {
+        const contentToDelete = this.getTextAfterBeat(editorView, event.beatId);
+        if (contentToDelete && contentToDelete.trim().length > 0) {
+          const beatPos = this.findBeatNodePosition(editorView, event.beatId);
+          const beatNode = beatPos !== null ? editorView.state.doc.nodeAt(beatPos) : null;
+
+          this.savePreviousContentToHistory(
+            event.beatId,
+            event.storyId,
+            contentToDelete,
+            event.beatType || 'story',
+            {
+              prompt: beatNode?.attrs['prompt'] || undefined,
+              model: beatNode?.attrs['model'] || undefined,
+              stagingNotes: beatNode?.attrs['stagingNotes'] || undefined
+            }
+          ).catch(error => {
+            console.error('[BeatOperations] Failed to save content to history before delete:', error);
+          });
+        }
+      }
       this.deleteContentAfterBeat(editorView, event.beatId, getHTMLContent);
       return;
     }
@@ -300,12 +322,21 @@ export class BeatOperationsService {
     if (event.storyId) {
       const existingContent = this.getTextAfterBeat(editorView, event.beatId);
       if (existingContent && existingContent.trim().length > 0) {
+        // Read metadata from beat node for history entry
+        const beatPos = this.findBeatNodePosition(editorView, event.beatId);
+        const beatNode = beatPos !== null ? editorView.state.doc.nodeAt(beatPos) : null;
+
         // Save existing content as a previous version (don't block generation)
         this.savePreviousContentToHistory(
           event.beatId,
           event.storyId,
           existingContent,
-          event.beatType || 'story'
+          event.beatType || 'story',
+          {
+            prompt: beatNode?.attrs['prompt'] || undefined,
+            model: beatNode?.attrs['model'] || undefined,
+            stagingNotes: beatNode?.attrs['stagingNotes'] || undefined
+          }
         ).catch(error => {
           console.error('[BeatOperations] Failed to save previous content to history:', error);
         });
@@ -376,7 +407,9 @@ export class BeatOperationsService {
     }
 
     // Generate AI content with streaming
-    this.beatAIService.generateBeatContent(event.prompt || '', event.beatId, {
+    // For rewrite actions, use the rewrite instruction for AI; otherwise use the original prompt
+    const aiPrompt = event.rewriteInstruction || event.prompt || '';
+    this.beatAIService.generateBeatContent(aiPrompt, event.beatId, {
       wordCount: event.wordCount,
       model: event.model,
       storyId: event.storyId,
@@ -385,10 +418,12 @@ export class BeatOperationsService {
       beatPosition: beatNodePosition,
       beatType: event.beatType,
       customContext: event.customContext,
-      action: event.action === 'rewrite' ? 'rewrite' : 'generate',
+      action: event.action === 'rewrite' ? 'rewrite' : (event.action === 'regenerate' ? 'regenerate' : 'generate'),
       existingText: event.existingText,
       textAfterBeat: textAfterBeatForBridging,
-      stagingNotes: event.stagingNotes
+      stagingNotes: event.stagingNotes,
+      originalPrompt: event.prompt,  // Pass original prompt for history
+      rewriteInstruction: event.rewriteInstruction  // Pass rewrite instruction for history
     }).subscribe({
       next: (finalContent) => {
         // Final content received - ensure beat node is updated
@@ -453,6 +488,29 @@ export class BeatOperationsService {
     }
     const previousPrompt = beatNode.attrs['prompt'] || '';
     const previousVersionId = beatNode.attrs['currentVersionId'] || '';
+    const previousModel = beatNode.attrs['model'] || '';
+    const previousStagingNotes = beatNode.attrs['stagingNotes'] || '';
+    const previousBeatType = (beatNode.attrs['beatType'] || 'story') as 'story' | 'scene';
+
+    // 2b. Save current content to history BEFORE switching (if there's content to save)
+    if (previousContent && previousContent.trim().length > 0) {
+      try {
+        await this.savePreviousContentToHistory(
+          beatId,
+          history.storyId,
+          previousContent,
+          previousBeatType,
+          {
+            prompt: previousPrompt,
+            model: previousModel,
+            stagingNotes: previousStagingNotes
+          }
+        );
+      } catch (saveError) {
+        console.warn('[BeatOperations] Failed to save current content to history before switch:', saveError);
+        // Continue with switch even if save fails
+      }
+    }
 
     try {
       // 3. Delete current content after beat
@@ -528,7 +586,9 @@ export class BeatOperationsService {
         this.updateBeatNode(editorView, beatId, {
           prompt: previousPrompt,
           currentVersionId: previousVersionId || undefined,
-          hasHistory: true
+          hasHistory: true,
+          model: previousModel || undefined,
+          stagingNotes: previousStagingNotes || undefined
         });
 
         console.info('[BeatOperations] Rollback completed successfully');
@@ -865,7 +925,17 @@ export class BeatOperationsService {
     beatId: string,
     storyId: string,
     content: string,
-    beatType: 'story' | 'scene'
+    beatType: 'story' | 'scene',
+    metadata?: {
+      prompt?: string;
+      model?: string;
+      action?: 'generate' | 'regenerate' | 'rewrite';
+      rewriteInstruction?: string;
+      stagingNotes?: string;
+      wordCount?: number;
+      selectedScenes?: { sceneId: string; chapterId: string; }[];
+      includeStoryOutline?: boolean;
+    }
   ): Promise<void> {
     // Check if this content already exists in ANY version to avoid duplicates
     const existingHistory = await this.beatHistoryService.getHistory(beatId);
@@ -884,19 +954,24 @@ export class BeatOperationsService {
 
     // Strip HTML tags for accurate word count
     const textContent = content.replace(/<[^>]*>/g, '').trim();
-    const wordCount = textContent ? textContent.split(/\s+/).length : 0;
+    const calculatedWordCount = textContent ? textContent.split(/\s+/).length : 0;
 
     // Save the existing content as a previous version
+    // Use metadata if provided, otherwise use defaults
     await this.beatHistoryService.saveVersion(beatId, storyId, {
       content,
-      prompt: '(previous content)',
-      model: 'manual',
+      prompt: metadata?.prompt || '(previous content)',
+      model: metadata?.model || 'manual',
       beatType,
-      wordCount,
+      wordCount: metadata?.wordCount || calculatedWordCount,
       generatedAt: new Date(),
       characterCount: content.length,
       isCurrent: false,
-      action: 'generate'
+      action: metadata?.action || 'generate',
+      rewriteInstruction: metadata?.rewriteInstruction,
+      stagingNotes: metadata?.stagingNotes,
+      selectedScenes: metadata?.selectedScenes,
+      includeStoryOutline: metadata?.includeStoryOutline
     });
   }
 }

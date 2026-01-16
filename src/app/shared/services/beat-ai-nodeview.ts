@@ -143,7 +143,6 @@ export class BeatAINodeView implements NodeView {
   }
 
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   stopEvent(_event: Event): boolean {
     // Allow all events inside the beat AI component - don't let outer ProseMirror interfere
     return true;
@@ -209,8 +208,20 @@ export class BeatAINodeView implements NodeView {
       includeStoryOutline: attrs['includeStoryOutline'] !== undefined ? attrs['includeStoryOutline'] : true,
       currentVersionId: attrs['currentVersionId'] || undefined,
       hasHistory: attrs['hasHistory'] || false,
-      stagingNotes: attrs['stagingNotes'] || undefined
+      stagingNotes: attrs['stagingNotes'] || undefined,
+      lastAction: attrs['lastAction'] || undefined,
+      rewriteContext: this.parseRewriteContext(attrs['rewriteContext'])
     };
+  }
+
+  private parseRewriteContext(value: string | undefined): { originalText: string; instruction: string } | undefined {
+    if (!value) return undefined;
+    try {
+      return JSON.parse(value);
+    } catch {
+      // Gracefully handle corrupted JSON - reset to undefined
+      return undefined;
+    }
   }
 
   private updateNodeAttrs(beatData: BeatAI): void {
@@ -241,6 +252,14 @@ export class BeatAINodeView implements NodeView {
     }
     // Always include stagingNotes, preserving existing value if not provided
     attrs['stagingNotes'] = beatData.stagingNotes ?? this.node.attrs['stagingNotes'] ?? '';
+
+    // Persist lastAction and rewriteContext for split button functionality
+    if (beatData.lastAction) {
+      attrs['lastAction'] = beatData.lastAction;
+    }
+    if (beatData.rewriteContext) {
+      attrs['rewriteContext'] = JSON.stringify(beatData.rewriteContext);
+    }
 
     const tr = this.view.state.tr.setNodeMarkup(pos, undefined, attrs);
     this.view.dispatch(tr);

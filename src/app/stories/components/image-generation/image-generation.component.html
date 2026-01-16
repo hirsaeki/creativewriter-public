@@ -52,43 +52,61 @@
 
           <!-- Model Selection -->
           <ion-card class="model-card" *ngIf="isProviderConfigured(selectedProvider)">
-            <ion-card-header>
+            <ion-card-header (click)="toggleModelSelector()" (keydown.enter)="toggleModelSelector()"
+              class="model-selector-header" role="button" tabindex="0"
+              [attr.aria-expanded]="modelSelectorExpanded || !selectedModel">
               <ion-card-title>
                 <ion-icon name="sparkles-outline"></ion-icon>
-                Select Model
+                {{ selectedModel ? 'Model' : 'Select Model' }}
               </ion-card-title>
+              <ion-icon [name]="modelSelectorExpanded ? 'chevron-up' : 'chevron-down'" class="expand-icon"></ion-icon>
             </ion-card-header>
             <ion-card-content>
-              <!-- Loading state -->
-              <div *ngIf="modelsLoading" class="loading-state">
-                <ion-spinner name="crescent"></ion-spinner>
-                <p>Loading models...</p>
+              <!-- Collapsed: Show selected model preview -->
+              <div *ngIf="!modelSelectorExpanded && selectedModel" class="selected-model-preview"
+                   (click)="toggleModelSelector()" (keydown.enter)="toggleModelSelector()" tabindex="0" role="button">
+                <div class="model-info">
+                  <h4>{{ selectedModel.name }}</h4>
+                  <p>{{ selectedModel.description | slice:0:80 }}{{ selectedModel.description.length > 80 ? '...' : '' }}</p>
+                </div>
+                <ion-button fill="clear" size="small" (click)="$event.stopPropagation(); toggleModelSelector()">
+                  <ion-icon name="swap-horizontal-outline" slot="icon-only"></ion-icon>
+                </ion-button>
               </div>
 
-              <div *ngIf="!modelsLoading">
-                <!-- Search -->
-                <ion-searchbar [(ngModel)]="modelSearchTerm" (ionInput)="onModelSearch()" placeholder="Search models..."
-                  debounce="300">
-                </ion-searchbar>
+              <!-- Expanded: Show search and model list -->
+              <div *ngIf="modelSelectorExpanded || !selectedModel" class="model-selector-expanded">
+                <!-- Loading state -->
+                <div *ngIf="modelsLoading" class="loading-state">
+                  <ion-spinner name="crescent"></ion-spinner>
+                  <p>Loading models...</p>
+                </div>
 
-                <!-- Model list -->
-                <div class="model-list">
-                  <div *ngFor="let model of filteredModels" class="model-item"
-                    [class.selected]="selectedModel?.id === model.id" (click)="selectModel(model)"
-                    (keydown.enter)="selectModel(model)" tabindex="0" role="option"
-                    [attr.aria-selected]="selectedModel?.id === model.id">
-                    <div class="model-info">
-                      <h4>{{ model.name }}</h4>
-                      <p>{{ model.description | slice:0:100 }}{{ model.description.length > 100 ? '...' : '' }}</p>
+                <div *ngIf="!modelsLoading">
+                  <!-- Search -->
+                  <ion-searchbar [(ngModel)]="modelSearchTerm" (ionInput)="onModelSearch()" placeholder="Search models..."
+                    debounce="300">
+                  </ion-searchbar>
+
+                  <!-- Model list -->
+                  <div class="model-list">
+                    <div *ngFor="let model of filteredModels" class="model-item"
+                      [class.selected]="selectedModel?.id === model.id" (click)="selectModel(model)"
+                      (keydown.enter)="selectModel(model)" tabindex="0" role="option"
+                      [attr.aria-selected]="selectedModel?.id === model.id">
+                      <div class="model-info">
+                        <h4>{{ model.name }}</h4>
+                        <p>{{ model.description | slice:0:100 }}{{ model.description.length > 100 ? '...' : '' }}</p>
+                      </div>
+                      <ion-icon *ngIf="selectedModel?.id === model.id" name="checkmark-circle" color="primary">
+                      </ion-icon>
                     </div>
-                    <ion-icon *ngIf="selectedModel?.id === model.id" name="checkmark-circle" color="primary">
-                    </ion-icon>
-                  </div>
 
-                  <div *ngIf="filteredModels.length === 0" class="no-models">
-                    <ion-icon name="cloud-outline"></ion-icon>
-                    <p *ngIf="modelSearchTerm">No models found matching "{{ modelSearchTerm }}"</p>
-                    <p *ngIf="!modelSearchTerm">No models available for this provider</p>
+                    <div *ngIf="filteredModels.length === 0" class="no-models">
+                      <ion-icon name="cloud-outline"></ion-icon>
+                      <p *ngIf="modelSearchTerm">No models found matching "{{ modelSearchTerm }}"</p>
+                      <p *ngIf="!modelSearchTerm">No models available for this provider</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -203,14 +221,6 @@
                   </div>
                 </div>
               </div>
-
-              <!-- Generate Button -->
-              <ion-button expand="block" color="primary" (click)="generateImage()"
-                [disabled]="isGenerating || !prompt.trim()" class="generate-button">
-                <ion-spinner *ngIf="isGenerating" name="crescent" slot="start"></ion-spinner>
-                <ion-icon *ngIf="!isGenerating" name="sparkles-outline" slot="start"></ion-icon>
-                {{ isGenerating ? 'Generating...' : 'Generate Image' }}
-              </ion-button>
             </ion-card-content>
           </ion-card>
         </div>
@@ -278,13 +288,23 @@
                     <p class="job-prompt" [title]="job.prompt">{{ job.prompt | slice:0:100 }}{{ job.prompt.length > 100 ?
                       '...' : '' }}</p>
                     <div class="job-actions">
+                      <ion-button fill="clear" size="small" (click)="restoreSettings(job)" title="Restore settings">
+                        <ion-icon name="arrow-undo-outline" slot="icon-only"></ion-icon>
+                      </ion-button>
                       <ion-button fill="clear" size="small" (click)="copyPrompt(job.prompt)" title="Copy prompt">
                         <ion-icon name="copy-outline" slot="icon-only"></ion-icon>
                       </ion-button>
-                      <ion-button fill="clear" size="small" (click)="regenerateAndAppend(job)" title="Regenerate" [disabled]="isGenerating || job.status !== 'completed'">
+                      <ion-button *ngIf="job.status === 'processing'" fill="clear" size="small" color="danger"
+                        (click)="cancelJob(job.id)" title="Cancel">
+                        <ion-icon name="close-circle-outline" slot="icon-only"></ion-icon>
+                      </ion-button>
+                      <ion-button *ngIf="job.status !== 'processing'" fill="clear" size="small"
+                        (click)="regenerateAndAppend(job)" title="Regenerate"
+                        [disabled]="job.status !== 'completed' || processingCount >= 3">
                         <ion-icon name="refresh-outline" slot="icon-only"></ion-icon>
                       </ion-button>
-                      <ion-button fill="clear" size="small" color="danger" (click)="deleteJob(job.id)" title="Delete">
+                      <ion-button fill="clear" size="small" color="danger" (click)="deleteJob(job.id)" title="Delete"
+                        [disabled]="job.status === 'processing'">
                         <ion-icon name="trash-outline" slot="icon-only"></ion-icon>
                       </ion-button>
                     </div>
@@ -296,6 +316,18 @@
         </div>
       </div>
     </div>
+
+    <!-- Generate FAB -->
+    <ion-fab slot="fixed" vertical="bottom" horizontal="end" *ngIf="selectedModel" class="generate-fab">
+      <ion-fab-button (click)="generateImage()"
+        [disabled]="!prompt.trim() || processingCount >= 3" color="primary"
+        [attr.aria-label]="processingCount >= 3 ? 'Maximum concurrent generations reached' : 'Generate image'">
+        <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
+      </ion-fab-button>
+      <ion-badge *ngIf="processingCount > 0" color="warning" class="processing-badge">
+        {{ processingCount }}
+      </ion-badge>
+    </ion-fab>
 
     <!-- Toast -->
     <ion-toast [isOpen]="showToast" [message]="toastMessage" [duration]="3000" [color]="toastColor"

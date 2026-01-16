@@ -8,14 +8,15 @@ import {
   IonLabel, IonInput, IonTextarea,
   IonRange, IonSpinner,
   IonChip, IonProgressBar, IonToast, IonSearchbar,
-  IonSegment, IonSegmentButton, IonBadge
+  IonSegment, IonSegmentButton, IonBadge,
+  IonFab, IonFabButton
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
-  arrowBack, imageOutline, downloadOutline, refreshOutline,
-  settingsOutline, checkmarkCircle, closeCircle, timeOutline,
+  arrowBack, arrowUndoOutline, imageOutline, downloadOutline, refreshOutline,
+  settingsOutline, checkmarkCircle, closeCircle, closeCircleOutline, timeOutline,
   copyOutline, trashOutline, cloudOutline, alertCircleOutline,
-  sparklesOutline, chevronUp, chevronDown
+  sparklesOutline, chevronUp, chevronDown, swapHorizontalOutline
 } from 'ionicons/icons';
 import { Subscription } from 'rxjs';
 import { ImageGenerationService } from '../../../shared/services/image-generation.service';
@@ -46,6 +47,7 @@ interface AspectRatioOption {
     IonRange, IonSpinner,
     IonChip, IonProgressBar, IonToast, IonSearchbar,
     IonSegment, IonSegmentButton, IonBadge,
+    IonFab, IonFabButton,
     ImageGalleryModalComponent
   ],
   templateUrl: './image-generation.component.html',
@@ -66,6 +68,7 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
   modelSearchTerm = '';
   modelsLoading = false;
   selectedModel: ImageGenerationModel | null = null;
+  modelSelectorExpanded = false;
 
   // Generation parameters
   prompt = '';
@@ -92,7 +95,7 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
 
   // Jobs and state
   jobs: ImageGenerationJob[] = [];
-  isGenerating = false;
+  processingCount = 0;
 
   // Toast
   showToast = false;
@@ -110,10 +113,10 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
 
   constructor() {
     addIcons({
-      arrowBack, imageOutline, downloadOutline, refreshOutline,
-      settingsOutline, checkmarkCircle, closeCircle, timeOutline,
+      arrowBack, arrowUndoOutline, imageOutline, downloadOutline, refreshOutline,
+      settingsOutline, checkmarkCircle, closeCircle, closeCircleOutline, timeOutline,
       copyOutline, trashOutline, cloudOutline, alertCircleOutline,
-      sparklesOutline, chevronUp, chevronDown
+      sparklesOutline, chevronUp, chevronDown, swapHorizontalOutline
     });
   }
 
@@ -156,10 +159,10 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
       })
     );
 
-    // Subscribe to generating state
+    // Subscribe to processing count for UI feedback
     this.subscription.add(
-      this.imageGenService.generating$.subscribe(generating => {
-        this.isGenerating = generating;
+      this.imageGenService.processingCount$.subscribe(count => {
+        this.processingCount = count;
       })
     );
   }
@@ -173,7 +176,7 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
     this.filterModelsByProvider();
     this.selectedModel = null;
 
-    // Auto-select first model for this provider
+    // Auto-select first model for this provider (selector will collapse)
     if (this.filteredModels.length > 0) {
       this.selectModel(this.filteredModels[0]);
     }
@@ -214,6 +217,7 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
 
   selectModel(model: ImageGenerationModel): void {
     this.selectedModel = model;
+    this.modelSelectorExpanded = false;  // Collapse after selection
 
     // Update aspect ratios based on model capabilities
     if (model.capabilities.aspectRatios) {
@@ -228,6 +232,10 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
         this.selectedAspectRatio = this.aspectRatios[0]?.value || '1:1';
       }
     }
+  }
+
+  toggleModelSelector(): void {
+    this.modelSelectorExpanded = !this.modelSelectorExpanded;
   }
 
   private getAspectRatioIcon(ratio: string): string {
@@ -305,7 +313,7 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
   }
 
   async generateImage(): Promise<void> {
-    if (!this.selectedModel || !this.prompt.trim() || this.isGenerating) {
+    if (!this.selectedModel || !this.prompt.trim()) {
       return;
     }
 
@@ -315,21 +323,25 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
     // Save settings for next time (uses the same complete request object)
     this.imageGenService.saveLastPrompt(this.selectedModel.id, request);
 
-    // Generate
+    // Generate - fires in background, job appears in history immediately
     this.subscription.add(
       this.imageGenService.generateImage(request).subscribe({
-        next: (job) => {
-          if (job.status === 'completed') {
-            this.showToastMessage('Image generated successfully!', 'success');
-          } else if (job.status === 'failed') {
-            this.showToastMessage(`Generation failed: ${job.error}`, 'danger');
-          }
+        next: () => {
+          this.showToastMessage('Generation started!', 'primary');
         },
         error: (error) => {
           this.showToastMessage(`Error: ${error.message}`, 'danger');
         }
       })
     );
+  }
+
+  /**
+   * Cancel a running generation
+   */
+  cancelJob(jobId: string): void {
+    this.imageGenService.cancelGeneration(jobId);
+    this.showToastMessage('Generation cancelled', 'medium');
   }
 
   // History methods
@@ -405,18 +417,46 @@ export class ImageGenerationComponent implements OnInit, OnDestroy {
   copyPrompt(prompt: string): void {
     navigator.clipboard.writeText(prompt).then(() => {
       this.showToastMessage('Prompt copied to clipboard', 'primary');
+    }).catch(() => {
+      this.showToastMessage('Failed to copy to clipboard', 'danger');
     });
   }
 
+  /**
+   * Restore all settings from a job's request to the form
+   */
+  restoreSettings(job: ImageGenerationJob): void {
+    const request = job.request;
+
+    // Find and select the model
+    const model = this.allModels.find(m => m.id === request.modelId);
+    if (model) {
+      this.selectedProvider = model.provider;
+      this.filterModelsByProvider();
+      this.selectModel(model);
+    }
+
+    // Restore all settings from the request
+    this.prompt = request.prompt || '';
+    this.negativePrompt = request.negativePrompt || '';
+    this.selectedAspectRatio = request.aspectRatio || '1:1';
+    this.numImages = request.numImages || 1;
+    this.seed = request.seed;
+    this.guidanceScale = request.guidanceScale ?? 7.5;
+    this.inferenceSteps = request.inferenceSteps ?? 28;
+    this.enableSafetyChecker = request.enableSafetyChecker ?? true;
+    this.safetyTolerance = request.safetyTolerance ?? '2';
+
+    this.showToastMessage('Settings restored', 'primary');
+  }
+
   regenerateAndAppend(job: ImageGenerationJob): void {
-    if (this.isGenerating || job.status !== 'completed') return;
+    if (job.status !== 'completed') return;
 
     this.subscription.add(
       this.imageGenService.regenerateAndAppend(job.id).subscribe({
-        next: (updatedJob) => {
-          if (updatedJob.images && updatedJob.images.length > (job.images?.length || 0)) {
-            this.showToastMessage('Images added to generation!', 'success');
-          }
+        next: () => {
+          this.showToastMessage('Regeneration started!', 'primary');
         },
         error: (error) => {
           this.showToastMessage(`Regeneration failed: ${error.message}`, 'danger');

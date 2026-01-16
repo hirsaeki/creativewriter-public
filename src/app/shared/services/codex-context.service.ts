@@ -280,8 +280,18 @@ export class CodexContextService {
         }
 
         if (entry.metadata) {
+          // Fields to exclude from prompt context (internal/import metadata)
+          const excludedFields = new Set([
+            'storyRole',
+            'customFields',
+            'aliases',
+            'originalid',
+            'alwaysincludeincontext',
+            'noautoinclude',
+            'originaltype'
+          ]);
           Object.entries(entry.metadata)
-            .filter(([key]) => key !== 'storyRole' && key !== 'customFields' && key !== 'aliases')
+            .filter(([key]) => !excludedFields.has(key))
             .filter(([, value]) => value !== null && value !== undefined && value !== '')
             .forEach(([key, value]) => {
               const tagName = this.sanitizeXmlTagName(key);
@@ -294,7 +304,7 @@ export class CodexContextService {
       }).join('\n');
     }).join('\n');
 
-    return `<codex>\n${content}\n</codex>`;
+    return content;
   }
 
   private getCategoryTypeForRelevance(categoryTitle: string): 'character' | 'location' | 'object' | 'lore' | 'other' {

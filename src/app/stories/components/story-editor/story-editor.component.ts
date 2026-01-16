@@ -51,6 +51,7 @@ import { SceneNavigationService } from '../../services/scene-navigation.service'
 import { StoryEditorStateService } from '../../services/story-editor-state.service';
 import { MobileDebugService } from '../../../core/services/mobile-debug.service';
 import { DialogService } from '../../../core/services/dialog.service';
+import { BeatHistoryService } from '../../../shared/services/beat-history.service';
 
 @Component({
   selector: 'app-story-editor',
@@ -91,6 +92,7 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
   private codexService = inject(CodexService);
   private mobileDebug = inject(MobileDebugService);
   private dialogService = inject(DialogService);
+  private beatHistoryService = inject(BeatHistoryService);
   private lastSyncTime: Date | undefined;
 
   @ViewChild('headerTitle', { static: true }) headerTitle!: TemplateRef<unknown>;
@@ -1655,6 +1657,25 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Save current content to history BEFORE deleting
+    // Fire-and-forget: don't await - history save shouldn't block regeneration
+    const existingContent = this.proseMirrorService.getTextAfterBeat(event.beatId);
+    if (existingContent && existingContent.trim().length > 0) {
+      this.beatHistoryService.saveVersion(event.beatId, this.story.id, {
+        content: existingContent,
+        prompt: event.prompt || '',
+        model: event.model || '',
+        beatType: event.beatType || 'story',
+        wordCount: event.wordCount || 400,
+        generatedAt: new Date(),
+        characterCount: existingContent.length,
+        isCurrent: false,
+        action: 'generate' as const
+      }).catch(error => {
+        console.error('[StoryEditor] Failed to save content to history before regenerate:', error);
+      });
+    }
+
     // Use marker-aware deletion to preserve pre-existing text that was pushed down
     // when the beat was inserted in the middle of content
     const deleted = this.proseMirrorService.deleteGeneratedContentOnly(event.beatId);
@@ -1668,13 +1689,8 @@ export class StoryEditorComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const generateEvent: BeatAIPromptEvent = {
-      ...event,
-      action: 'generate'
-    };
-
     const enhancedEvent: BeatAIPromptEvent = {
-      ...generateEvent,
+      ...event,
       storyId: this.story.id,
       chapterId: this.activeChapterId || undefined,
       sceneId: this.activeSceneId || undefined

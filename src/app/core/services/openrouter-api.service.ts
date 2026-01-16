@@ -3,6 +3,13 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, tap, takeUntil, Subject } from 'rxjs';
 import { SettingsService } from './settings.service';
 import { AIRequestLoggerService } from './ai-request-logger.service';
+import {
+  isReasoningVariant,
+  getBaseModelId,
+  usesEffortReasoning,
+  REASONING_DEFAULTS,
+  calculateReasoningBudget
+} from '../models/reasoning.config';
 
 export interface OpenRouterRequest {
   model: string;
@@ -14,6 +21,11 @@ export interface OpenRouterRequest {
   temperature?: number;
   top_p?: number;
   stream?: boolean;
+  // Reasoning configuration for thinking models
+  reasoning?: {
+    effort?: 'high' | 'medium' | 'low';
+    max_tokens?: number;
+  };
 }
 
 export interface OpenRouterResponse {
@@ -60,18 +72,21 @@ export class OpenRouterApiService {
   } = {}): Observable<OpenRouterResponse> {
     const settings = this.settingsService.getSettings();
     const startTime = Date.now();
-    
+
     if (!settings.openRouter.enabled || !settings.openRouter.apiKey) {
       throw new Error('OpenRouter API ist nicht aktiviert oder API-Key fehlt');
     }
 
-    const model = options.model || settings.openRouter.model;
-    if (!model) {
+    const inputModel = options.model || settings.openRouter.model;
+    if (!inputModel) {
       throw new Error('No AI model selected');
     }
 
     const maxTokens = options.maxTokens || 500;
     const wordCount = options.wordCount || Math.floor(maxTokens / 1.3);
+
+    // Process model for reasoning variants (pass maxTokens for dynamic reasoning budget)
+    const { model, reasoningConfig } = this.processReasoningModel(inputModel, maxTokens);
 
     // Build prompt for logging - use messages if prompt is empty
     let promptForLogging = prompt;
@@ -84,7 +99,7 @@ export class OpenRouterApiService {
     // Log the request
     const logId = this.aiLogger.logRequest({
       endpoint: this.API_URL,
-      model: model,
+      model: model + (reasoningConfig ? ' (Reasoning)' : ''),
       wordCount: wordCount,
       maxTokens: maxTokens,
       prompt: promptForLogging
@@ -102,16 +117,17 @@ export class OpenRouterApiService {
       messages: options.messages && options.messages.length > 0
         ? options.messages
         : [{ role: 'user', content: prompt }],
-      max_tokens: maxTokens,
+      max_tokens: this.calculateRequestMaxTokens(maxTokens, reasoningConfig),
       temperature: options.temperature !== undefined ? options.temperature : settings.openRouter.temperature,
-      top_p: options.topP !== undefined ? options.topP : settings.openRouter.topP
+      top_p: options.topP !== undefined ? options.topP : settings.openRouter.topP,
+      ...(reasoningConfig && { reasoning: reasoningConfig })
     };
 
     // Create abort subject for this request
     const requestId = options.requestId || this.generateRequestId();
     const abortSubject = new Subject<void>();
     this.abortSubjects.set(requestId, abortSubject);
-    
+
     // Store request metadata for abort handling
     this.requestMetadata.set(requestId, { logId, startTime });
 
@@ -198,18 +214,21 @@ export class OpenRouterApiService {
   } = {}): Observable<string> {
     const settings = this.settingsService.getSettings();
     const startTime = Date.now();
-    
+
     if (!settings.openRouter.enabled || !settings.openRouter.apiKey) {
       throw new Error('OpenRouter API ist nicht aktiviert oder API-Key fehlt');
     }
 
-    const model = options.model || settings.openRouter.model;
-    if (!model) {
+    const inputModel = options.model || settings.openRouter.model;
+    if (!inputModel) {
       throw new Error('No AI model selected');
     }
 
     const maxTokens = options.maxTokens || 500;
     const wordCount = options.wordCount || Math.floor(maxTokens / 1.3);
+
+    // Process model for reasoning variants (pass maxTokens for dynamic reasoning budget)
+    const { model, reasoningConfig } = this.processReasoningModel(inputModel, maxTokens);
 
     // Build prompt for logging - use messages if prompt is empty
     let promptForLogging = prompt;
@@ -222,7 +241,7 @@ export class OpenRouterApiService {
     // Log the request
     const logId = this.aiLogger.logRequest({
       endpoint: this.API_URL,
-      model: model,
+      model: model + (reasoningConfig ? ' (Reasoning)' : ''),
       wordCount: wordCount,
       maxTokens: maxTokens,
       prompt: promptForLogging
@@ -233,17 +252,18 @@ export class OpenRouterApiService {
       messages: options.messages && options.messages.length > 0
         ? options.messages
         : [{ role: 'user', content: prompt }],
-      max_tokens: maxTokens,
+      max_tokens: this.calculateRequestMaxTokens(maxTokens, reasoningConfig),
       temperature: options.temperature !== undefined ? options.temperature : settings.openRouter.temperature,
       top_p: options.topP !== undefined ? options.topP : settings.openRouter.topP,
-      stream: true
+      stream: true,
+      ...(reasoningConfig && { reasoning: reasoningConfig })
     };
 
     // Create abort subject for this request
     const requestId = options.requestId || this.generateRequestId();
     const abortSubject = new Subject<void>();
     this.abortSubjects.set(requestId, abortSubject);
-    
+
     // Store request metadata for abort handling
     this.requestMetadata.set(requestId, { logId, startTime });
 
@@ -370,5 +390,49 @@ export class OpenRouterApiService {
 
   private generateRequestId(): string {
     return 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+  }
+
+  /**
+   * Calculate total max_tokens for the API request.
+   * For reasoning models with token budgets, max_tokens must include both
+   * the reasoning budget AND the output budget (OpenRouter requirement).
+   */
+  private calculateRequestMaxTokens(
+    outputMaxTokens: number,
+    reasoningConfig: OpenRouterRequest['reasoning'] | undefined
+  ): number {
+    if (reasoningConfig?.max_tokens) {
+      return reasoningConfig.max_tokens + outputMaxTokens;
+    }
+    return outputMaxTokens;
+  }
+
+  /**
+   * Process model ID for reasoning variants.
+   * If the model has :reasoning suffix, strips it and returns appropriate reasoning config.
+   * @param model - The model ID (may include :reasoning suffix)
+   * @param outputMaxTokens - The max tokens for output, used to calculate dynamic reasoning budget
+   */
+  private processReasoningModel(model: string, outputMaxTokens: number): {
+    model: string;
+    reasoningConfig: OpenRouterRequest['reasoning'] | undefined;
+  } {
+    if (isReasoningVariant(model)) {
+      const baseModel = getBaseModelId(model);
+      // Configure reasoning based on model type
+      if (usesEffortReasoning(baseModel)) {
+        return {
+          model: baseModel,
+          reasoningConfig: { effort: REASONING_DEFAULTS.effort }
+        };
+      } else {
+        // Use dynamic reasoning budget based on output tokens (1:1 ratio with constraints)
+        return {
+          model: baseModel,
+          reasoningConfig: { max_tokens: calculateReasoningBudget(outputMaxTokens) }
+        };
+      }
+    }
+    return { model, reasoningConfig: undefined };
   }
 }

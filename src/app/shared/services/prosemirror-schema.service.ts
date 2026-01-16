@@ -105,7 +105,9 @@ export class ProseMirrorSchemaService {
           includeStoryOutline: { default: true },
           currentVersionId: { default: '' },
           hasHistory: { default: false },
-          stagingNotes: { default: '' }
+          stagingNotes: { default: '' },
+          lastAction: { default: '' },
+          rewriteContext: { default: '' }
         },
         group: 'block',
         atom: true,
@@ -126,7 +128,9 @@ export class ProseMirrorSchemaService {
             'data-include-story-outline': node.attrs['includeStoryOutline'] !== undefined ? node.attrs['includeStoryOutline'] : 'true',
             'data-current-version-id': node.attrs['currentVersionId'] || '',
             'data-has-history': node.attrs['hasHistory'] ? 'true' : 'false',
-            'data-staging-notes': node.attrs['stagingNotes'] || ''
+            'data-staging-notes': node.attrs['stagingNotes'] || '',
+            'data-last-action': node.attrs['lastAction'] || '',
+            'data-rewrite-context': node.attrs['rewriteContext'] || ''
           };
 
           // Create content to make the beat visible in saved HTML
@@ -171,7 +175,9 @@ export class ProseMirrorSchemaService {
               includeStoryOutline: includeStoryOutlineStr !== '' ? (includeStoryOutlineStr === 'true') : true,
               currentVersionId: dom.getAttribute('data-current-version-id') || '',
               hasHistory: dom.getAttribute('data-has-history') === 'true',
-              stagingNotes: dom.getAttribute('data-staging-notes') || ''
+              stagingNotes: dom.getAttribute('data-staging-notes') || '',
+              lastAction: dom.getAttribute('data-last-action') || '',
+              rewriteContext: dom.getAttribute('data-rewrite-context') || ''
             };
 
             return attrs;

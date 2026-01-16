@@ -321,4 +321,22 @@ describe('BeatAIComponent', () => {
       expect(mockModalService.show).toHaveBeenCalledWith('preview content');
     });
   });
+
+  describe('regenerateFromPrompt', () => {
+    it('should clear rewrite context before regenerating', async () => {
+      component.beatData.lastAction = 'rewrite';
+      component.beatData.rewriteContext = { originalText: 'test', instruction: 'make shorter' };
+      component.beatData.generatedContent = 'existing content';
+      component.currentPrompt = 'test prompt';
+
+      spyOn(component, 'regenerateContent').and.returnValue(Promise.resolve());
+
+      await component.regenerateFromPrompt();
+
+      expect(component.beatData.lastAction).toBe('generate');
+      expect(component.beatData.rewriteContext).toBeUndefined();
+      expect(component.regenerateContent).toHaveBeenCalled();
+    });
+  });
+
 });

@@ -1,7 +1,6 @@
-import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { DOCUMENT } from '@angular/common';
 import { BeatAIService } from './beat-ai.service';
-import { BeatHistoryService } from './beat-history.service';
 import { OpenRouterApiService } from '../../core/services/openrouter-api.service';
 import { GoogleGeminiApiService } from '../../core/services/google-gemini-api.service';
 import { OllamaApiService } from '../../core/services/ollama-api.service';
@@ -14,21 +13,13 @@ import { PromptManagerService } from './prompt-manager.service';
 import { CodexRelevanceService } from '../../core/services/codex-relevance.service';
 import { AIProviderValidationService } from '../../core/services/ai-provider-validation.service';
 import { DatabaseService } from '../../core/services/database.service';
-import { BeatVersionHistory } from '../../stories/models/beat-version-history.interface';
 
 describe('BeatAIService', () => {
   let service: BeatAIService;
-  let mockBeatHistoryService: jasmine.SpyObj<BeatHistoryService>;
   let mockSettingsService: jasmine.SpyObj<SettingsService>;
 
   beforeEach(() => {
     // Create mock services
-    mockBeatHistoryService = jasmine.createSpyObj('BeatHistoryService', [
-      'getHistory',
-      'saveVersion',
-      'setCurrentVersion'
-    ]);
-
     mockSettingsService = jasmine.createSpyObj('SettingsService', ['getSettings']);
     // Return minimal settings object - actual settings structure is complex
     // but not needed for history-related tests
@@ -61,7 +52,6 @@ describe('BeatAIService', () => {
     TestBed.configureTestingModule({
       providers: [
         BeatAIService,
-        { provide: BeatHistoryService, useValue: mockBeatHistoryService },
         { provide: SettingsService, useValue: mockSettingsService },
         { provide: OpenRouterApiService, useValue: mockOpenRouterApi },
         { provide: GoogleGeminiApiService, useValue: mockGeminiApi },
@@ -85,242 +75,8 @@ describe('BeatAIService', () => {
     expect(service).toBeTruthy();
   });
 
-  describe('saveToHistory (via internal access)', () => {
-    // Access private method for testing
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let serviceAny: any;
-
-    beforeEach(() => {
-      serviceAny = service;
-      mockBeatHistoryService.saveVersion.and.returnValue(Promise.resolve('v-new-123'));
-    });
-
-    it('should save content to history with correct parameters', fakeAsync(async () => {
-      mockBeatHistoryService.getHistory.and.returnValue(Promise.resolve(null));
-
-      await serviceAny.saveToHistory(
-        'beat-123',
-        'Test prompt',
-        '<p>Generated content</p>',
-        {
-          model: 'claude-opus-4',
-          beatType: 'story',
-          wordCount: 400,
-          storyId: 'story-456'
-        }
-      );
-      tick();
-
-      expect(mockBeatHistoryService.saveVersion).toHaveBeenCalledWith(
-        'beat-123',
-        'story-456',
-        jasmine.objectContaining({
-          content: '<p>Generated content</p>',
-          prompt: 'Test prompt',
-          model: 'claude-opus-4',
-          beatType: 'story',
-          wordCount: 400,
-          isCurrent: true,
-          action: 'generate'
-        })
-      );
-    }));
-
-    it('should not save empty content', fakeAsync(async () => {
-      await serviceAny.saveToHistory(
-        'beat-123',
-        'Test prompt',
-        '',
-        { storyId: 'story-456' }
-      );
-      tick();
-
-      expect(mockBeatHistoryService.saveVersion).not.toHaveBeenCalled();
-    }));
-
-    it('should not save whitespace-only content', fakeAsync(async () => {
-      await serviceAny.saveToHistory(
-        'beat-123',
-        'Test prompt',
-        '   \n\t   ',
-        { storyId: 'story-456' }
-      );
-      tick();
-
-      expect(mockBeatHistoryService.saveVersion).not.toHaveBeenCalled();
-    }));
-
-    it('should not save without storyId', fakeAsync(async () => {
-      await serviceAny.saveToHistory(
-        'beat-123',
-        'Test prompt',
-        '<p>Content</p>',
-        { model: 'claude-opus-4' }  // No storyId
-      );
-      tick();
-
-      expect(mockBeatHistoryService.saveVersion).not.toHaveBeenCalled();
-    }));
-
-    it('should skip saving duplicate content', fakeAsync(async () => {
-      const existingHistory: BeatVersionHistory = {
-        _id: 'history-beat-123',
-        type: 'beat-history',
-        beatId: 'beat-123',
-        storyId: 'story-456',
-        versions: [{
-          versionId: 'v-existing',
-          content: '<p>Generated content</p>',
-          prompt: 'Old prompt',
-          model: 'claude-opus-4',
-          beatType: 'story',
-          wordCount: 400,
-          generatedAt: new Date(),
-          characterCount: 100,
-          isCurrent: true
-        }],
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      mockBeatHistoryService.getHistory.and.returnValue(Promise.resolve(existingHistory));
-
-      await serviceAny.saveToHistory(
-        'beat-123',
-        'New prompt',
-        '<p>Generated content</p>',  // Same content as existing
-        { storyId: 'story-456' }
-      );
-      tick();
-
-      expect(mockBeatHistoryService.saveVersion).not.toHaveBeenCalled();
-    }));
-
-    it('should save when content differs from existing versions', fakeAsync(async () => {
-      const existingHistory: BeatVersionHistory = {
-        _id: 'history-beat-123',
-        type: 'beat-history',
-        beatId: 'beat-123',
-        storyId: 'story-456',
-        versions: [{
-          versionId: 'v-existing',
-          content: '<p>Old content</p>',
-          prompt: 'Old prompt',
-          model: 'claude-opus-4',
-          beatType: 'story',
-          wordCount: 400,
-          generatedAt: new Date(),
-          characterCount: 100,
-          isCurrent: true
-        }],
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      mockBeatHistoryService.getHistory.and.returnValue(Promise.resolve(existingHistory));
-
-      await serviceAny.saveToHistory(
-        'beat-123',
-        'New prompt',
-        '<p>New different content</p>',
-        { storyId: 'story-456' }
-      );
-      tick();
-
-      expect(mockBeatHistoryService.saveVersion).toHaveBeenCalled();
-    }));
-
-    it('should handle history service errors gracefully', fakeAsync(async () => {
-      mockBeatHistoryService.getHistory.and.returnValue(Promise.resolve(null));
-      mockBeatHistoryService.saveVersion.and.returnValue(Promise.reject(new Error('DB error')));
-
-      // Should not throw, just log error
-      await expectAsync(serviceAny.saveToHistory(
-        'beat-123',
-        'Test prompt',
-        '<p>Content</p>',
-        { storyId: 'story-456' }
-      )).toBeResolved();
-      tick();
-    }));
-
-    it('should include selected scenes in saved version', fakeAsync(async () => {
-      mockBeatHistoryService.getHistory.and.returnValue(Promise.resolve(null));
-
-      await serviceAny.saveToHistory(
-        'beat-123',
-        'Test prompt',
-        '<p>Content</p>',
-        {
-          storyId: 'story-456',
-          customContext: {
-            selectedScenes: ['scene-1', 'scene-2'],
-            includeStoryOutline: true,
-            selectedSceneContexts: [
-              { sceneId: 'scene-1', chapterId: 'ch-1', content: 'Scene 1 text' },
-              { sceneId: 'scene-2', chapterId: 'ch-2', content: 'Scene 2 text' }
-            ]
-          }
-        }
-      );
-      tick();
-
-      expect(mockBeatHistoryService.saveVersion).toHaveBeenCalledWith(
-        'beat-123',
-        'story-456',
-        jasmine.objectContaining({
-          selectedScenes: [
-            { sceneId: 'scene-1', chapterId: 'ch-1' },
-            { sceneId: 'scene-2', chapterId: 'ch-2' }
-          ],
-          includeStoryOutline: true
-        })
-      );
-    }));
-
-    it('should save rewrite action with existing text', fakeAsync(async () => {
-      mockBeatHistoryService.getHistory.and.returnValue(Promise.resolve(null));
-
-      await serviceAny.saveToHistory(
-        'beat-123',
-        'Rewrite this',
-        '<p>Rewritten content</p>',
-        {
-          storyId: 'story-456',
-          action: 'rewrite',
-          existingText: '<p>Original text</p>'
-        }
-      );
-      tick();
-
-      expect(mockBeatHistoryService.saveVersion).toHaveBeenCalledWith(
-        'beat-123',
-        'story-456',
-        jasmine.objectContaining({
-          action: 'rewrite',
-          existingText: '<p>Original text</p>'
-        })
-      );
-    }));
-
-    it('should default to generate action when not specified', fakeAsync(async () => {
-      mockBeatHistoryService.getHistory.and.returnValue(Promise.resolve(null));
-
-      await serviceAny.saveToHistory(
-        'beat-123',
-        'Test prompt',
-        '<p>Content</p>',
-        { storyId: 'story-456' }
-      );
-      tick();
-
-      expect(mockBeatHistoryService.saveVersion).toHaveBeenCalledWith(
-        'beat-123',
-        'story-456',
-        jasmine.objectContaining({
-          action: 'generate'
-        })
-      );
-    }));
-  });
+  // Note: saveToHistory tests removed - this functionality is now in BeatOperationsService
+  // via savePreviousContentToHistory which saves content BEFORE operations instead of after.
 
   describe('isCompleted flag behavior', () => {
     it('should have isCompleted property in GenerationContext interface', () => {

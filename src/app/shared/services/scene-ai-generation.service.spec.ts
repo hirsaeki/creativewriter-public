@@ -185,7 +185,7 @@ describe('SceneAIGenerationService', () => {
     it('should include codex context in prompt', async () => {
       mockCodexContextService.buildCodexXml.and.returnValue(
         Promise.resolve({
-          xml: '<codex><entry>Character: John</entry></codex>',
+          xml: '<character name="John"><description>A character</description></character>',
           categories: [],
           entriesDropped: 2,
           totalEntries: 5

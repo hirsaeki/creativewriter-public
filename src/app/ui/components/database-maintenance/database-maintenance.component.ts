@@ -13,13 +13,14 @@ import {
   trashOutline, albumsOutline, buildOutline, syncOutline, refreshOutline,
   cloudOutline, cloudOfflineOutline, scanOutline, checkboxOutline,
   squareOutline, imageOutline, statsChartOutline, copyOutline,
-  searchOutline, closeCircleOutline, nuclearOutline
+  searchOutline, closeCircleOutline, nuclearOutline, flaskOutline
 } from 'ionicons/icons';
 import { DatabaseBackupService, ExportProgress, ImportProgress } from '../../../shared/services/database-backup.service';
 import { BeatHistoryService } from '../../../shared/services/beat-history.service';
 import { DatabaseService } from '../../../core/services/database.service';
 import { StoryMetadataIndexService } from '../../../stories/services/story-metadata-index.service';
 import { DbMaintenanceService, OrphanedImage, RemoteScanProgress, DatabaseStats, DuplicateImage, IntegrityIssue } from '../../../shared/services/db-maintenance.service';
+import { TestStoryGeneratorService } from '../../../shared/services/test-story-generator.service';
 
 @Component({
   selector: 'app-database-maintenance',
@@ -41,6 +42,7 @@ export class DatabaseMaintenanceComponent {
   private readonly databaseService = inject(DatabaseService);
   private readonly metadataIndexService = inject(StoryMetadataIndexService);
   private readonly dbMaintenanceService = inject(DbMaintenanceService);
+  private readonly testStoryGenerator = inject(TestStoryGeneratorService);
   private readonly alertController = inject(AlertController);
   private readonly toastController = inject(ToastController);
 
@@ -99,6 +101,9 @@ export class DatabaseMaintenanceComponent {
   isDeepCleaning = false;
   deepCleanResult: { sizeBefore: number; sizeAfter: number; saved: number; deletedDatabases: number } | null = null;
 
+  // Developer Tools state
+  isCreatingTestStory = false;
+
   constructor() {
     addIcons({
       downloadOutline, cloudUploadOutline, informationCircleOutline,
@@ -106,7 +111,7 @@ export class DatabaseMaintenanceComponent {
       trashOutline, albumsOutline, buildOutline, syncOutline, refreshOutline,
       cloudOutline, cloudOfflineOutline, scanOutline, checkboxOutline,
       squareOutline, imageOutline, statsChartOutline, copyOutline,
-      searchOutline, closeCircleOutline, nuclearOutline
+      searchOutline, closeCircleOutline, nuclearOutline, flaskOutline
     });
 
     this.loadRemoteDatabaseInfo();
@@ -683,5 +688,20 @@ This action CANNOT be undone! All previous versions will be lost forever.`,
 
   trackByIntegrityIssue(_index: number, issue: IntegrityIssue): string {
     return issue.storyId;
+  }
+
+  // ===== Developer Tools methods =====
+  async createTestStory(): Promise<void> {
+    this.isCreatingTestStory = true;
+    try {
+      const result = await this.testStoryGenerator.createTestStory();
+      this.showToast(`Created test story: "${result.title}"`, 'success');
+    } catch (error) {
+      console.error('Failed to create test story:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create test story. Please try again.';
+      this.showToast(errorMessage, 'danger');
+    } finally {
+      this.isCreatingTestStory = false;
+    }
   }
 }

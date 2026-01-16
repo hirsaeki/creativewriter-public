@@ -84,6 +84,14 @@
           </ion-button>
         </div>
 
+        <!-- Rewrite Instruction (for rewrites) -->
+        <div class="rewrite-instruction-section" *ngIf="version.action === 'rewrite' && version.rewriteInstruction">
+          <strong>Rewrite Instruction:</strong>
+          <div class="rewrite-instruction-content">
+            {{ version.rewriteInstruction }}
+          </div>
+        </div>
+
         <!-- Original Text (for rewrites) -->
         <div class="original-text-section" *ngIf="version.action === 'rewrite' && version.existingText">
           <strong>Original Text (Before Rewrite):</strong>

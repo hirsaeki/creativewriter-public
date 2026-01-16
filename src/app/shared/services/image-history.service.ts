@@ -32,6 +32,11 @@ export class ImageHistoryService {
     map(jobs => jobs.filter(j => j.status === 'pending' || j.status === 'processing'))
   );
 
+  // Observable for count of currently processing jobs
+  public processingCount$ = this.jobs$.pipe(
+    map(jobs => jobs.filter(j => j.status === 'processing').length)
+  );
+
   constructor() {
     this.loadFromStorage();
   }
@@ -228,14 +233,23 @@ export class ImageHistoryService {
       const saved = localStorage.getItem(this.STORAGE_KEY);
       if (saved) {
         const jobs: ImageGenerationJob[] = JSON.parse(saved);
-        // Convert date strings back to Date objects
+        // Convert date strings back to Date objects and handle stale processing jobs
         jobs.forEach(job => {
           job.createdAt = new Date(job.createdAt);
           if (job.completedAt) {
             job.completedAt = new Date(job.completedAt);
           }
+          // Mark any "processing" or "pending" jobs as failed on reload
+          // These jobs were interrupted when the app was closed/refreshed
+          if (job.status === 'processing' || job.status === 'pending') {
+            job.status = 'failed';
+            job.completedAt = new Date();
+            job.error = 'Job interrupted by app reload';
+          }
         });
         this.jobsSubject.next(jobs);
+        // Save to persist the status changes
+        this.saveToStorage();
       }
     } catch (error) {
       console.warn('Failed to load jobs from localStorage:', error);

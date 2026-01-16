@@ -279,12 +279,13 @@
               aria-label="Generate content">
               <ion-icon name="color-wand-outline" aria-hidden="true"></ion-icon>
             </button>
+            <!-- Regenerate button - always regenerates from original prompt -->
             <button
               *ngIf="beatData.generatedContent && !beatData.isGenerating"
               class="cw-btn-glass-success"
-              (click)="regenerateContent(); $event.stopPropagation()"
-              title="Regenerate"
-              aria-label="Regenerate content">
+              (click)="regenerateFromPrompt(); $event.stopPropagation()"
+              title="Regenerate from beat prompt"
+              aria-label="Regenerate from beat prompt">
               <ion-icon name="refresh-outline" aria-hidden="true"></ion-icon>
             </button>
             <button

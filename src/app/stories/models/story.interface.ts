@@ -109,61 +109,59 @@ export interface Story {
 
 export const DEFAULT_STORY_SETTINGS: StorySettings = {
   systemMessage: 'You are a creative writing assistant that helps with writing stories. Maintain the style and tone of the existing story.',
-  beatGenerationTemplate: `<messages>
-<message role="system">{systemMessage}</message>
-<message role="user">You are continuing a story. Here is the context:
+  beatGenerationTemplate: `---SYSTEM---
+{systemMessage}
 
-<story_title>{storyTitle}</story_title>
+---USER---
+You are continuing a story. Here is the context:
 
-<glossary>
+## Story Title
+{storyTitle}
+
+## Glossary
 {codexEntries}
-</glossary>
 
-<story_context>
+## Story So Far
 {storySoFar}
-</story_context>
 
-<current_scene>
+## Current Scene
 {sceneFullText}
-</current_scene>
 
-<beat_generation_task>
-  <objective>
-    Generate the next story beat that advances the narrative from the current scene's ending point.
-  </objective>
+---
 
-  <narrative_parameters>
-    {pointOfView}
-    <word_count>{wordCount} words (±50 words acceptable)</word_count>
-    <tense>{tense}</tense>
-  </narrative_parameters>
+# Beat Generation Task
 
-  <beat_requirements>
-    {prompt}
-  </beat_requirements>
+## Objective
+Generate the next story beat that advances the narrative from the current scene's ending point.
 
-  <style_guidance>
-    - Match the exact tone and narrative voice of the current scene
-    - Maintain the established balance of dialogue, action, and introspection
-    - End on a moment of significance, decision point, or natural transition
-  </style_guidance>
+## Narrative Parameters
+- {pointOfView}
+- {wordCount} words (±50 words acceptable)
+- {tense}
 
-  <constraints>
-    - Do NOT resolve major plot threads or conflicts
-    - Do NOT have characters act inconsistently with their established personalities
-    - Do NOT introduce unrelated subplots or major new story elements
-    - Do NOT write beyond what is specifically requested in the beat requirements
-  </constraints>
+## Beat Requirements
+{prompt}
 
-  {rules}
+## Style Guidance
+- Match the exact tone and narrative voice of the current scene
+- Maintain the established balance of dialogue, action, and introspection
+- End on a moment of significance, decision point, or natural transition
 
-  <output_format>
-    Pure narrative prose. No meta-commentary, scene markers, chapter headings, or author notes.
-  </output_format>
-</beat_generation_task>
+## Constraints
+- Do NOT resolve major plot threads or conflicts
+- Do NOT have characters act inconsistently with their established personalities
+- Do NOT introduce unrelated subplots or major new story elements
+- Do NOT write beyond what is specifically requested in the beat requirements
 
-Generate the beat now:</message>
-</messages>`,
+## Rules
+{rules}
+
+## Output Format
+Pure narrative prose. No meta-commentary, scene markers, chapter headings, or author notes.
+
+---
+
+Generate the beat now:`,
   useFullStoryContext: false,
   narrativePerspective: 'third-person-limited',
   tense: 'past',
@@ -178,49 +176,53 @@ Generate the beat now:</message>
 };
 
 // Default sections for Story Beat template
+// NOTE: Section content is plain text only - no XML or Markdown formatting.
+// The template builder (sectionsToTemplate) applies formatting when building the prompt.
 export const DEFAULT_BEAT_TEMPLATE_SECTIONS: BeatTemplateSections = {
   userMessagePreamble: 'You are continuing a story. Here is the context:',
   objective: 'Generate the next story beat that advances the narrative from the current scene\'s ending point.',
-  narrativeParameters: `<point_of_view>{pointOfView}</point_of_view>
-<word_count>{wordCount} words (±50 words acceptable)</word_count>
-<tense>{tense}</tense>`,
+  narrativeParameters: `{pointOfView}
+{wordCount} words (±50 words acceptable)
+{tense}`,
   stagingNotes: 'Consider these staging notes for physical and contextual consistency:',
   beatRequirements: '{prompt}',
-  styleGuidance: `- Match the exact tone and narrative voice of the current scene
-- Maintain the established balance of dialogue, action, and introspection
-- End on a moment of significance, decision point, or natural transition`,
-  constraints: `- Do NOT resolve major plot threads or conflicts
-- Do NOT have characters act inconsistently with their established personalities
-- Do NOT introduce unrelated subplots or major new story elements
-- Do NOT write beyond what is specifically requested in the beat requirements`,
+  styleGuidance: `Match the exact tone and narrative voice of the current scene
+Maintain the established balance of dialogue, action, and introspection
+End on a moment of significance, decision point, or natural transition`,
+  constraints: `Do NOT resolve major plot threads or conflicts
+Do NOT have characters act inconsistently with their established personalities
+Do NOT introduce unrelated subplots or major new story elements
+Do NOT write beyond what is specifically requested in the beat requirements`,
   outputFormat: 'Pure narrative prose. No meta-commentary, scene markers, chapter headings, or author notes.',
   generatePrompt: 'Generate the beat now:'
 };
 
 // Default sections for Scene Beat template
+// NOTE: Section content is plain text only - no XML or Markdown formatting.
+// The template builder (sceneBeatSectionsToTemplate) applies formatting when building the prompt.
 export const DEFAULT_SCENE_BEAT_TEMPLATE_SECTIONS: SceneBeatTemplateSections = {
   userMessagePreamble: 'You are continuing a story. Here is the context:',
   objective: `Expand this moment with rich detail, deepening the reader's immersion in the scene.
 Focus on the immediate experience rather than advancing the plot.`,
-  narrativeParameters: `<point_of_view>{pointOfView}</point_of_view>
-<word_count>{wordCount} words (±50 words acceptable)</word_count>
-<tense>{tense}</tense>`,
+  narrativeParameters: `{pointOfView}
+{wordCount} words (±50 words acceptable)
+{tense}`,
   stagingNotes: 'Consider these staging notes for physical and contextual consistency:',
   beatRequirements: '{prompt}',
-  focusAreas: `<area>Internal character thoughts and emotional reactions</area>
-<area>Sensory details - sight, sound, touch, smell, taste</area>
-<area>Micro-actions and body language</area>
-<area>Atmosphere and mood of the moment</area>
-<area>Subtext in dialogue (if present)</area>`,
+  focusAreas: `Internal character thoughts and emotional reactions
+Sensory details - sight, sound, touch, smell, taste
+Micro-actions and body language
+Atmosphere and mood of the moment
+Subtext in dialogue (if present)`,
   bridgingInstructions: 'Your generation must seamlessly connect to the existing text that follows. End in a way that flows naturally into this text.',
-  styleGuidance: `- Match the exact tone and narrative voice of the current scene
-- Maintain the established balance of dialogue, action, and introspection
-- Deepen the reader's connection to the viewpoint character`,
-  constraints: `- Stay within this moment - do NOT advance to new scenes or time jumps
-- Do NOT resolve conflicts or make major plot progress
-- Do NOT have characters act inconsistently with their established personalities
-- Do NOT introduce major new story elements
-- Match the exact tone and narrative voice`,
+  styleGuidance: `Match the exact tone and narrative voice of the current scene
+Maintain the established balance of dialogue, action, and introspection
+Deepen the reader's connection to the viewpoint character`,
+  constraints: `Stay within this moment - do NOT advance to new scenes or time jumps
+Do NOT resolve conflicts or make major plot progress
+Do NOT have characters act inconsistently with their established personalities
+Do NOT introduce major new story elements
+Match the exact tone and narrative voice`,
   outputFormat: 'Pure narrative prose. No meta-commentary, scene markers, chapter headings, or author notes.',
   generatePrompt: 'Generate the beat now:'
 };
@@ -396,18 +398,20 @@ export const SCENE_BEAT_TEMPLATE_SECTION_META: BeatTemplateSectionMeta[] = [
 ];
 
 // Default sections for Scene from Outline template
+// NOTE: Section content is plain text only - no XML or Markdown formatting.
+// The template builder (sceneFromOutlineSectionsToTemplate) applies formatting when building the prompt.
 export const DEFAULT_SCENE_FROM_OUTLINE_TEMPLATE_SECTIONS: SceneFromOutlineTemplateSections = {
   userMessagePreamble: 'You are writing a complete scene for a story.',
   objective: 'Write a complete, self-contained scene based on the provided outline. This is a full scene generation, not a continuation of existing content.',
   narrativeParameters: `{pointOfView}
-<target_length>Approximately {wordCount} words</target_length>
+Approximately {wordCount} words
 {tense}`,
   sceneOutline: '{sceneOutline}',
-  styleGuidance: `- Create a complete narrative arc within the scene
-- Balance dialogue, action, and introspection appropriately
-- Establish setting and atmosphere early
-- End with a sense of completion or meaningful transition
-- Match the tone and voice established in the story context`,
+  styleGuidance: `Create a complete narrative arc within the scene
+Balance dialogue, action, and introspection appropriately
+Establish setting and atmosphere early
+End with a sense of completion or meaningful transition
+Match the tone and voice established in the story context`,
   outputFormat: 'Pure narrative prose. No meta-commentary, scene markers, chapter headings, or author notes.',
   generatePrompt: 'Generate the complete scene now:'
 };

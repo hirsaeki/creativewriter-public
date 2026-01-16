@@ -1,6 +1,6 @@
 import { Injectable, OnDestroy, inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { Observable, ReplaySubject, Subject, Subscription, bufferTime, catchError, filter, finalize, from, map, of, switchMap, tap } from 'rxjs';
+import { Observable, ReplaySubject, Subject, Subscription, bufferTime, catchError, filter, from, map, of, switchMap, tap } from 'rxjs';
 import { BeatAI, BeatAIGenerationEvent } from '../../stories/models/beat-ai.interface';
 import {
   Story, NarrativePerspective, StoryTense,
@@ -19,7 +19,6 @@ import { CodexService } from '../../stories/services/codex.service';
 import { PromptManagerService } from './prompt-manager.service';
 import { CodexRelevanceService, CodexEntry as CodexRelevanceEntry } from '../../core/services/codex-relevance.service';
 import { CodexEntry, CustomField } from '../../stories/models/codex.interface';
-import { BeatHistoryService } from './beat-history.service';
 import { DatabaseService } from '../../core/services/database.service';
 
 type ProviderType = 'ollama' | 'claude' | 'gemini' | 'openrouter' | 'openaiCompatible';
@@ -58,7 +57,6 @@ export class BeatAIService implements OnDestroy {
   private readonly codexService = inject(CodexService);
   private readonly promptManager = inject(PromptManagerService);
   private readonly codexRelevanceService = inject(CodexRelevanceService);
-  private readonly beatHistoryService = inject(BeatHistoryService);
   private readonly document = inject(DOCUMENT);
   private readonly aiProviderValidation = inject(AIProviderValidationService);
   private readonly databaseService = inject(DatabaseService);
@@ -431,10 +429,12 @@ export class BeatAIService implements OnDestroy {
       includeStoryOutline: boolean;
       selectedSceneContexts: { sceneId: string; chapterId: string; content: string; }[];
     };
-    action?: 'generate' | 'rewrite';
+    action?: 'generate' | 'regenerate' | 'rewrite';
     existingText?: string;
     textAfterBeat?: string; // Text that follows this beat position (for scene beat bridging)
     stagingNotes?: string; // Meta-context for physical/positional consistency
+    originalPrompt?: string; // Original beat prompt (for history, separate from AI prompt for rewrites)
+    rewriteInstruction?: string; // Rewrite instruction (for history)
   } = {}): Observable<string> {
     const settings = this.settingsService.getSettings();
 
@@ -554,23 +554,7 @@ export class BeatAIService implements OnDestroy {
               this.stopGeneration(beatId);
             }
           };
-        }).pipe(
-          finalize(() => {
-            // Only save to history if generation completed normally (not cancelled/unsubscribed)
-            if (!context.isCompleted) {
-              console.info('[BeatAIService] Generation was cancelled, not saving to history');
-              return;
-            }
-            // Save to version history after generation completes
-            const finalContent = context.latestContent;
-            if (finalContent && finalContent.trim().length > 0) {
-              // Call saveToHistory asynchronously (don't block)
-              this.saveToHistory(beatId, prompt, finalContent, options).catch(error => {
-                console.error('[BeatAIService] Error saving to history:', error);
-              });
-            }
-          })
-        );
+        });
       })
     );
   }
@@ -1103,22 +1087,42 @@ export class BeatAIService implements OnDestroy {
   }
 
   private parseStructuredPrompt(prompt: string): {role: 'system' | 'user' | 'assistant', content: string}[] {
-    // Parse XML-like message structure from the template
-    const messagePattern = /<message role="(system|user|assistant)">([\s\S]*?)<\/message>/gi;
     const messages: {role: 'system' | 'user' | 'assistant', content: string}[] = [];
-    
-    let match;
-    while ((match = messagePattern.exec(prompt)) !== null) {
-      const role = match[1] as 'system' | 'user' | 'assistant';
-      const content = match[2].trim();
-      messages.push({ role, content });
+    const validRoles = ['system', 'user', 'assistant'];
+
+    // Try new delimiter format first: ---SYSTEM---, ---USER---, ---ASSISTANT---
+    const delimiterPattern = /---\s*(SYSTEM|USER|ASSISTANT)\s*---/gi;
+    const parts = prompt.split(delimiterPattern);
+
+    if (parts.length > 1) {
+      // New delimiter format detected
+      let i = 1; // Skip any content before first delimiter
+      while (i < parts.length - 1) {
+        const roleStr = parts[i].toLowerCase().trim();
+        const content = parts[i + 1]?.trim() || '';
+        if (validRoles.includes(roleStr) && content) {
+          messages.push({ role: roleStr as 'system' | 'user' | 'assistant', content });
+        }
+        i += 2;
+      }
     }
-    
-    // If no structured messages found, treat as single user message
+
+    // Fallback to legacy XML format if no delimiter messages found
+    if (messages.length === 0) {
+      const messagePattern = /<message role="(system|user|assistant)">([\s\S]*?)<\/message>/gi;
+      let match;
+      while ((match = messagePattern.exec(prompt)) !== null) {
+        const role = match[1] as 'system' | 'user' | 'assistant';
+        const content = match[2].trim();
+        messages.push({ role, content });
+      }
+    }
+
+    // Final fallback: treat as single user message
     if (messages.length === 0) {
       messages.push({ role: 'user', content: prompt });
     }
-    
+
     return messages;
   }
 
@@ -1135,7 +1139,7 @@ export class BeatAIService implements OnDestroy {
       includeStoryOutline: boolean;
       selectedSceneContexts: { sceneId: string; chapterId: string; content: string; }[];
     };
-    action?: 'generate' | 'rewrite';
+    action?: 'generate' | 'regenerate' | 'rewrite';
     existingText?: string;
     textAfterBeat?: string; // Text that follows this beat position (for scene beat bridging)
     stagingNotes?: string; // Meta-context for physical/positional consistency
@@ -1239,30 +1243,36 @@ export class BeatAIService implements OnDestroy {
             const tenseText = this.generateTenseText(story.settings?.tense);
 
 
-        const codexText = filteredCodexEntries.length > 0 
-          ? '<codex>\n' + filteredCodexEntries.map(categoryData => {
+        // Fields to exclude from prompt context (internal/import metadata)
+        const excludedMetadataFields = new Set([
+          'storyRole', 'customFields', 'aliases',
+          'originalid', 'alwaysincludeincontext', 'noautoinclude', 'originaltype'
+        ]);
+
+        const codexText = filteredCodexEntries.length > 0
+          ? filteredCodexEntries.map(categoryData => {
               const categoryType = this.getCategoryXmlType(categoryData.category);
-              
+
               return categoryData.entries.map((entry: CodexEntry) => {
                 let entryXml = `<${categoryType} name="${this.escapeXml(entry.title)}"`;
-                
+
                 // Add aliases if present
                 if (entry.metadata?.['aliases']) {
                   entryXml += ` aliases="${this.escapeXml(entry.metadata['aliases'])}"`;
                 }
-                
+
                 // Add story role for characters
                 if (entry.metadata?.['storyRole'] && categoryData.category === 'Characters') {
                   entryXml += ` storyRole="${this.escapeXml(entry.metadata['storyRole'])}"`;
                 }
-                
+
                 entryXml += '>\n';
-                
+
                 // Main description
                 if (entry.content) {
                   entryXml += `  <description>${this.escapeXml(entry.content)}</description>\n`;
                 }
-                
+
                 // Custom fields
                 const customFields = entry.metadata?.['customFields'] || [];
                 if (Array.isArray(customFields)) {
@@ -1271,22 +1281,22 @@ export class BeatAIService implements OnDestroy {
                     entryXml += `  <${fieldName}>${this.escapeXml(field.value)}</${fieldName}>\n`;
                   });
                 }
-                
+
                 // Additional metadata fields
                 if (entry.metadata) {
                   Object.entries(entry.metadata)
-                    .filter(([key]) => key !== 'storyRole' && key !== 'customFields' && key !== 'aliases')
+                    .filter(([key]) => !excludedMetadataFields.has(key))
                     .filter(([, value]) => value !== null && value !== undefined && value !== '')
                     .forEach(([key, value]) => {
                       const tagName = this.sanitizeXmlTagName(key);
                       entryXml += `  <${tagName}>${this.escapeXml(String(value))}</${tagName}>\n`;
                     });
                 }
-                
+
                 entryXml += `</${categoryType}>`;
                 return entryXml;
               }).join('\n');
-            }).join('\n') + '\n</codex>'
+            }).join('\n')
           : '';
 
 
@@ -1422,13 +1432,8 @@ Preserve all aspects of the original text that are not addressed by the instruct
           processedTemplate = processedTemplate.replace(regex, value || '');
         });
 
-        // Remove staging_notes section if no staging notes provided
-        if (!options.stagingNotes?.trim()) {
-          processedTemplate = processedTemplate.replace(
-            /<staging_notes>[\s\S]*?<\/staging_notes>\s*/g,
-            ''
-          );
-        }
+        // Note: Empty staging notes are handled gracefully - the placeholder {stagingNotes}
+        // gets replaced with empty string, leaving just the instruction text which is fine.
 
             return processedTemplate;
           })
@@ -1590,85 +1595,6 @@ ${bridgingSection}
 
   private generateId(): string {
     return 'beat-' + Math.random().toString(36).substring(2, 11);
-  }
-
-  /**
-   * Save generated content to version history
-   * Called automatically after successful generation
-   */
-  private async saveToHistory(
-    beatId: string,
-    prompt: string,
-    content: string,
-    options: {
-      model?: string;
-      beatType?: 'story' | 'scene';
-      wordCount?: number;
-      storyId?: string;
-      customContext?: {
-        selectedScenes: string[];
-        includeStoryOutline: boolean;
-        selectedSceneContexts: { sceneId: string; chapterId: string; content: string; }[];
-      };
-      action?: 'generate' | 'rewrite';
-      existingText?: string;
-      stagingNotes?: string;
-    }
-  ): Promise<void> {
-    // Don't save if content is empty or fallback
-    if (!content || content.trim().length === 0) {
-      return;
-    }
-
-    // Don't save if storyId is not provided
-    if (!options.storyId) {
-      console.warn(`[BeatAIService] Cannot save version history without storyId for beat ${beatId}`);
-      return;
-    }
-
-    try {
-      // Check for duplicate content in existing history
-      const existingHistory = await this.beatHistoryService.getHistory(beatId);
-      if (existingHistory) {
-        const normalizedContent = content.trim();
-        const isDuplicate = existingHistory.versions.some(
-          v => v.content.trim() === normalizedContent
-        );
-        if (isDuplicate) {
-          console.info('[BeatAIService] Skipping duplicate content in history');
-          return;
-        }
-      }
-
-      // Extract selected scenes from custom context
-      const selectedScenes = options.customContext?.selectedSceneContexts?.map(ctx => ({
-        sceneId: ctx.sceneId,
-        chapterId: ctx.chapterId
-      }));
-
-      await this.beatHistoryService.saveVersion(
-        beatId,
-        options.storyId,
-        {
-          content,
-          prompt,
-          model: options.model || 'unknown',
-          beatType: options.beatType || 'story',
-          wordCount: options.wordCount || 400,
-          generatedAt: new Date(),
-          characterCount: content.length,
-          isCurrent: true,
-          selectedScenes,
-          includeStoryOutline: options.customContext?.includeStoryOutline,
-          action: options.action || 'generate',
-          existingText: options.existingText,
-          stagingNotes: options.stagingNotes
-        }
-      );
-    } catch (error) {
-      console.error(`[BeatAIService] Failed to save version history for beat ${beatId}:`, error);
-      // Don't throw - history saving failure shouldn't break generation
-    }
   }
 
   // Public method to preview the structured prompt
@@ -1961,31 +1887,27 @@ ${bridgingSection}
 
     if (!story || !story.chapters) return '';
 
-    let xml = '<storySoFar>\n';
-    
-    // Group chapters by acts (for now, all in act 1)
-    xml += '  <act number="1">\n';
-    
+    let xml = '<act number="1">\n';
+
     const sortedChapters = [...story.chapters].sort((a, b) => a.order - b.order);
-    
+
     for (const chapter of sortedChapters) {
       if (!chapter.scenes || chapter.scenes.length === 0) continue;
-      
-      xml += `    <chapter title="${this.escapeXml(chapter.title)}" number="${chapter.order}">\n`;
-      
+
+      xml += `  <chapter title="${this.escapeXml(chapter.title)}" number="${chapter.order}">\n`;
+
       const sortedScenes = [...chapter.scenes].sort((a, b) => a.order - b.order);
-      
+
       for (const scene of sortedScenes) {
         // Stop before the target scene
         if (scene.id === targetSceneId) {
-          xml += '    </chapter>\n';
-          xml += '  </act>\n';
-          xml += '</storySoFar>';
+          xml += '  </chapter>\n';
+          xml += '</act>';
           return xml;
         }
-        
-        xml += `      <scene title="${this.escapeXml(scene.title)}" number="${scene.order}">`;
-        
+
+        xml += `    <scene title="${this.escapeXml(scene.title)}" number="${scene.order}">`;
+
         // Check if this scene should use full text instead of summary
         if (sceneTextMap.has(scene.id)) {
           // Use the full text from selected scenes
@@ -1996,16 +1918,15 @@ ${bridgingSection}
           const content = scene.summary || this.extractFullTextFromScene(scene);
           xml += this.escapeXml(content);
         }
-        
+
         xml += '</scene>\n';
       }
-      
-      xml += '    </chapter>\n';
+
+      xml += '  </chapter>\n';
     }
-    
-    xml += '  </act>\n';
-    xml += '</storySoFar>';
-    
+
+    xml += '</act>';
+
     return xml;
   }
 

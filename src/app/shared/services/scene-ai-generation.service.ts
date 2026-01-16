@@ -429,8 +429,8 @@ export class SceneAIGenerationService implements OnDestroy {
 
     const codexEntriesForTemplate = codexEntriesRaw
       ? this.indentXmlBlock(codexEntriesRaw, '      ')
-      : '      <codex />';
-    const codexEntriesForCustomPrompt = codexEntriesRaw || '<codex />';
+      : '';
+    const codexEntriesForCustomPrompt = codexEntriesRaw || '';
     const languageInstructionXml = `<languageRequirement>${this.escapeXml(languageInstruction)}</languageRequirement>`;
     const lengthRequirementXml = `<lengthRequirement>${this.escapeXml(wordCountInstruction)}</lengthRequirement>`;
     const redundancyNote = 'Do not repeat information already captured in the codex context.';

@@ -448,44 +448,73 @@ export class SceneGenerationService {
       return [{ role: 'user', content: '' }];
     }
 
-    const messagePattern = /<message role="(system|user|assistant)">([\s\S]*?)<\/message>/gi;
     const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [];
-    let match: RegExpExecArray | null;
+    const validRoles = ['system', 'user', 'assistant'];
 
-    // Detect potential malformed message tags
-    const openTagPattern = /<message[^>]*>/gi;
-    const closeTagPattern = /<\/message>/gi;
-    const openTags = (prompt.match(openTagPattern) || []).length;
-    const closeTags = (prompt.match(closeTagPattern) || []).length;
+    // Try new delimiter format first: ---SYSTEM---, ---USER---, ---ASSISTANT---
+    const delimiterPattern = /---\s*(SYSTEM|USER|ASSISTANT)\s*---/gi;
+    const parts = prompt.split(delimiterPattern);
 
-    if (openTags !== closeTags) {
-      console.warn(
-        `[SceneGeneration] Mismatched message tags in template: ${openTags} opening tags, ${closeTags} closing tags`
-      );
+    if (parts.length > 1) {
+      // New delimiter format detected
+      let i = 1; // Skip any content before first delimiter
+      while (i < parts.length - 1) {
+        const roleStr = parts[i].toLowerCase().trim();
+        const content = parts[i + 1]?.trim() || '';
+        if (!validRoles.includes(roleStr)) {
+          console.warn(`[SceneGeneration] Invalid role in template: ${roleStr}`);
+          i += 2;
+          continue;
+        }
+        if (content) {
+          messages.push({ role: roleStr as 'system' | 'user' | 'assistant', content });
+        } else {
+          console.warn(`[SceneGeneration] Empty content for ${roleStr} message in template`);
+        }
+        i += 2;
+      }
     }
 
-    // Detect message tags with invalid roles
-    const invalidRolePattern = /<message role="(?!system|user|assistant)[^"]*">/gi;
-    const invalidRoles = prompt.match(invalidRolePattern);
-    if (invalidRoles && invalidRoles.length > 0) {
-      console.warn(
-        `[SceneGeneration] Invalid message roles found in template: ${invalidRoles.join(', ')}`
-      );
-    }
+    // Fallback to legacy XML format if no delimiter messages found
+    if (messages.length === 0) {
+      const messagePattern = /<message role="(system|user|assistant)">([\s\S]*?)<\/message>/gi;
+      let match: RegExpExecArray | null;
 
-    // Extract valid messages
-    while ((match = messagePattern.exec(prompt)) !== null) {
-      const role = match[1] as 'system' | 'user' | 'assistant';
-      const content = match[2].trim();
+      // Detect potential malformed message tags
+      const openTagPattern = /<message[^>]*>/gi;
+      const closeTagPattern = /<\/message>/gi;
+      const openTags = (prompt.match(openTagPattern) || []).length;
+      const closeTags = (prompt.match(closeTagPattern) || []).length;
 
-      if (!content) {
-        console.warn(`[SceneGeneration] Empty content for ${role} message in template`);
+      if (openTags !== closeTags) {
+        console.warn(
+          `[SceneGeneration] Mismatched message tags in template: ${openTags} opening tags, ${closeTags} closing tags`
+        );
       }
 
-      messages.push({ role, content });
+      // Detect message tags with invalid roles
+      const invalidRolePattern = /<message role="(?!system|user|assistant)[^"]*">/gi;
+      const invalidRoles = prompt.match(invalidRolePattern);
+      if (invalidRoles && invalidRoles.length > 0) {
+        console.warn(
+          `[SceneGeneration] Invalid message roles found in template: ${invalidRoles.join(', ')}`
+        );
+      }
+
+      // Extract valid messages
+      while ((match = messagePattern.exec(prompt)) !== null) {
+        const role = match[1] as 'system' | 'user' | 'assistant';
+        const content = match[2].trim();
+
+        if (!content) {
+          console.warn(`[SceneGeneration] Empty content for ${role} message in template`);
+        }
+
+        messages.push({ role, content });
+      }
     }
 
-    // Fallback: if no structured messages found, treat entire prompt as user message
+    // Final fallback: if no structured messages found, treat entire prompt as user message
     if (messages.length === 0) {
       console.debug('[SceneGeneration] No structured messages found, using prompt as single user message');
       messages.push({ role: 'user', content: prompt });
