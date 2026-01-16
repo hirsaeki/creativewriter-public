@@ -94,4 +94,35 @@
     margin-top: 24px;
     text-align: center;
   }
+
+  .language-settings-card {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+    }
+
+    ion-card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    ion-card-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      p {
+        margin: 0;
+        flex: 1;
+      }
+
+      .nav-arrow {
+        font-size: 1.5em;
+        color: var(--ion-color-medium);
+      }
+    }
+  }
 }

@@ -2,17 +2,31 @@
   <div class="tab-header">
     <h2>
       <ion-icon name="shield-checkmark-outline"></ion-icon>
-      Reverse Proxy Settings
+      {{ 'settings.proxy.title' | cwT }}
     </h2>
-    <p>Configure reverse proxy endpoints for API providers. Useful for self-hosted proxies or enterprise environments.</p>
+    <p>{{ 'settings.proxy.description' | cwT }}</p>
   </div>
+
+  <!-- Language Settings Link -->
+  <ion-card class="language-settings-card" routerLink="/settings/language">
+    <ion-card-header>
+      <ion-card-title>
+        <ion-icon name="language-outline"></ion-icon>
+        {{ 'settings.proxy.languageSettings' | cwT }}
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <p>{{ 'settings.language.description' | cwT }}</p>
+      <ion-icon name="chevron-forward-outline" class="nav-arrow"></ion-icon>
+    </ion-card-content>
+  </ion-card>
 
   <!-- Claude Proxy -->
   <ion-card>
     <ion-card-header>
       <ion-card-title>
         <ion-icon name="server-outline"></ion-icon>
-        Claude API Proxy
+        {{ 'settings.proxy.claudeApiProxy' | cwT }}
       </ion-card-title>
     </ion-card-header>
     <ion-card-content>
@@ -20,13 +34,13 @@
         <ion-toggle
           [(ngModel)]="claudeConfig.enabled"
           (ionChange)="onToggleChange('claude')">
-          Enable Proxy
+          {{ 'settings.proxy.enableProxy' | cwT }}
         </ion-toggle>
       </ion-item>
 
       <ion-item *ngIf="claudeConfig.enabled">
         <ion-input
-          label="Proxy URL"
+          [label]="'settings.proxy.proxyUrl' | cwT"
           labelPlacement="stacked"
           placeholder="https://your-proxy.example.com"
           [(ngModel)]="claudeConfig.url"
@@ -40,7 +54,7 @@
 
       <ion-item *ngIf="claudeConfig.enabled">
         <ion-input
-          label="Auth Token (optional)"
+          [label]="'settings.proxy.authToken' | cwT"
           labelPlacement="stacked"
           type="password"
           placeholder="Bearer token for proxy authentication"
@@ -51,17 +65,17 @@
 
       <ion-item *ngIf="claudeConfig.enabled && claudeConfig.authToken">
         <ion-select
-          label="Auth Header Type"
+          [label]="'settings.proxy.authHeaderType' | cwT"
           labelPlacement="stacked"
           [(ngModel)]="claudeConfig.authHeaderType"
           (ionChange)="onSettingsChange()">
-          <ion-select-option value="authorization">Authorization (Transparent Proxy)</ion-select-option>
-          <ion-select-option value="x-proxy-auth">X-Proxy-Auth (Explicit Proxy)</ion-select-option>
+          <ion-select-option value="authorization">{{ 'settings.proxy.authorizationOption' | cwT }}</ion-select-option>
+          <ion-select-option value="x-proxy-auth">{{ 'settings.proxy.xProxyAuthOption' | cwT }}</ion-select-option>
         </ion-select>
       </ion-item>
 
       <ion-note *ngIf="claudeConfig.enabled" color="medium">
-        The proxy should forward requests to https://api.anthropic.com
+        {{ 'settings.proxy.forwardNote' | cwT:{ url: 'https://api.anthropic.com' } }}
       </ion-note>
 
       <div class="test-connection-row" *ngIf="canTestClaude">
@@ -72,7 +86,7 @@
           [disabled]="isTestingProvider('claude')">
           <ion-icon name="cloud-outline" slot="start"></ion-icon>
           <ion-spinner *ngIf="isTestingProvider('claude')" name="crescent" slot="end"></ion-spinner>
-          Test Connection
+          {{ 'settings.proxy.testConnection' | cwT }}
         </ion-button>
         <ion-icon
           *ngIf="claudeTestResult === 'success'"
@@ -95,7 +109,7 @@
     <ion-card-header>
       <ion-card-title>
         <ion-icon name="server-outline"></ion-icon>
-        OpenRouter API Proxy
+        {{ 'settings.proxy.openRouterApiProxy' | cwT }}
       </ion-card-title>
     </ion-card-header>
     <ion-card-content>
@@ -103,13 +117,13 @@
         <ion-toggle
           [(ngModel)]="openRouterConfig.enabled"
           (ionChange)="onToggleChange('openRouter')">
-          Enable Proxy
+          {{ 'settings.proxy.enableProxy' | cwT }}
         </ion-toggle>
       </ion-item>
 
       <ion-item *ngIf="openRouterConfig.enabled">
         <ion-input
-          label="Proxy URL"
+          [label]="'settings.proxy.proxyUrl' | cwT"
           labelPlacement="stacked"
           placeholder="https://your-proxy.example.com"
           [(ngModel)]="openRouterConfig.url"
@@ -123,7 +137,7 @@
 
       <ion-item *ngIf="openRouterConfig.enabled">
         <ion-input
-          label="Auth Token (optional)"
+          [label]="'settings.proxy.authToken' | cwT"
           labelPlacement="stacked"
           type="password"
           placeholder="Bearer token for proxy authentication"
@@ -134,17 +148,17 @@
 
       <ion-item *ngIf="openRouterConfig.enabled && openRouterConfig.authToken">
         <ion-select
-          label="Auth Header Type"
+          [label]="'settings.proxy.authHeaderType' | cwT"
           labelPlacement="stacked"
           [(ngModel)]="openRouterConfig.authHeaderType"
           (ionChange)="onSettingsChange()">
-          <ion-select-option value="authorization">Authorization (Transparent Proxy)</ion-select-option>
-          <ion-select-option value="x-proxy-auth">X-Proxy-Auth (Explicit Proxy)</ion-select-option>
+          <ion-select-option value="authorization">{{ 'settings.proxy.authorizationOption' | cwT }}</ion-select-option>
+          <ion-select-option value="x-proxy-auth">{{ 'settings.proxy.xProxyAuthOption' | cwT }}</ion-select-option>
         </ion-select>
       </ion-item>
 
       <ion-note *ngIf="openRouterConfig.enabled" color="medium">
-        The proxy should forward requests to https://openrouter.ai
+        {{ 'settings.proxy.forwardNote' | cwT:{ url: 'https://openrouter.ai' } }}
       </ion-note>
 
       <div class="test-connection-row" *ngIf="canTestOpenRouter">
@@ -155,7 +169,7 @@
           [disabled]="isTestingProvider('openRouter')">
           <ion-icon name="cloud-outline" slot="start"></ion-icon>
           <ion-spinner *ngIf="isTestingProvider('openRouter')" name="crescent" slot="end"></ion-spinner>
-          Test Connection
+          {{ 'settings.proxy.testConnection' | cwT }}
         </ion-button>
         <ion-icon
           *ngIf="openRouterTestResult === 'success'"
@@ -178,7 +192,7 @@
     <ion-card-header>
       <ion-card-title>
         <ion-icon name="server-outline"></ion-icon>
-        Google Gemini API Proxy
+        {{ 'settings.proxy.geminiApiProxy' | cwT }}
       </ion-card-title>
     </ion-card-header>
     <ion-card-content>
@@ -186,13 +200,13 @@
         <ion-toggle
           [(ngModel)]="googleGeminiConfig.enabled"
           (ionChange)="onToggleChange('googleGemini')">
-          Enable Proxy
+          {{ 'settings.proxy.enableProxy' | cwT }}
         </ion-toggle>
       </ion-item>
 
       <ion-item *ngIf="googleGeminiConfig.enabled">
         <ion-input
-          label="Proxy URL"
+          [label]="'settings.proxy.proxyUrl' | cwT"
           labelPlacement="stacked"
           placeholder="https://your-proxy.example.com"
           [(ngModel)]="googleGeminiConfig.url"
@@ -206,7 +220,7 @@
 
       <ion-item *ngIf="googleGeminiConfig.enabled">
         <ion-input
-          label="Auth Token (optional)"
+          [label]="'settings.proxy.authToken' | cwT"
           labelPlacement="stacked"
           type="password"
           placeholder="Bearer token for proxy authentication"
@@ -217,17 +231,17 @@
 
       <ion-item *ngIf="googleGeminiConfig.enabled && googleGeminiConfig.authToken">
         <ion-select
-          label="Auth Header Type"
+          [label]="'settings.proxy.authHeaderType' | cwT"
           labelPlacement="stacked"
           [(ngModel)]="googleGeminiConfig.authHeaderType"
           (ionChange)="onSettingsChange()">
-          <ion-select-option value="authorization">Authorization (Transparent Proxy)</ion-select-option>
-          <ion-select-option value="x-proxy-auth">X-Proxy-Auth (Explicit Proxy)</ion-select-option>
+          <ion-select-option value="authorization">{{ 'settings.proxy.authorizationOption' | cwT }}</ion-select-option>
+          <ion-select-option value="x-proxy-auth">{{ 'settings.proxy.xProxyAuthOption' | cwT }}</ion-select-option>
         </ion-select>
       </ion-item>
 
       <ion-note *ngIf="googleGeminiConfig.enabled" color="medium">
-        The proxy should forward requests to https://generativelanguage.googleapis.com
+        {{ 'settings.proxy.forwardNote' | cwT:{ url: 'https://generativelanguage.googleapis.com' } }}
       </ion-note>
 
       <div class="test-connection-row" *ngIf="canTestGoogleGemini">
@@ -238,7 +252,7 @@
           [disabled]="isTestingProvider('googleGemini')">
           <ion-icon name="cloud-outline" slot="start"></ion-icon>
           <ion-spinner *ngIf="isTestingProvider('googleGemini')" name="crescent" slot="end"></ion-spinner>
-          Test Connection
+          {{ 'settings.proxy.testConnection' | cwT }}
         </ion-button>
         <ion-icon
           *ngIf="googleGeminiTestResult === 'success'"
@@ -261,13 +275,13 @@
     <ion-card-header>
       <ion-card-title>
         <ion-icon name="key-outline"></ion-icon>
-        Ollama Authentication
+        {{ 'settings.proxy.ollamaAuth' | cwT }}
       </ion-card-title>
     </ion-card-header>
     <ion-card-content>
       <ion-item>
         <ion-input
-          label="Auth Token (optional)"
+          [label]="'settings.proxy.authToken' | cwT"
           labelPlacement="stacked"
           type="password"
           placeholder="Bearer token for Ollama server"
@@ -277,7 +291,7 @@
       </ion-item>
 
       <ion-note color="medium">
-        Add authentication if your Ollama server is behind a reverse proxy with auth
+        {{ 'settings.proxy.ollamaNote' | cwT }}
       </ion-note>
     </ion-card-content>
   </ion-card>
@@ -287,13 +301,13 @@
     <ion-card-header>
       <ion-card-title>
         <ion-icon name="key-outline"></ion-icon>
-        OpenAI-Compatible Authentication
+        {{ 'settings.proxy.openAIAuth' | cwT }}
       </ion-card-title>
     </ion-card-header>
     <ion-card-content>
       <ion-item>
         <ion-input
-          label="Auth Token (optional)"
+          [label]="'settings.proxy.authToken' | cwT"
           labelPlacement="stacked"
           type="password"
           placeholder="Bearer token for OpenAI-compatible server"
@@ -303,7 +317,7 @@
       </ion-item>
 
       <ion-note color="medium">
-        Add authentication if your OpenAI-compatible server requires Bearer token
+        {{ 'settings.proxy.openAINote' | cwT }}
       </ion-note>
     </ion-card-content>
   </ion-card>
@@ -312,7 +326,7 @@
   <div class="reset-section">
     <ion-button fill="outline" color="medium" (click)="resetSettings()">
       <ion-icon name="refresh-outline" slot="start"></ion-icon>
-      Reset Proxy Settings
+      {{ 'settings.proxy.resetSettings' | cwT }}
     </ion-button>
   </div>
 </div>
