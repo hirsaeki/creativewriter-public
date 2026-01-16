@@ -73,27 +73,55 @@ jobs:
           UPSTREAM_REPO: ${{ steps.detect.outputs.upstream }}
           TARGET_BRANCH: ${{ steps.detect.outputs.branch }}
         run: |
+          set -euo pipefail
+          
           git config --local user.name  "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          echo "Upstream: $UPSTREAM_REPO"
-          echo "Branch: $TARGET_BRANCH"
-          git config --local --get user.name
-          git config --local --get user.email
-
-          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
-          git fetch upstream
+          
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" || true
+          git fetch upstream "$TARGET_BRANCH"
           git checkout "$TARGET_BRANCH"
-
-          # Enable the 'ours' merge driver for .gitattributes merge=ours strategy.
-          # This ensures that files marked with 'merge=ours' in .gitattributes
-          # (e.g., src/app/custom/**, CLAUDE.local.md) will keep the local version
-          # when conflicts occur during upstream sync, protecting custom fork code.
+          
+          # .gitattributes の merge=ours を有効化
           git config --local merge.ours.driver true
-
-          if ! git merge --ff-only "upstream/${TARGET_BRANCH}"; then
-            # -X ours: resolve conflicts (including modify/delete) by keeping local version
-            git merge --no-edit -X ours "upstream/${TARGET_BRANCH}"
+          
+          # まずFF
+          if git merge --ff-only "upstream/${TARGET_BRANCH}"; then
+            echo "Fast-forwarded."
+          else
+            # 分岐してたら merge commit
+            if git merge --no-ff --no-edit "upstream/${TARGET_BRANCH}"; then
+              echo "Merge succeeded."
+            else
+              echo "Merge conflict. Auto-resolving merge=ours paths..."
+          
+              # 未解決パス
+              CONFLICTS="$(git ls-files -u | awk '{print $4}' | sort -u || true)"
+              echo "$CONFLICTS"
+          
+              while IFS= read -r path; do
+                [ -z "$path" ] && continue
+                attr="$(git check-attr merge -- "$path" | awk -F': ' '{print $3}')"
+                if [ "$attr" = "ours" ]; then
+                  echo "Resolve with ours: $path"
+                  if git checkout --ours -- "$path" 2>/dev/null; then
+                    git add -- "$path"
+                  else
+                    git rm -f -- "$path" >/dev/null 2>&1 || true
+                  fi
+                fi
+              done <<< "$CONFLICTS"
+          
+              # まだ残る競合は落とす（安全）
+              REMAINING="$(git ls-files -u | awk '{print $4}' | sort -u || true)"
+              if [ -n "$REMAINING" ]; then
+                echo "Remaining conflicts:"
+                echo "$REMAINING"
+                exit 1
+              fi
+          
+              git commit -m "Merge upstream/${TARGET_BRANCH} (auto-resolve merge=ours)"
+            fi
           fi
-
+          
           git push origin "$TARGET_BRANCH"
