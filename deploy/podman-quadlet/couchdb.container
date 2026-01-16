@@ -5,8 +5,8 @@ Description=CreativeWriter CouchDB
 Image=ghcr.io/marcodroll/creativewriter-public-couchdb:latest
 Pod=creativewriter@%i.pod
 EnvironmentFile=%h/.config/creativewriter/creativewriter.env
-Volume=%h/.local/share/creativewriter/data/couchdb-data:/opt/couchdb/data:Z
-Volume=%h/.local/share/creativewriter/log/couchdb_log:/opt/couchdb/var/log:Z
+Volume=${DATA_DIR:-%h/.local/share/creativewriter}/data/couchdb-data:/opt/couchdb/data:Z
+Volume=${DATA_DIR:-%h/.local/share/creativewriter}/log/couchdb_log:/opt/couchdb/var/log:Z
 
 [Service]
 Restart=always

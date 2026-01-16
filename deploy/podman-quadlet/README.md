@@ -27,9 +27,35 @@ Minimal steps:
 2. Copy configuration files to `~/.config/creativewriter/`:
    - `nginx.conf` (use as-is)
    - `creativewriter.env.example` -> rename to `creativewriter.env` and edit credentials
-3. Create data directories under `~/.local/share/creativewriter/`
+3. Create data directories (see [Data Directory](#data-directory) below)
 4. Run `systemctl --user daemon-reload`
 5. Start with `systemctl --user start creativewriter-stack@<PORT>.target`
+
+## Data Directory
+
+By default, persistent data is stored in `~/.local/share/creativewriter/`.
+
+To use a custom location (e.g., NAS, external drive), set `DATA_DIR` in `creativewriter.env`:
+
+```bash
+# ~/.config/creativewriter/creativewriter.env
+DATA_DIR=/mnt/nas/creativewriter
+```
+
+Required directory structure:
+```
+$DATA_DIR/
+├── data/
+│   └── couchdb-data/    # CouchDB database files
+└── log/
+    ├── couchdb_log/     # CouchDB logs
+    └── snapshot-service/ # Snapshot service logs
+```
+
+Create them with:
+```bash
+mkdir -p "${DATA_DIR:-$HOME/.local/share/creativewriter}"/{data/couchdb-data,log/couchdb_log,log/snapshot-service}
+```
 
 ## Architecture
 
@@ -79,4 +105,4 @@ External Access: http://localhost:<PORT>/
 - **Pod networking**: All containers share the same network namespace (`localhost`)
 - **Single entry point**: Only nginx exposes port 80 (mapped to host via Pod)
 - **Template specifier**: `%i` allows running multiple instances on different ports
-- **Persistent storage**: CouchDB data and logs stored in `~/.local/share/creativewriter/`
+- **Persistent storage**: CouchDB data and logs stored in `DATA_DIR` (default: `~/.local/share/creativewriter/`)
