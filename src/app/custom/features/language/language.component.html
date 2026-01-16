@@ -1,0 +1,37 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/settings"></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ 'settings.language.title' | cwT }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        <ion-icon name="language-outline"></ion-icon>
+        {{ 'settings.language.selectLanguage' | cwT }}
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <p class="description">{{ 'settings.language.description' | cwT }}</p>
+
+      <ion-list>
+        <ion-radio-group [value]="currentLang()" (ionChange)="onLanguageChange($event)">
+          @for (language of languages; track language.code) {
+            <ion-item>
+              <ion-radio [value]="language.code" justify="start" labelPlacement="end">
+                {{ language.labelKey | cwT }}
+              </ion-radio>
+              @if (currentLang() === language.code) {
+                <ion-icon name="checkmark-circle" color="primary" slot="end"></ion-icon>
+              }
+            </ion-item>
+          }
+        </ion-radio-group>
+      </ion-list>
+    </ion-card-content>
+  </ion-card>
+</ion-content>

@@ -60,25 +60,33 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
 ### Handoffs / Plans
 - `docs/runtime-i18n-handoff-ja.md` - runtime i18n（`ja` + `en` fallback、`custom`中心、ルート差し込み方針）
 
-### i18n 実装完了・次ステップ（2026-01-15）
+### i18n 実装完了・次ステップ（2026-01-17 更新）
 
 **実装済み:**
 - `src/app/custom/i18n/` - I18nService（Signal-based）、cwT Pipe、en/ja辞書
 - `src/app/custom/features/language/` - 言語設定画面（`/settings/language`）
 - `src/app/custom/routing/` - APP_INITIALIZERによるルート差し込み
 - `src/app/custom/components/proxy-settings/` - i18n対応済み、言語設定への導線追加
+- `src/app/custom/services/custom-global-error-handler.service.ts` - i18n対応済みエラーハンドラー（DI差し替え）
+- `src/app/custom/services/custom-dialog.service.ts` - i18n対応済みダイアログ（デフォルトボタンテキスト翻訳）
+- `src/app/custom/services/custom-memory-warning.service.ts` - i18n対応済みメモリ警告（完全再実装）
+- `.gitattributes`に`src/app/app.config.ts merge=ours`追加（保護完了）
 
 **動作確認方法:**
 1. `npm start` でアプリ起動
 2. `/settings` → Proxyタブ → 「Language Settings」カードをクリック
 3. `/settings/language` で `ja`/`en` 切替を確認
 4. リロード後も言語が保持されることを確認
+5. チャンクロードエラー時のダイアログが選択言語で表示される
+6. 確認ダイアログ（Cancel/Confirm/Delete等）が選択言語で表示される
+7. メモリ警告トースト（モバイル環境）が選択言語で表示される
 
 **次ステップ（優先度順）:**
-1. **`app.config.ts`の保護検討**: `.gitattributes`に`src/app/app.config.ts merge=ours`追加
-   - 現状`CustomModule`のimportがupstream syncでコンフリクトする可能性あり
-2. **翻訳範囲拡張（オプション）**:
-   - DI差し替えサービスへの翻訳追加（`DialogService`, `GlobalErrorHandlerService`, `MemoryWarningService`）
+1. ~~**`app.config.ts`の保護検討**~~ ✅ 完了
+2. ~~**翻訳範囲拡張**~~ ✅ 完了
+   - ~~`GlobalErrorHandlerService`~~ ✅ 完了
+   - ~~`DialogService`~~ ✅ 完了
+   - ~~`MemoryWarningService`~~ ✅ 完了
    - custom以外の画面は翻訳混在OK（fork方針として許容）
 3. **Impure Pipe最適化（低優先度）**:
    - 現状`pure: false`で毎CD実行。パフォーマンス問題が出たらSignal-based directiveへ移行検討
@@ -87,6 +95,7 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
 - SSRガード済み（`localStorage`/`document`アクセスはtry-catch）
 - upstreamの`app.routes.ts`は未変更（`Router.resetConfig()`で動的注入）
 - 翻訳キー追加時は`en.ts`を先に編集→`ja.ts`で型エラーが出るので漏れなし
+- `MemoryWarningService`は`private`メソッドのためラップ不可、完全再実装で対応
 
 ---
 

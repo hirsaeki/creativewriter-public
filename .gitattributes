@@ -2,6 +2,7 @@
 src/app/custom/** merge=ours
 
 # Protect fork-specific configuration files
+src/app/app.config.ts merge=ours
 CLAUDE.local.md merge=ours
 AGENTS.md merge=ours
 

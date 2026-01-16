@@ -1,16 +1,18 @@
 import { Component, OnInit, OnDestroy, inject, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonItem, IonLabel, IonInput, IonToggle, IonButton, IonIcon, IonNote, IonSpinner,
   IonSelect, IonSelectOption
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { shieldCheckmarkOutline, serverOutline, keyOutline, refreshOutline, checkmarkCircleOutline, closeCircleOutline, cloudOutline } from 'ionicons/icons';
+import { shieldCheckmarkOutline, serverOutline, keyOutline, refreshOutline, checkmarkCircleOutline, closeCircleOutline, cloudOutline, languageOutline, chevronForwardOutline } from 'ionicons/icons';
 import { Subscription } from 'rxjs';
 import { ProxySettingsService } from '../../services/proxy-settings.service';
 import { ProxySettings, ReverseProxyConfig } from '../../models/proxy-settings.interface';
+import { I18nPipe } from '../../i18n';
 import { ClaudeApiProxyService } from '../../services/claude-api-proxy.service';
 import { GeminiApiProxyService } from '../../services/gemini-api-proxy.service';
 import { OpenRouterApiProxyService } from '../../services/openrouter-api-proxy.service';
@@ -19,7 +21,7 @@ import { OpenRouterApiProxyService } from '../../services/openrouter-api-proxy.s
   selector: 'app-proxy-settings',
   standalone: true,
   imports: [
-    CommonModule, FormsModule,
+    CommonModule, FormsModule, RouterLink, I18nPipe,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
     IonItem, IonLabel, IonInput, IonToggle, IonButton, IonIcon, IonNote, IonSpinner,
     IonSelect, IonSelectOption
@@ -68,7 +70,7 @@ export class ProxySettingsComponent implements OnInit, OnDestroy {
   googleGeminiUrlError: string | null = null;
 
   constructor() {
-    addIcons({ shieldCheckmarkOutline, serverOutline, keyOutline, refreshOutline, checkmarkCircleOutline, closeCircleOutline, cloudOutline });
+    addIcons({ shieldCheckmarkOutline, serverOutline, keyOutline, refreshOutline, checkmarkCircleOutline, closeCircleOutline, cloudOutline, languageOutline, chevronForwardOutline });
   }
 
   ngOnInit(): void {
