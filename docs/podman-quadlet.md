@@ -28,17 +28,37 @@ podman --version
 
 ## Directory Setup
 
-Create the required directories:
+### Data Directory Configuration
+
+By default, persistent data is stored in `~/.local/share/creativewriter/`.
+
+To use a custom location (e.g., NAS, external drive), set `DATA_DIR` in `creativewriter.env`:
+
+```bash
+# ~/.config/creativewriter/creativewriter.env
+DATA_DIR=/mnt/nas/creativewriter
+```
+
+Required directory structure:
+```
+$DATA_DIR/
+├── data/
+│   └── couchdb-data/    # CouchDB database files
+└── log/
+    ├── couchdb_log/     # CouchDB logs
+    └── snapshot-service/ # Snapshot service logs
+```
+
+### Create Directories
 
 ```bash
 # Create config directory
 mkdir -p ~/.config/creativewriter
 mkdir -p ~/.config/containers/systemd
 
-# Create data directories
-mkdir -p ~/.local/share/creativewriter/data/couchdb-data
-mkdir -p ~/.local/share/creativewriter/log/couchdb_log
-mkdir -p ~/.local/share/creativewriter/log/snapshot-service
+# Create data directories (supports custom DATA_DIR)
+DATA_DIR="${DATA_DIR:-$HOME/.local/share/creativewriter}"
+mkdir -p "$DATA_DIR"/{data/couchdb-data,log/couchdb_log,log/snapshot-service}
 ```
 
 ## Installation
@@ -56,7 +76,7 @@ cp deploy/podman-quadlet/*.target ~/.config/containers/systemd/
 ### 2. Copy Configuration Files
 
 ```bash
-cp nginx.conf ~/.config/creativewriter/nginx.conf
+cp deploy/podman-quadlet/nginx.conf ~/.config/creativewriter/nginx.conf
 ```
 
 ### 3. Create Environment File
@@ -154,6 +174,56 @@ Expected responses:
 - `/_db/_up`: `{"status":"ok"}`
 - `/api/replicate/test`: HTTP 200 with JSON response
 - `/api/gemini/test`: HTTP 200 with JSON response
+
+## Architecture
+
+All containers run within a single Pod, communicating over `localhost`:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    creativewriter@<PORT>.pod                        │
+│                    (Published: <PORT>:80)                           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌──────────────────┐      ┌─────────────────────────────────────┐  │
+│  │                  │      │                                     │  │
+│  │  nginx (SPA)     │      │  Reverse Proxy Routes               │  │
+│  │  :80             │─────▶│                                     │  │
+│  │                  │      │  /_db/*        → localhost:5984     │  │
+│  └──────────────────┘      │  /api/replicate/* → localhost:3001  │  │
+│          │                 │  /api/fal/*    → localhost:3001     │  │
+│          │                 │  /api/gemini/* → localhost:3002     │  │
+│          ▼                 │                                     │  │
+│  ┌──────────────────┐      └─────────────────────────────────────┘  │
+│  │  Static Files    │                                               │
+│  │  /usr/share/     │      ┌─────────────────────────────────────┐  │
+│  │  nginx/html      │      │  Backend Services                   │  │
+│  └──────────────────┘      │                                     │  │
+│                            │  ┌─────────┐  ┌─────────┐           │  │
+│                            │  │CouchDB  │  │Replicate│           │  │
+│                            │  │:5984    │  │Proxy    │           │  │
+│                            │  │         │  │:3001    │           │  │
+│                            │  └─────────┘  └─────────┘           │  │
+│                            │                                     │  │
+│                            │  ┌─────────┐  ┌─────────┐           │  │
+│                            │  │Gemini   │  │Snapshot │           │  │
+│                            │  │Proxy    │  │Service  │           │  │
+│                            │  │:3002    │  │         │           │  │
+│                            │  └─────────┘  └─────────┘           │  │
+│                            │                                     │  │
+│                            └─────────────────────────────────────┘  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+External Access: http://localhost:<PORT>/
+```
+
+### Key Points
+
+- **Pod networking**: All containers share the same network namespace (`localhost`)
+- **Single entry point**: Only nginx exposes port 80 (mapped to host via Pod)
+- **Template specifier**: `%i` allows running multiple instances on different ports
+- **Persistent storage**: CouchDB data and logs stored in `DATA_DIR` (default: `~/.local/share/creativewriter/`)
 
 ## Logs
 

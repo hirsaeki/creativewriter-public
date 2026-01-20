@@ -101,6 +101,10 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
 
 ## Tips & Reminders
 
+### ワークフロー例外
+- **ドキュメントのみの変更**（`.md`ファイル等）では `npm run build` / `npm test` / `npm run lint` は**不要**
+  - これらはTypeScript/Angularコードに影響する変更時のみ実行すること
+
 ### ローカルテスト環境
 - **Karma テスト**: Windows環境ではEdgeを使用
   ```cmd
