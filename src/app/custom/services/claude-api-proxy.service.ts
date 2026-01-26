@@ -30,11 +30,13 @@ export class ClaudeApiProxyService extends ClaudeApiService {
   }
 
   private buildProxyApiUrl(): string {
-    return this.buildProxyUrl('/v1/messages');
+    // User should include /v1 in proxy URL (consistent with Gemini requiring /v1beta)
+    return this.buildProxyUrl('/messages');
   }
 
   private buildProxyModelsUrl(): string {
-    return this.buildProxyUrl('/v1/models');
+    // User should include /v1 in proxy URL (consistent with Gemini requiring /v1beta)
+    return this.buildProxyUrl('/models');
   }
 
   private buildProxyHeaders(baseHeaders: Record<string, string>): Record<string, string> {
@@ -402,7 +404,7 @@ export class ClaudeApiProxyService extends ClaudeApiService {
 
   /**
    * Tests if the proxy server itself is reachable.
-   * This method sends a lightweight HEAD request to the proxy URL
+   * This method sends a lightweight GET request to /v1/models
    * to verify connectivity without consuming API resources.
    * @returns Observable<boolean> - true if proxy is reachable, false otherwise
    */
@@ -415,18 +417,28 @@ export class ClaudeApiProxyService extends ClaudeApiService {
     }
 
     const baseUrl = proxyConfig.url.endsWith('/') ? proxyConfig.url.slice(0, -1) : proxyConfig.url;
+    // Use models endpoint for a lightweight GET request to test connectivity
+    // User should include /v1 in proxy URL if needed (consistent with Gemini requiring /v1beta)
+    const testUrl = `${baseUrl}/models`;
 
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+      'anthropic-version': '2023-06-01'
+    };
+
+    // Note: API key is intentionally NOT sent during proxy connection test
+    // to prevent potential API key leakage to malicious proxy URLs.
+    // The proxy connection test only verifies connectivity, not API functionality.
+
     if (proxyConfig.authToken) {
       const headerName = this.getAuthHeaderName(proxyConfig);
       headers[headerName] = `Bearer ${proxyConfig.authToken}`;
     }
 
-    return this.proxyHttp.head(baseUrl, {
+    return this.proxyHttp.get(testUrl, {
       headers: new HttpHeaders(headers),
       observe: 'response'
     }).pipe(
-      map(() => true),
+      map(response => response.status >= 200 && response.status < 400),
       catchError(() => of(false))
     );
   }

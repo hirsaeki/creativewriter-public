@@ -99,6 +99,45 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
 
 ---
 
+### 日本語テンプレート実装（2026-01-26 実装済み・未コミット分あり）
+
+**実装済み（コミット済み）:**
+- `src/assets/templates/system-message-ja.txt` - AIシステムプロンプト
+- `src/assets/templates/default-beat-rules-ja.txt` - 執筆ルール
+- `src/assets/templates/beat-generation-ja.template` - Beat生成プロンプト構造
+- `StoryLanguage`型に`'ja'`追加（2箇所）
+- 言語選択ダイアログに日本語オプション追加
+- `story-list.component.ts`のActionSheetに日本語オプション追加
+- `scene-ai-generation.service.ts`に`case 'ja'`追加
+
+**実装済み（未コミット）:**
+- プロキシ接続テストの修正（HEAD→GET /models）
+  - `claude-api-proxy.service.ts`: `/models`エンドポイント使用
+  - `openrouter-api-proxy.service.ts`: `/models`エンドポイント使用
+- Claudeプロキシ: URLにバージョン込み（`/v1`）で統一（Geminiの`/v1beta`と同様）
+  - `buildProxyApiUrl()`: `/v1/messages` → `/messages`
+  - `buildProxyModelsUrl()`: `/v1/models` → `/models`
+
+**未実装・要対応:**
+1. **モデル一覧が表示されない問題**
+   - 原因: プロキシがOpenAI互換形式で返す（`{ id, object, owned_by }`）が、アプリはAnthropic形式（`{ id, display_name, type }`）を期待
+   - 対策案: `model.service.ts`の`transformClaudeModels`で`label: model.display_name || model.id`にフォールバック追加
+   - 注意: upstreamファイル変更のため、コンフリクトリスクあり。custom内でオーバーライド検討も可
+
+2. **Geminiモデル一覧がハードコード**
+   - 現状: `loadGeminiModels()`はプリセット4モデルのみ返す（API未使用）
+   - プロキシはGemini形式（`{ models: [{ name, displayName, ... }] }`）で返す
+   - custom内で`GeminiApiProxyService`にモデル取得機能追加検討
+
+**プロキシURL設定ルール（統一済み）:**
+| プロバイダー | URL例 | テスト | API呼び出し |
+|-------------|-------|--------|-------------|
+| Gemini | `https://proxy/v1beta` | `{url}/models` | `{url}/models/{model}:generateContent` |
+| Claude | `https://proxy/v1` | `{url}/models` | `{url}/messages` |
+| OpenRouter | `https://proxy/api/v1` | `{url}/models` | `{url}/chat/completions` |
+
+---
+
 ## Tips & Reminders
 
 ### ワークフロー例外

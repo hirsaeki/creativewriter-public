@@ -432,6 +432,11 @@ export class StoryListComponent implements OnInit, OnDestroy {
           handler: () => this.handleLanguageSelection('es')
         },
         {
+          text: '日本語',
+          data: { language: 'ja' },
+          handler: () => this.handleLanguageSelection('ja')
+        },
+        {
           text: 'Custom Language',
           data: { language: 'custom' },
           handler: () => this.handleLanguageSelection('custom')

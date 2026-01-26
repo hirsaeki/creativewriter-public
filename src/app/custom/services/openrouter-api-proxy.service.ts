@@ -366,7 +366,7 @@ export class OpenRouterApiProxyService extends OpenRouterApiService {
 
   /**
    * Tests if the proxy connection is working properly.
-   * Sends a HEAD request to verify proxy server connectivity without making actual API calls.
+   * Sends a GET request to /models to verify proxy server connectivity without making actual API calls.
    * @returns Observable<boolean> - true if successful, false if failed
    */
   testProxyConnection(): Observable<boolean> {
@@ -378,17 +378,19 @@ export class OpenRouterApiProxyService extends OpenRouterApiService {
     }
 
     const proxyUrl = this.getProxyUrl();
+    // Use models endpoint for a lightweight GET request to test connectivity
+    const testUrl = proxyUrl.endsWith('/') ? `${proxyUrl}models` : `${proxyUrl}/models`;
 
     // Only use proxy auth headers - no OpenRouter API key needed for connectivity check
     const headers = new HttpHeaders({
       ...this.getProxyAuthHeaders()
     });
 
-    return this.proxyHttp.head(proxyUrl, {
+    return this.proxyHttp.get(testUrl, {
       headers,
       observe: 'response'
     }).pipe(
-      map(() => true),
+      map(response => response.status >= 200 && response.status < 400),
       catchError(() => of(false))
     );
   }
