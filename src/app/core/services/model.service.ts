@@ -31,7 +31,7 @@ export class ModelService {
 
   private openRouterModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private replicateModelsSubject = new BehaviorSubject<ModelOption[]>([]);
-  private geminiModelsSubject = new BehaviorSubject<ModelOption[]>([]);
+  protected geminiModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private ollamaModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private claudeModelsSubject = new BehaviorSubject<ModelOption[]>([]);
   private openAICompatibleModelsSubject = new BehaviorSubject<ModelOption[]>([]);
@@ -371,7 +371,7 @@ export class ModelService {
     return models
       .map(model => ({
         id: model.id,
-        label: model.display_name,
+        label: model.display_name || model.id,
         description: this.generateClaudeModelDescription(model.id),
         costInputEur: this.estimateClaudeCostInput(model.id),
         costOutputEur: this.estimateClaudeCostOutput(model.id),

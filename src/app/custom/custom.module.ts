@@ -6,6 +6,7 @@ import { OllamaApiService } from '../core/services/ollama-api.service';
 import { OpenAICompatibleApiService } from '../core/services/openai-compatible-api.service';
 import { DialogService } from '../core/services/dialog.service';
 import { MemoryWarningService } from '../core/services/memory-warning.service';
+import { ModelService } from '../core/services/model.service';
 import { ClaudeApiProxyService } from './services/claude-api-proxy.service';
 import { OpenRouterApiProxyService } from './services/openrouter-api-proxy.service';
 import { GeminiApiProxyService } from './services/gemini-api-proxy.service';
@@ -15,6 +16,7 @@ import { ProxySettingsService } from './services/proxy-settings.service';
 import { CustomGlobalErrorHandlerService } from './services/custom-global-error-handler.service';
 import { CustomDialogService } from './services/custom-dialog.service';
 import { CustomMemoryWarningService } from './services/custom-memory-warning.service';
+import { CustomModelService } from './services/custom-model.service';
 import { provideCustomRoutes } from './routing';
 
 @NgModule({
@@ -28,6 +30,7 @@ import { provideCustomRoutes } from './routing';
     { provide: ErrorHandler, useClass: CustomGlobalErrorHandlerService },
     { provide: DialogService, useClass: CustomDialogService },
     { provide: MemoryWarningService, useClass: CustomMemoryWarningService },
+    { provide: ModelService, useClass: CustomModelService },
     provideCustomRoutes(),
   ]
 })

@@ -6,6 +6,7 @@ import { SettingsService } from '../../core/services/settings.service';
 import { AIRequestLoggerService } from '../../core/services/ai-request-logger.service';
 import { ProxySettingsService } from './proxy-settings.service';
 import { ReverseProxyConfig } from '../models/proxy-settings.interface';
+import { GeminiModelsResponse } from '../../core/models/model.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -458,6 +459,55 @@ export class GeminiApiProxyService extends GoogleGeminiApiService {
       this.proxyAbortSubjects.delete(requestId);
     }
     this.proxyRequestMetadata.delete(requestId);
+  }
+
+  /**
+   * Lists available Gemini models from the proxy.
+   * Returns models in Google Gemini API format.
+   */
+  listModels(): Observable<GeminiModelsResponse> {
+    const proxyConfig = this.proxySettingsService.getGoogleGeminiProxyConfig();
+
+    if (!proxyConfig?.enabled || !proxyConfig.url) {
+      return of({ models: [] });
+    }
+
+    const settings = this.proxySettingsServiceRef.getSettings();
+
+    if (!settings.googleGemini.enabled || !settings.googleGemini.apiKey) {
+      return of({ models: [] });
+    }
+
+    const proxyUrl = proxyConfig.url.endsWith('/')
+      ? proxyConfig.url.slice(0, -1)
+      : proxyConfig.url;
+    const modelsUrl = `${proxyUrl}/models`;
+
+    const headersObj: Record<string, string> = {
+      'User-Agent': 'NovelCrafter/1.0',
+      'X-Client-Name': 'NovelCrafter',
+      'X-Client-Version': '1.0',
+      'X-API-Key': settings.googleGemini.apiKey
+    };
+
+    if (proxyConfig.authToken) {
+      const headerName = this.getAuthHeaderName(proxyConfig);
+      headersObj[headerName] = `Bearer ${proxyConfig.authToken}`;
+    }
+
+    const headers = new HttpHeaders(headersObj);
+
+    return this.proxyHttp.get<GeminiModelsResponse>(modelsUrl, { headers }).pipe(
+      catchError(() => of({ models: [] }))
+    );
+  }
+
+  /**
+   * Check if proxy is enabled for Gemini.
+   */
+  isProxyEnabled(): boolean {
+    const proxyConfig = this.proxySettingsService.getGoogleGeminiProxyConfig();
+    return !!(proxyConfig?.enabled && proxyConfig.url);
   }
 
   /**
