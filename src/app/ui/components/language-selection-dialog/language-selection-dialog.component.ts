@@ -7,7 +7,7 @@ import {
   ModalController
 } from '@ionic/angular/standalone';
 
-export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
+export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'ja' | 'custom';
 
 @Component({
   selector: 'app-language-selection-dialog',

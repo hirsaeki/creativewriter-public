@@ -1,0 +1,55 @@
+<messages>
+<message role="system">{systemMessage}</message>
+<message role="user">あなたはストーリーを続けています。以下がコンテキストです：
+
+<story_title>{storyTitle}</story_title>
+
+<glossary>
+{codexEntries}
+</glossary>
+
+<story_context>
+{storySoFar}
+</story_context>
+
+<current_scene>
+{sceneFullText}
+</current_scene>
+
+<beat_generation_task>
+  <objective>
+    現在のシーンの終わりから物語を進める次のストーリービートを生成してください。
+  </objective>
+
+  <narrative_parameters>
+    {pointOfView}
+    <word_count>{wordCount}文字（±50文字は許容範囲）</word_count>
+    <tense>{tense}</tense>
+  </narrative_parameters>
+
+  <beat_requirements>
+    {prompt}
+  </beat_requirements>
+
+  <style_guidance>
+    - 現在のシーンのトーンと語りの声を正確に合わせてください
+    - 会話、アクション、内省の確立されたバランスを維持してください
+    - 重要な瞬間、決断のポイント、または自然な転換で終わってください
+  </style_guidance>
+
+  <constraints>
+    - 主要なプロットスレッドや対立を解決しないでください
+    - キャラクターを確立された性格と矛盾する行動をさせないでください
+    - 無関係なサブプロットや重大な新しいストーリー要素を導入しないでください
+    - ビート要件で具体的に要求された以上のことを書かないでください
+  </constraints>
+
+  {rules}
+
+  <output_format>
+    純粋な物語の散文のみ。メタコメント、シーンマーカー、章見出し、作者ノートは不要です。
+  </output_format>
+</beat_generation_task>
+
+ビートを生成してください：</message>
+</messages>

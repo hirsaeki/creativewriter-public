@@ -1,7 +1,7 @@
 import { FavoriteModelLists } from '../../core/models/settings.interface';
 
 export type NarrativePerspective = 'first-person' | 'third-person-limited' | 'third-person-omniscient' | 'second-person';
-export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'custom';
+export type StoryLanguage = 'en' | 'de' | 'fr' | 'es' | 'ja' | 'custom';
 export type StoryTense = 'past' | 'present';
 export type TemplateMode = 'sections' | 'advanced';
 

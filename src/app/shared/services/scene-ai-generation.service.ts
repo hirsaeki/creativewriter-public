@@ -599,6 +599,7 @@ export class SceneAIGenerationService implements OnDestroy {
       case 'de': return 'Antworte auf Deutsch.';
       case 'fr': return 'Réponds en français.';
       case 'es': return 'Responde en español.';
+      case 'ja': return '日本語で回答してください。';
       case 'en': return 'Respond in English.';
       default: return 'Write the summary in the same language as the scene content.';
     }
