@@ -99,7 +99,7 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
 
 ---
 
-### 日本語テンプレート実装（2026-01-26 実装済み・未コミット分あり）
+### 日本語テンプレート実装（2026-01-26 完了）
 
 **実装済み（コミット済み）:**
 - `src/assets/templates/system-message-ja.txt` - AIシステムプロンプト
@@ -109,25 +109,24 @@ This fork uses `sync-upstream.yml` to automatically sync with the upstream repos
 - 言語選択ダイアログに日本語オプション追加
 - `story-list.component.ts`のActionSheetに日本語オプション追加
 - `scene-ai-generation.service.ts`に`case 'ja'`追加
-
-**実装済み（未コミット）:**
 - プロキシ接続テストの修正（HEAD→GET /models）
-  - `claude-api-proxy.service.ts`: `/models`エンドポイント使用
-  - `openrouter-api-proxy.service.ts`: `/models`エンドポイント使用
-- Claudeプロキシ: URLにバージョン込み（`/v1`）で統一（Geminiの`/v1beta`と同様）
-  - `buildProxyApiUrl()`: `/v1/messages` → `/messages`
-  - `buildProxyModelsUrl()`: `/v1/models` → `/models`
+- Claudeプロキシ: URLにバージョン込み（`/v1`）で統一
 
-**未実装・要対応:**
-1. **モデル一覧が表示されない問題**
-   - 原因: プロキシがOpenAI互換形式で返す（`{ id, object, owned_by }`）が、アプリはAnthropic形式（`{ id, display_name, type }`）を期待
-   - 対策案: `model.service.ts`の`transformClaudeModels`で`label: model.display_name || model.id`にフォールバック追加
-   - 注意: upstreamファイル変更のため、コンフリクトリスクあり。custom内でオーバーライド検討も可
+---
 
-2. **Geminiモデル一覧がハードコード**
-   - 現状: `loadGeminiModels()`はプリセット4モデルのみ返す（API未使用）
-   - プロキシはGemini形式（`{ models: [{ name, displayName, ... }] }`）で返す
-   - custom内で`GeminiApiProxyService`にモデル取得機能追加検討
+### プロキシ経由モデル一覧取得（2026-01-26 完了）
+
+**実装済み（コミット済み）:**
+- `model.service.ts:374` - Claudeモデルのlabelにフォールバック追加 (`model.display_name || model.id`)
+- `model.service.ts:34` - `geminiModelsSubject`を`protected`に変更（サブクラスアクセス許可）
+- `gemini-api-proxy.service.ts` - `listModels()`と`isProxyEnabled()`メソッド追加
+- `custom-model.service.ts` (新規) - `ModelService`を拡張し`loadGeminiModels()`をオーバーライド
+- `custom.module.ts` - `{ provide: ModelService, useClass: CustomModelService }` DI設定追加
+
+**動作:**
+- Geminiプロキシが有効な場合、`/models`エンドポイントから動的にモデル一覧を取得
+- プロキシ無効またはエラー時は従来のハードコードモデル（4モデル）にフォールバック
+- `geminiModelsSubject`が更新されるため、`getCurrentGeminiModels()`も正しく動作
 
 **プロキシURL設定ルール（統一済み）:**
 | プロバイダー | URL例 | テスト | API呼び出し |
